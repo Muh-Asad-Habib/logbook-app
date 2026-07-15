@@ -76,12 +76,16 @@ app.use("/api/export", exportRouter);
 app.use("/api/import", importRouter);
 app.use("/api/tunnel", tunnelRouter);
 
-// Panel pemeliharaan — path diambil dari data/admin.json saat request masuk,
+// Panel pemeliharaan — path diambil dari database saat request masuk,
 // jadi bisa diganti tanpa restart. Tidak ada referensi apa pun di frontend.
 app.use((req, res, next) => {
   const base = panelPath();
   if (req.path === base || req.path.startsWith(base + "/")) {
-    req.url = req.url.slice(base.length) || "/";
+    // Potong prefix panel TANPA merusak query string.
+    // (Rewrite Vercel menambahkan "?path=..." — "/pusat-kendali?path=x"
+    //  harus menjadi "/?path=x", bukan "?path=x")
+    const sisa = req.url.slice(base.length);
+    req.url = sisa.startsWith("?") ? "/" + sisa : (sisa || "/");
     return adminRouter(req, res, next);
   }
   next();
