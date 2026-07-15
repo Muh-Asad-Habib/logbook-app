@@ -1,0 +1,25 @@
+{
+  "name": "logbook-backend",
+  "version": "3.0.0",
+  "description": "Logbook Kegiatan & Keuangan — Express + Neon Postgres + ImageKit + Swagger (siap serverless Vercel)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "helmet": "^8.3.0",
+    "jszip": "^3.10.1",
+    "multer": "^2.2.0",
+    "pdfkit": "^0.19.1",
+    "sharp": "^0.35.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
