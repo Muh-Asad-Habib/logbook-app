@@ -1,0 +1,21 @@
+{
+  "name": "logbook-app",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Logbook Kegiatan & Keuangan — Vercel (hosting) + Neon Postgres (data) + ImageKit (foto). 100% gratis, online 24 jam.",
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace frontend",
+    "dev": "npm run dev --workspace backend",
+    "start": "npm run start --workspace backend",
+    "migrate": "node tools/migrate-to-cloud.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

@@ -1,0 +1,27 @@
+# dependensi & hasil build
+node_modules/
+frontend/.next/
+frontend/out/
+.vercel/
+
+# rahasia — JANGAN pernah di-push
+.env
+.env.*
+!.env.example
+
+# data & foto lokal (privat — sudah dimigrasikan ke cloud, tetap jadi cadangan lokal)
+data/
+uploads/
+
+# alat bantu lokal
+tools/cloudflared.exe
+
+# salinan template di root (yang dipakai aplikasi: backend/src/assets/)
+/template-logbook.docx
+
+# lain-lain
+*.log
+.DS_Store
+Thumbs.db
+
+
