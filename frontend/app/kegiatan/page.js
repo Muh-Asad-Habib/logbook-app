@@ -5,6 +5,7 @@ import {
   Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange,
 } from "lucide-react";
 import { api, fotoUrl, fmtDurasi, fmtTgl, useApi, refreshData } from "@/lib/api";
+import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import { toast, confirmDialog } from "@/components/Toast";
 
@@ -199,13 +200,31 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // Waktu tersimpan dalam MENIT (kanonik) — form menerima jam + menit bebas.
+  const totalLama = entri?.waktu_menit ?? 0;
+  const [jam, setJam] = useState(entri ? Math.floor(totalLama / 60) : 0);
+  const [menit, setMenit] = useState(entri ? totalLama % 60 : 0);
+  const totalMenit = Math.round((parseFloat(jam) || 0) * 60 + (parseFloat(menit) || 0));
+
   const submit = async (ev) => {
     ev.preventDefault();
     setBusy(true);
     setErr("");
     const fd = new FormData(ev.target);
+    // Konversi jam+menit → satu nilai menit; field bantu tidak ikut terkirim
+    fd.delete("waktu_jam_input");
+    fd.delete("waktu_menit_input");
+    fd.set("waktu_menit", String(Math.max(0, totalMenit)));
     if (entri) fd.set("keep_keys", JSON.stringify(keep));
     try {
+      // Kompres foto di browser — hindari 413 (limit body ±4,5 MB di Vercel)
+      const totalFoto = await kompresFormFoto(fd, "foto");
+      if (totalFoto > BATAS_UPLOAD) {
+        throw new Error(
+          `Total foto masih ${fmtUkuran(totalFoto)} setelah dikompres — ` +
+          `maksimal ±4 MB per simpan. Kurangi jumlah foto, lalu tambahkan sisanya lewat Edit.`
+        );
+      }
       if (entri) await api.updateKegiatan(entri.id, fd);
       else await api.addKegiatan(fd);
       onSaved(!entri);
@@ -233,11 +252,23 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
                    defaultValue={entri?.capaian_delta ?? 0} />
           </label>
           <label className="field">
-            Waktu (menit)
-            <input type="number" name="waktu_menit" min="0" step="any"
-                   defaultValue={entri?.waktu_menit ?? 0} />
+            Waktu — jam
+            <input type="number" name="waktu_jam_input" min="0" step="any"
+                   value={jam} onChange={(e) => setJam(e.target.value)}
+                   placeholder="0" />
+          </label>
+          <label className="field">
+            Waktu — menit
+            <input type="number" name="waktu_menit_input" min="0" step="any"
+                   value={menit} onChange={(e) => setMenit(e.target.value)}
+                   placeholder="0" />
           </label>
         </div>
+        <p className="muted mts">
+          Boleh diisi salah satu atau keduanya (mis. 1 jam 22 menit, 82 menit, atau 2 jam) —
+          tersimpan &amp; diekspor sebagai <b>{Math.max(0, totalMenit)} menit</b>
+          {totalMenit >= 60 ? ` (${fmtDurasi(Math.max(0, totalMenit))})` : ""}.
+        </p>
         <label className="field mt">
           Deskripsi kegiatan
           <textarea name="kegiatan" required defaultValue={entri?.kegiatan || ""}

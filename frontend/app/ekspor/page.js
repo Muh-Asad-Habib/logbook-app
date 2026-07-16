@@ -33,6 +33,7 @@ export default function EksporPage() {
   const [err, setErr] = useState("");
   const [file, setFile] = useState(null);
   const [busyImpor, setBusyImpor] = useState(false);
+  const [progres, setProgres] = useState(0);
   const [hasilImpor, setHasilImpor] = useState(null);
 
   const loadErr = e1 || e2;
@@ -42,12 +43,12 @@ export default function EksporPage() {
 
   const impor = async () => {
     setBusyImpor(true);
+    setProgres(0);
     setHasilImpor(null);
     setErr("");
     try {
-      const fd = new FormData();
-      if (file) fd.append("file", file);
-      const j = await api.importDocx(fd);
+      // File besar otomatis diunggah terpotong (lolos limit ±4,5 MB Vercel)
+      const j = await api.importDocx(file, setProgres);
       setHasilImpor(j);
       toast.ok(`Impor selesai: ${j.keg_baru + j.keu_baru} entri baru`);
       refreshData();
@@ -56,6 +57,7 @@ export default function EksporPage() {
       toast.err("Impor gagal");
     } finally {
       setBusyImpor(false);
+      setProgres(0);
     }
   };
 
@@ -118,7 +120,9 @@ export default function EksporPage() {
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           <button className="btn primary" onClick={impor} disabled={busyImpor}>
-            {busyImpor ? "Mengimpor…" : <><Upload className="lucide" /> Impor sekarang</>}
+            {busyImpor
+              ? (progres > 0 ? `Mengunggah… ${progres}%` : "Mengimpor…")
+              : <><Upload className="lucide" /> Impor sekarang</>}
           </button>
         </div>
         <p className="muted mts">

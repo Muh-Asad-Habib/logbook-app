@@ -104,6 +104,14 @@ const SKEMA = [
      exp     BIGINT NOT NULL,
      ua_hash TEXT NOT NULL DEFAULT ''
    )`,
+  `CREATE TABLE IF NOT EXISTS import_chunks (
+     id         TEXT NOT NULL,
+     idx        INTEGER NOT NULL,
+     user_id    TEXT NOT NULL,
+     data       TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     PRIMARY KEY (id, idx)
+   )`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */

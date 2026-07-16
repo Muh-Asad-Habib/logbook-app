@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData } from "@/lib/api";
+import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import { toast, confirmDialog } from "@/components/Toast";
 
@@ -231,6 +232,13 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
     setErr("");
     const fd = new FormData(ev.target);
     try {
+      // Kompres bukti di browser — hindari 413 (limit body ±4,5 MB di Vercel)
+      const totalBukti = await kompresFormFoto(fd, "bukti");
+      if (totalBukti > BATAS_UPLOAD) {
+        throw new Error(
+          `Bukti masih ${fmtUkuran(totalBukti)} setelah dikompres — maksimal ±4 MB.`
+        );
+      }
       if (entri) await api.updateKeuangan(entri.id, fd);
       else await api.addKeuangan(fd);
       onSaved(!entri);
