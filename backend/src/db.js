@@ -112,6 +112,13 @@ const SKEMA = [
      created_at TEXT NOT NULL,
      PRIMARY KEY (id, idx)
    )`,
+  `CREATE TABLE IF NOT EXISTS laporan_docx (
+     user_id    TEXT PRIMARY KEY,
+     nama       TEXT NOT NULL DEFAULT 'laporan-kemajuan.docx',
+     data       TEXT NOT NULL,
+     ukuran     INTEGER NOT NULL DEFAULT 0,
+     updated_at TEXT NOT NULL
+   )`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */

@@ -985,3 +985,40 @@ tr.subtotal td {
   }
 }
 
+/* ===== Penampil Laporan Kemajuan (.docx via docx-preview) =====
+ * Dokumen dirender sebagai "halaman" putih persis tampilan Word —
+ * dibiarkan putih juga di mode gelap agar warna dokumen tetap akurat. */
+.docx-card { padding: 12px; }
+.docx-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 240px);
+  border-radius: 12px;
+  background: #52565e;               /* latar abu ala area kerja Word */
+  padding: 18px 8px;
+}
+.docx-wrap .docx-wrapper {
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.docx-wrap .docx {
+  background: #ffffff;
+  color: #000;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Layar sempit: halaman menyesuaikan lebar layar agar tetap terbaca */
+@media (max-width: 760px) {
+  .docx-wrap { padding: 10px 4px; max-height: calc(100vh - 200px); }
+  .docx-wrap .docx {
+    width: 100% !important;
+    min-height: unset !important;
+    padding: 24px 18px !important;
+  }
+}
+

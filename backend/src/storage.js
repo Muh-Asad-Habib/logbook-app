@@ -411,3 +411,46 @@ export async function setSetting(userId, kunci, nilai) {
   );
 }
 
+/* ---------- Laporan kemajuan (.docx — SATU file per user) ----------
+ * Kunci utama = user_id, jadi setiap unggahan baru otomatis MENIMPA
+ * file lama (UPSERT) — tidak pernah ada dua laporan tersimpan. */
+
+export async function saveLaporan(userId, nama, buffer) {
+  await q(
+    `INSERT INTO laporan_docx (user_id, nama, data, ukuran, updated_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
+       data = EXCLUDED.data, ukuran = EXCLUDED.ukuran, updated_at = EXCLUDED.updated_at`,
+    [userId, nama, buffer.toString("base64"), buffer.length, nowIso()]
+  );
+  return { nama, ukuran: buffer.length };
+}
+
+export async function infoLaporan(userId) {
+  const rows = await q(
+    "SELECT nama, ukuran, updated_at FROM laporan_docx WHERE user_id = $1", [userId]
+  );
+  if (!rows[0]) return { ada: false };
+  return {
+    ada: true,
+    nama: rows[0].nama,
+    ukuran: Number(rows[0].ukuran) || 0,
+    updated_at: rows[0].updated_at,
+  };
+}
+
+export async function getLaporan(userId) {
+  const rows = await q(
+    "SELECT nama, data FROM laporan_docx WHERE user_id = $1", [userId]
+  );
+  if (!rows[0]) return null;
+  return { nama: rows[0].nama, buffer: Buffer.from(rows[0].data, "base64") };
+}
+
+export async function deleteLaporan(userId) {
+  const rows = await q(
+    "DELETE FROM laporan_docx WHERE user_id = $1 RETURNING nama", [userId]
+  );
+  return rows.length > 0;
+}
+

@@ -1,0 +1,181 @@
+/**
+ * Laporan Kemajuan (.docx) — SATU file per akun.
+ * Unggahan baru selalu MENGGANTI file lama (UPSERT di storage), jadi tidak
+ * pernah ada dua laporan tersimpan. File besar diunggah terpotong (chunked)
+ * agar lolos batas body ±4,5 MB Vercel — pola yang sama dengan impor DOCX.
+ */
+import { Router } from "express";
+import multer from "multer";
+import * as store from "../storage.js";
+import { authRequired } from "../auth.js";
+import { catatAktivitas } from "../aktivitas.js";
+import { q } from "../db.js";
+
+const MAKS_UKURAN = 40 * 1024 * 1024; // 40 MB — laporan berfoto banyak pun cukup
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAKS_UKURAN, files: 1 },
+});
+
+const router = Router();
+router.use(authRequired);
+
+/** .docx = arsip ZIP → harus berawalan "PK". */
+const validDocx = (buf) =>
+  buf && buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b;
+
+const bersihkanNama = (s) => {
+  const nama = String(s || "laporan-kemajuan.docx")
+    .replace(/[\\/:*?"<>|]/g, "_").trim().slice(0, 120);
+  return nama.toLowerCase().endsWith(".docx") ? nama : `${nama}.docx`;
+};
+
+async function simpan(req, res, nama, buffer) {
+  if (!validDocx(buffer)) {
+    return res.status(400).json({ error: "Berkas bukan dokumen Word (.docx) yang valid" });
+  }
+  if (buffer.length > MAKS_UKURAN) {
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 40 MB)" });
+  }
+  const hasil = await store.saveLaporan(req.userId, bersihkanNama(nama), buffer);
+  catatAktivitas(req.userId, "laporan.unggah", { nama: hasil.nama, ukuran: hasil.ukuran });
+  res.json({ ok: true, ...hasil, catatan: "Laporan lama (bila ada) sudah digantikan" });
+}
+
+/**
+ * @openapi
+ * /api/laporan/info:
+ *   get:
+ *     tags: [Laporan]
+ *     summary: Info laporan kemajuan tersimpan (nama, ukuran, waktu unggah)
+ *     responses:
+ *       200: { description: "{ ada, nama, ukuran, updated_at }" }
+ */
+router.get("/info", async (req, res, next) => {
+  try {
+    res.json(await store.infoLaporan(req.userId));
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /api/laporan/file:
+ *   get:
+ *     tags: [Laporan]
+ *     summary: Unduh/ambil berkas laporan kemajuan (.docx)
+ *     responses:
+ *       200: { description: Berkas .docx }
+ *       404: { description: Belum ada laporan }
+ */
+router.get("/file", async (req, res, next) => {
+  try {
+    const l = await store.getLaporan(req.userId);
+    if (!l) return res.status(404).json({ error: "Belum ada laporan tersimpan" });
+    res.setHeader("Content-Type",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const unduh = req.query.unduh ? "attachment" : "inline";
+    res.setHeader("Content-Disposition",
+      `${unduh}; filename="${encodeURIComponent(l.nama)}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(l.buffer);
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /api/laporan:
+ *   post:
+ *     tags: [Laporan]
+ *     summary: Unggah laporan kemajuan (.docx) — menggantikan laporan lama
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Tersimpan (file lama digantikan) }
+ *       400: { description: Berkas tidak valid }
+ *   delete:
+ *     tags: [Laporan]
+ *     summary: Hapus laporan kemajuan tersimpan
+ *     responses:
+ *       200: { description: Terhapus }
+ */
+router.post("/", upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file?.buffer) return res.status(400).json({ error: "Pilih berkas .docx dahulu" });
+    await simpan(req, res, req.file.originalname, req.file.buffer);
+  } catch (err) { next(err); }
+});
+
+router.delete("/", async (req, res, next) => {
+  try {
+    const ada = await store.deleteLaporan(req.userId);
+    if (!ada) return res.status(404).json({ error: "Belum ada laporan tersimpan" });
+    catatAktivitas(req.userId, "laporan.hapus", {});
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+/* ============ unggah terpotong (file > ±3 MB) ============
+ * Memakai tabel import_chunks yang sama dengan impor DOCX
+ * (id unggahan berbeda, terikat user_id, dibersihkan otomatis). */
+const CHUNK_MAX_B64 = 3.5 * 1024 * 1024;
+const CHUNK_MAX_IDX = 60;
+const ID_RE = /^[a-z0-9-]{8,64}$/;
+
+router.post("/chunk", async (req, res, next) => {
+  try {
+    const { id, idx, data } = req.body || {};
+    const i = Number(idx);
+    if (!ID_RE.test(String(id || "")) || !Number.isInteger(i) || i < 0 || i > CHUNK_MAX_IDX) {
+      return res.status(400).json({ error: "id/idx potongan tidak valid" });
+    }
+    if (typeof data !== "string" || !data || data.length > CHUNK_MAX_B64 ||
+        !/^[A-Za-z0-9+/=]+$/.test(data)) {
+      return res.status(400).json({ error: "data potongan tidak valid (harus base64 ≤ 3,5 MB)" });
+    }
+    await q(
+      `INSERT INTO import_chunks (id, idx, user_id, data, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id, idx) DO UPDATE SET data = EXCLUDED.data,
+         user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at`,
+      [id, i, req.userId, data, new Date().toISOString()]
+    );
+    res.json({ ok: true, idx: i });
+  } catch (err) { next(err); }
+});
+
+router.post("/selesai", async (req, res, next) => {
+  const id = String(req.body?.id || "");
+  try {
+    const total = Number(req.body?.total);
+    if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
+      return res.status(400).json({ error: "id/total tidak valid" });
+    }
+    const rows = await q(
+      "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
+      [id, req.userId]
+    );
+    if (rows.length !== total) {
+      return res.status(400).json({
+        error: `Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`,
+      });
+    }
+    const buffer = Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
+    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId]);
+    await simpan(req, res, req.body?.nama, buffer);
+  } catch (err) {
+    q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId])
+      .catch(() => {});
+    next(err);
+  }
+});
+
+export default router;
+
