@@ -60,6 +60,10 @@ async function parse(res) {
     try {
       msg = (await res.json()).error || msg;
     } catch {}
+    if (res.status === 413) {
+      msg = "Ukuran unggahan melebihi batas server (±4,5 MB per permintaan) — " +
+            "kurangi jumlah/ukuran foto lalu coba lagi.";
+    }
     throw new Error(msg);
   }
   return res.json();
@@ -195,7 +199,43 @@ export const api = {
   statistik: () => aFetch("/api/statistik", { cache: "no-store" }),
 
   // ---- Impor ----
-  importDocx: (formData) => aFetch("/api/import/docx", { method: "POST", body: formData }),
+  /**
+   * Impor .docx. File kecil dikirim sekali jalan; file besar otomatis
+   * dipotong ±2 MB per request (batas keras Vercel ±4,5 MB → dulu 413).
+   * @param {File|null} file  berkas .docx (null → server pakai template bawaan)
+   * @param {(persen:number)=>void} [onProgress]
+   */
+  importDocx: async (file, onProgress) => {
+    const LANGSUNG_MAKS = 3 * 1024 * 1024; // ≤3 MB → satu request multipart
+    if (!file || file.size <= LANGSUNG_MAKS) {
+      const fd = new FormData();
+      if (file) fd.append("file", file);
+      return aFetch("/api/import/docx", { method: "POST", body: fd });
+    }
+    const CHUNK = 2 * 1024 * 1024; // biner per potongan (base64 ≈ 2,7 MB)
+    const id = `imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const total = Math.ceil(file.size / CHUNK);
+    for (let i = 0; i < total; i++) {
+      const potong = file.slice(i * CHUNK, (i + 1) * CHUNK);
+      const b64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] || "");
+        r.onerror = () => reject(new Error("Gagal membaca berkas"));
+        r.readAsDataURL(potong);
+      });
+      await aFetch("/api/import/docx/chunk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, idx: i, data: b64 }),
+      });
+      onProgress?.(Math.round(((i + 1) / (total + 1)) * 100));
+    }
+    return aFetch("/api/import/docx/selesai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, total }),
+    });
+  },
 };
 
 /** URL gambar di server (perlu token karena <img> tidak bisa kirim header). */

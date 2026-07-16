@@ -30,7 +30,9 @@ app.use(
 );
 app.use(cors()); // API terbuka — bisa dipanggil dari mana saja
 app.use(compression()); // gzip — payload JSON/HTML/JS jauh lebih kecil
-app.use(express.json());
+// limit 4mb: potongan impor .docx (base64 ±2,7 MB per request) tetap di bawah
+// batas keras Vercel ±4,5 MB per request
+app.use(express.json({ limit: "4mb" }));
 
 /**
  * Inisialisasi asinkron SEKALI per proses:

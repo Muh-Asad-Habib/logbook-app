@@ -243,25 +243,70 @@ function fillMissingDates(tblXml, entries, style) {
 }
 
 /**
- * Isi satu tabel: entri baru → baris kosong pertama (atau baris tambahan);
- * baris kosong yang tersisa DIHAPUS agar dokumen rapi.
+ * Kunci pencocokan sebuah baris data: teks KOLOM ISI (sel ke-2 —
+ * "Kegiatan"/"Item") yang dinormalisasi. Pencocokan per-baris ini
+ * menggantikan pencarian substring atas seluruh teks tabel, yang dulu
+ * membuat entri baru salah terdeteksi "sudah ada" (mis. deskripsi pendek
+ * atau berawalan sama dengan teks lain) sehingga tak pernah diekspor.
+ */
+function rowKey(tr) {
+  const cells = tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [];
+  if (cells.length < 2) return "";
+  return norm(textOf(cells[1]));
+}
+
+/** Ganti isi sel tertentu sebuah baris berdasarkan indeks (properti sel dipertahankan). */
+function replaceCells(trXml, perIdx) {
+  let i = 0;
+  return trXml.replace(/<w:tc>[\s\S]*?<\/w:tc>/g, (cell) => {
+    const content = perIdx[i];
+    i += 1;
+    if (content === undefined) return cell;
+    const tcPr = (cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || [""])[0];
+    return `<w:tc>${tcPr}${content}</w:tc>`;
+  });
+}
+
+/**
+ * Isi satu tabel:
+ * - baris lama yang cocok (kolom isinya sama) → sel data lainnya DISEGARKAN
+ *   dengan nilai terbaru aplikasi (tanggal/capaian/waktu dsb; foto dibiarkan),
+ *   sehingga hasil edit di aplikasi ikut terbawa ke dokumen;
+ * - entri tanpa baris cocok → baris kosong pertama (atau baris tambahan);
+ * - baris kosong yang tersisa DIHAPUS agar dokumen rapi.
  * @returns {added, skipped, xml}
  */
-function fillTable(tblXml, entries, buildCells) {
-  const docText = normText(textOf(tblXml));
+function fillTable(tblXml, entries, buildCells, refreshRow) {
+  let xml = tblXml;
   const rows = rowsOf(tblXml);
   const emptyRows = rows.filter((r) => isEmptyRow(r) && cellCount(r) >= 2);
   const templateRow = emptyRows[0] || rows[rows.length - 1];
 
+  // Peta baris data lama: kunci kolom isi → baris (masing-masing sekali pakai)
+  const lama = new Map();
+  rows.forEach((row, i) => {
+    if (i === 0 || isHeaderRow(row) || isEmptyRow(row)) return;
+    const k = rowKey(row);
+    if (k && !lama.has(k)) lama.set(k, row);
+  });
+
   let added = 0, skipped = 0;
   const newRows = [];
   for (const e of entries) {
-    if (docText.includes(e.dedup)) { skipped += 1; continue; }
+    const cocok = lama.get(e.dedup);
+    if (cocok) {
+      lama.delete(e.dedup); // satu baris hanya untuk satu entri
+      skipped += 1;
+      if (refreshRow) {
+        const baru = refreshRow(cocok, e);
+        if (baru && baru !== cocok) xml = xml.replace(cocok, () => baru);
+      }
+      continue;
+    }
     newRows.push(fillRow(templateRow, buildCells(e)));
     added += 1;
   }
 
-  let xml = tblXml;
   // Gantikan baris kosong dengan baris terisi; sisa baris kosong dibuang.
   emptyRows.forEach((er, i) => {
     const isi = i < newRows.length ? newRows[i] : "";
@@ -274,14 +319,29 @@ function fillTable(tblXml, entries, buildCells) {
   return { added, skipped, xml };
 }
 
-/** Entri yang BELUM ada di dokumen (untuk ditampilkan di UI). */
+/** Entri yang BELUM ada di dokumen (untuk ditampilkan di UI).
+ *  Memakai pencocokan per-baris yang sama dengan fillTable agar angkanya
+ *  konsisten dengan hasil ekspor sesungguhnya. */
 export async function entriesToExport(userId) {
   if (!_docXmlCache) await warmTemplate();
-  // Akun selain pemilik template memakai template kosong → semua entrinya dihitung baru.
-  const docText = (await store.isDefaultUser(userId)) ? normText(textOf(_docXmlCache)) : "";
-  const inDoc = (k) => k !== "" && docText.includes(k);
-  const keg = (await store.listKegiatan(userId)).filter((e) => !inDoc(norm(e.kegiatan)));
-  const keu = (await store.listKeuangan(userId)).filter((e) => !inDoc(norm(e.item)));
+  const kunciKeg = new Set();
+  const kunciKeu = new Set();
+  // Akun selain pemilik template memakai template kosong → semua entrinya baru.
+  if (await store.isDefaultUser(userId)) {
+    const tables = _docXmlCache.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [];
+    const kumpul = (tbl, set) => {
+      if (!tbl) return;
+      rowsOf(tbl).forEach((row, i) => {
+        if (i === 0 || isHeaderRow(row) || isEmptyRow(row)) return;
+        const k = rowKey(row);
+        if (k) set.add(k);
+      });
+    };
+    kumpul(tables[0], kunciKeg);
+    kumpul(tables[1], kunciKeu);
+  }
+  const keg = (await store.listKegiatan(userId)).filter((e) => !kunciKeg.has(norm(e.kegiatan)));
+  const keu = (await store.listKeuangan(userId)).filter((e) => !kunciKeu.has(norm(e.item)));
   return { kegiatan: keg.length, keuangan: keu.length };
 }
 
@@ -349,7 +409,12 @@ export async function buildDocx(userId) {
       .join("") || emptyP();
     return [P(fmtTgl(e.tanggal), stKeg[0]), P(e.kegiatan, stKeg[1]),
             P(`${e.capaian_total}%`, stKeg[2]), P(String(e.waktu_menit), stKeg[3]), fotoXml];
-  });
+  }, (row, e) => replaceCells(row, {
+    // baris lama yang cocok → segarkan tanggal/capaian/waktu (teks & foto dibiarkan)
+    0: P(fmtTgl(e.tanggal), stKeg[0]),
+    2: P(`${e.capaian_total}%`, stKeg[2]),
+    3: P(String(e.waktu_menit), stKeg[3]),
+  }));
 
   // ---- Tabel keuangan: Tanggal | Item | Harga | Jumlah | Total | Bukti ----
   const keuEntries = keuList.map((e) => ({ ...e, dedup: norm(e.item) }));
@@ -363,7 +428,13 @@ export async function buildDocx(userId) {
       P(String(e.jumlah), stKeu[3]), P(fmtRupiah(e.total), stKeu[4]),
       bukti ? `<w:p>${stKeu[5]?.pPr || ""}<w:r>${bukti}</w:r></w:p>` : emptyP(),
     ];
-  });
+  }, (row, e) => replaceCells(row, {
+    // baris lama yang cocok → segarkan tanggal/harga/jumlah/total (bukti dibiarkan)
+    0: P(fmtTgl(e.tanggal), stKeu[0]),
+    2: P(`${fmtRupiah(e.harga_satuan)}${e.satuan_suffix || ""}`, stKeu[2]),
+    3: P(String(e.jumlah), stKeu[3]),
+    4: P(fmtRupiah(e.total), stKeu[4]),
+  }));
 
   // Susun ulang dokumen (ganti kedua tabel sesuai urutan)
   let idx = 0;

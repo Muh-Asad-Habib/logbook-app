@@ -25,3 +25,5 @@ tools/cloudflared.exe
 Thumbs.db
 
 
+.vercel
+.env*
