@@ -9,7 +9,8 @@ export default function Prefetch() {
   useEffect(() => {
     // Beri jeda singkat agar data halaman aktif dimuat lebih dulu
     const t = setTimeout(() => {
-      ["/api/statistik", "/api/kegiatan", "/api/keuangan", "/api/export/info", "/api/tunnel"]
+      ["/api/statistik", "/api/kegiatan", "/api/keuangan", "/api/export/info",
+       "/api/laporan/info", "/api/tunnel"]
         .forEach(preload);
     }, 250);
     return () => clearTimeout(t);

@@ -14,7 +14,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpenText, LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
-  Settings, LogOut, Sun, Moon, Plus, ChevronUp, PanelLeftClose, PanelLeftOpen,
+  FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, PanelLeftClose, PanelLeftOpen,
   Target, Flame, Banknote,
   Link as LinkIcon, Copy, Check,
 } from "lucide-react";
@@ -26,6 +26,7 @@ const MENU = [
   { href: "/", label: "Dashboard", Ic: LayoutDashboard },
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
+  { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
   { href: "/galeri", label: "Galeri", Ic: Images },
   { href: "/ekspor", label: "Ekspor", Ic: FileOutput },
 ];
@@ -34,6 +35,7 @@ const JUDUL = {
   "/": "Dashboard",
   "/kegiatan": "Kegiatan",
   "/keuangan": "Keuangan",
+  "/laporan": "Laporan Kemajuan",
   "/galeri": "Galeri",
   "/ekspor": "Ekspor / Impor",
   "/profil": "Pengaturan akun",
@@ -291,9 +293,9 @@ export default function Shell({ children }) {
 
       {/* ===== Bottom-nav (mobile) ===== */}
       <nav className="bottom-nav">
-        {MENU.map(({ href, label, Ic }) => (
+        {MENU.map(({ href, label, pendek, Ic }) => (
           <Link key={href} href={href} className={path === href ? "active" : ""}>
-            <Ic className="lucide" /> {label}
+            <Ic className="lucide" /> {pendek || label}
           </Link>
         ))}
       </nav>

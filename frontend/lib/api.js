@@ -146,6 +146,38 @@ export function useApi(path) {
   return { data: cache.get(path), error: errors.get(path) };
 }
 
+/* ---------- Unggah terpotong (chunked) ----------
+ * Vercel menolak body > ±4,5 MB per request. File besar dipotong ±2 MB
+ * (base64) lalu dirakit kembali di server. Dipakai impor DOCX & laporan. */
+const CHUNK = 2 * 1024 * 1024;
+
+async function uploadChunked(basePath, file, onProgress, extra = {}) {
+  const id = `up-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const total = Math.ceil(file.size / CHUNK);
+  for (let i = 0; i < total; i++) {
+    const potong = file.slice(i * CHUNK, (i + 1) * CHUNK);
+    const b64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1] || "");
+      r.onerror = () => reject(new Error("Gagal membaca berkas"));
+      r.readAsDataURL(potong);
+    });
+    await aFetch(`${basePath}/chunk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, idx: i, data: b64 }),
+    });
+    onProgress?.(Math.round(((i + 1) / (total + 1)) * 100));
+  }
+  return aFetch(`${basePath}/selesai`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, total, ...extra }),
+  });
+}
+
+const LANGSUNG_MAKS = 3 * 1024 * 1024; // ≤3 MB → satu request multipart
+
 export const api = {
   // ---- Auth ----
   register: (username, password) =>
@@ -206,35 +238,36 @@ export const api = {
    * @param {(persen:number)=>void} [onProgress]
    */
   importDocx: async (file, onProgress) => {
-    const LANGSUNG_MAKS = 3 * 1024 * 1024; // ≤3 MB → satu request multipart
     if (!file || file.size <= LANGSUNG_MAKS) {
       const fd = new FormData();
       if (file) fd.append("file", file);
       return aFetch("/api/import/docx", { method: "POST", body: fd });
     }
-    const CHUNK = 2 * 1024 * 1024; // biner per potongan (base64 ≈ 2,7 MB)
-    const id = `imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    const total = Math.ceil(file.size / CHUNK);
-    for (let i = 0; i < total; i++) {
-      const potong = file.slice(i * CHUNK, (i + 1) * CHUNK);
-      const b64 = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result).split(",")[1] || "");
-        r.onerror = () => reject(new Error("Gagal membaca berkas"));
-        r.readAsDataURL(potong);
-      });
-      await aFetch("/api/import/docx/chunk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, idx: i, data: b64 }),
-      });
-      onProgress?.(Math.round(((i + 1) / (total + 1)) * 100));
+    return uploadChunked("/api/import/docx", file, onProgress);
+  },
+
+  // ---- Laporan kemajuan (.docx — satu file, unggahan baru mengganti lama) ----
+  laporanInfo: () => aFetch("/api/laporan/info", { cache: "no-store" }),
+  uploadLaporan: async (file, onProgress) => {
+    if (file.size <= LANGSUNG_MAKS) {
+      const fd = new FormData();
+      fd.append("file", file);
+      return aFetch("/api/laporan", { method: "POST", body: fd });
     }
-    return aFetch("/api/import/docx/selesai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, total }),
+    return uploadChunked("/api/laporan", file, onProgress, { nama: file.name });
+  },
+  deleteLaporan: () => aFetch("/api/laporan", { method: "DELETE" }),
+  /** Ambil berkas laporan sebagai ArrayBuffer (untuk dirender docx-preview). */
+  laporanFile: async () => {
+    const res = await fetch(`${API_URL}/api/laporan/file`, {
+      headers: authHeaders(), cache: "no-store",
     });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch {}
+      throw new Error(msg);
+    }
+    return res.arrayBuffer();
   },
 };
 
