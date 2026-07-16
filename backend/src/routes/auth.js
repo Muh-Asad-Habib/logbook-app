@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as store from "../storage.js";
 import { verifyPassword } from "../passwords.js";
-import { authRequired } from "../auth.js";
+import { authRequired, lupakanSesi } from "../auth.js";
 import { catatAktivitas, bacaAktivitas } from "../aktivitas.js";
 import { rateLimit } from "../ratelimit.js";
 
@@ -126,6 +126,7 @@ router.get("/me", authRequired, (req, res) => {
 router.post("/logout", authRequired, async (req, res, next) => {
   try {
     await store.deleteSession(req.token);
+    lupakanSesi(req.token); // cache sesi ikut dibuang — token langsung tidak sah
     catatAktivitas(req.userId, "akun.keluar", {});
     res.json({ ok: true });
   } catch (err) {

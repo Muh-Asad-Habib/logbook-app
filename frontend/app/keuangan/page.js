@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData } from "@/lib/api";
-import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran } from "@/lib/foto";
+import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import { toast, confirmDialog } from "@/components/Toast";
 
@@ -150,7 +150,7 @@ export default function KeuanganPage() {
                     <td>
                       {r.e.bukti_key ? (
                         <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
-                             onClick={() => bukaBukti(r.e)}
+                             onError={retryFoto} onClick={() => bukaBukti(r.e)}
                              style={{ width: 44, height: 44, objectFit: "cover",
                                       borderRadius: 8, cursor: "zoom-in" }} />
                       ) : "—"}
@@ -185,7 +185,7 @@ export default function KeuanganPage() {
                   {e.bukti_key && (
                     <div className="foto-row">
                       <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
-                           onClick={() => bukaBukti(e)} />
+                           onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}
                 </div>

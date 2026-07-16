@@ -16,6 +16,27 @@ const LEWATI_DI_BAWAH = 300 * 1024;   // foto kecil dikirim apa adanya
 /** Batas aman total upload per request (limit keras Vercel ±4,5 MB). */
 export const BATAS_UPLOAD = 4 * 1024 * 1024;
 
+/**
+ * Muat ulang <img> yang gagal dimuat (onError) — browser TIDAK mengulang
+ * gambar gagal secara otomatis, jadi kegagalan sesaat (timeout serverless /
+ * database saat puluhan foto diminta serentak) membuat ikon rusak permanen
+ * sampai halaman di-reload. Handler ini mencoba ulang maks. 3× dengan jeda
+ * bertingkat + parameter cache-bust agar request benar-benar baru.
+ * Pakai: <img src={fotoUrl(k)} onError={retryFoto} … />
+ */
+export function retryFoto(ev) {
+  const img = ev?.currentTarget || ev?.target;
+  if (!img || !img.src) return;
+  const n = Number(img.dataset.retry || 0);
+  if (n >= 3) return;
+  img.dataset.retry = String(n + 1);
+  const asli = img.dataset.srcAsli || img.src.replace(/[?&]rf=\d+/g, "");
+  img.dataset.srcAsli = asli;
+  setTimeout(() => {
+    img.src = `${asli}${asli.includes("?") ? "&" : "?"}rf=${Date.now()}`;
+  }, 700 * (n + 1));
+}
+
 export const fmtUkuran = (b) =>
   b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(b / 1024)} KB`;
 

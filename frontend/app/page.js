@@ -7,6 +7,7 @@ import {
   TrendingUp, ChartColumn, ChartPie, Banknote, History, Save, Check, Plus, NotebookPen,
 } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate } from "@/lib/api";
+import { retryFoto } from "@/lib/foto";
 import {
   Gauge, Heatmap, AreaChart, BarChart, Breakdown, Sparkline,
 } from "@/components/Charts";
@@ -224,7 +225,7 @@ export default function Dashboard() {
                 <div className="tl-dot" />
                 <div className="tl-card">
                   {e.foto_keys.length > 0
-                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])} alt=""
+                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])} alt="" onError={retryFoto}
                            onClick={() => setLb({
                              items: e.foto_keys.map((k) => ({
                                src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.kegiatan.slice(0, 90),
