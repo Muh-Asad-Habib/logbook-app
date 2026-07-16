@@ -986,39 +986,39 @@ tr.subtotal td {
 }
 
 /* ===== Penampil Laporan Kemajuan (.docx via docx-preview) =====
- * Dokumen dirender sebagai "halaman" putih persis tampilan Word —
- * dibiarkan putih juga di mode gelap agar warna dokumen tetap akurat. */
-.docx-card { padding: 12px; }
-.docx-wrap {
-  overflow: auto;
-  max-height: calc(100vh - 240px);
+ * Dokumen dirender DI DALAM IFRAME terisolasi — CSS aplikasi tidak
+ * menyentuh isinya sama sekali, jadi tampilannya setia seperti Word. */
+.docx-card { padding: 14px; }
+.docx-bar { margin-bottom: 10px; gap: 8px; }
+.docx-nama {
+  display: block; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.docx-meta { display: block; font-size: 0.8rem; margin-top: 2px; }
+.docx-tools { gap: 6px; flex-wrap: nowrap; align-items: center; }
+.docx-zoom {
+  min-width: 46px; text-align: center; font-weight: 700; font-size: 0.82rem;
+  font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.docx-frame-wrap {
+  position: relative;
+  height: calc(100vh - 300px);
+  min-height: 460px;
   border-radius: 12px;
-  background: #52565e;               /* latar abu ala area kerja Word */
-  padding: 18px 8px;
+  overflow: hidden;
+  background: #525659;
+  border: 1px solid var(--line);
 }
-.docx-wrap .docx-wrapper {
-  background: transparent;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
+.docx-frame { width: 100%; height: 100%; border: 0; display: block; }
+.docx-loading {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: #e8eaf1; font-weight: 600; background: rgba(82, 86, 89, 0.85);
 }
-.docx-wrap .docx {
-  background: #ffffff;
-  color: #000;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  border-radius: 3px;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-/* Layar sempit: halaman menyesuaikan lebar layar agar tetap terbaca */
+.docx-spin { animation: docxspin 0.9s linear infinite; }
+@keyframes docxspin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) {
-  .docx-wrap { padding: 10px 4px; max-height: calc(100vh - 200px); }
-  .docx-wrap .docx {
-    width: 100% !important;
-    min-height: unset !important;
-    padding: 24px 18px !important;
-  }
+  .docx-frame-wrap { height: calc(100vh - 250px); min-height: 380px; }
+  .docx-bar { flex-direction: column; align-items: flex-start; }
 }
 

@@ -3,15 +3,18 @@
 /**
  * Laporan Kemajuan — unggah & tampilkan dokumen Word (.docx).
  *
- * - Penampil memakai docx-preview: dokumen dirender per halaman lengkap
- *   dengan gaya, tabel, dan gambarnya — tampil rapi seperti dibuka di Word.
- * - Penyimpanan hanya SATU file per akun: setiap unggahan baru otomatis
- *   MENGGANTIKAN laporan lama (tidak pernah ada dua file tersimpan).
- * - File besar diunggah terpotong agar lolos batas ±4,5 MB Vercel.
+ * Penampil: docx-preview dirender ke dalam IFRAME terisolasi sehingga CSS
+ * aplikasi tidak menyentuh isi dokumen — halaman, font, tabel, dan gambar
+ * tampil persis seperti dibuka di Word. Lebar otomatis menyesuaikan layar
+ * (auto-fit) dan ada kontrol zoom.
+ *
+ * Penyimpanan hanya SATU file per akun: unggahan baru otomatis MENGGANTIKAN
+ * laporan lama. File besar diunggah terpotong (lolos batas ±4,5 MB Vercel).
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  FileText, Upload, Download, Trash2, RefreshCw, Info, TriangleAlert,
+  FileText, Upload, Download, Trash2, Info, TriangleAlert,
+  ZoomIn, ZoomOut, Maximize, Loader,
 } from "lucide-react";
 import { api, exportUrl, useApi, revalidate, fmtTgl } from "@/lib/api";
 import { toast, confirmDialog } from "@/components/Toast";
@@ -27,6 +30,25 @@ const fmtWaktu = (iso) => {
   return `${fmtTgl(iso.slice(0, 10))} · ${jam}`;
 };
 
+/* Gaya dasar DI DALAM iframe — meniru area kerja Word (latar abu, halaman
+ * putih ber-bayangan). Isi dokumen memakai style bawaan docx-preview. */
+const GAYA_IFRAME = `
+  html, body { margin: 0; padding: 0; background: #525659; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #7a7d84; border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .docx-wrapper {
+    background: transparent !important;
+    padding: 22px 14px !important;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .docx-wrapper > section.docx {
+    box-shadow: 0 5px 22px rgba(0, 0, 0, 0.45) !important;
+    margin-bottom: 22px !important;
+  }
+  .docx-wrapper > section.docx:last-child { margin-bottom: 0 !important; }
+`;
+
 export default function LaporanPage() {
   const { data: info, error: infoErr } = useApi("/api/laporan/info");
   const [file, setFile] = useState(null);
@@ -34,29 +56,66 @@ export default function LaporanPage() {
   const [progres, setProgres] = useState(0);
   const [err, setErr] = useState("");
   const [memuat, setMemuat] = useState(false);
-  const wadahRef = useRef(null);
+  const [zoomPct, setZoomPct] = useState(null); // tampilan angka % di toolbar
+  const frameRef = useRef(null);
   const inputRef = useRef(null);
+  const zoomRef = useRef(null);       // null = auto-fit; angka = zoom manual
+  const lebarHalamanRef = useRef(0);  // lebar asli halaman pertama (px)
 
-  /* Render dokumen ke wadah — dipanggil saat info berubah (ada laporan). */
+  /* Terapkan zoom: auto-fit (pas lebar) atau persentase manual. */
+  const terapkanZoom = useCallback(() => {
+    const iframe = frameRef.current;
+    const doc = iframe?.contentDocument;
+    if (!doc?.body || !lebarHalamanRef.current) return;
+    const fit = Math.min(1, (iframe.clientWidth - 30) / lebarHalamanRef.current);
+    const z = zoomRef.current ?? fit;
+    doc.body.style.zoom = String(z);
+    setZoomPct(Math.round(z * 100));
+  }, []);
+
+  const ubahZoom = (langkah) => {
+    const kini = zoomRef.current ?? (zoomPct || 100) / 100;
+    zoomRef.current = Math.min(3, Math.max(0.3, kini + langkah));
+    terapkanZoom();
+  };
+  const zoomPas = () => { zoomRef.current = null; terapkanZoom(); };
+
+  /* Render dokumen ke dalam iframe — terisolasi dari CSS aplikasi. */
   useEffect(() => {
     let batal = false;
     async function render() {
-      if (!info?.ada || !wadahRef.current) return;
+      if (!info?.ada || !frameRef.current) return;
       setMemuat(true);
       setErr("");
       try {
         const [buf, docx] = await Promise.all([
           api.laporanFile(),
-          import("docx-preview"), // dimuat di browser saja (butuh DOM)
+          import("docx-preview"), // hanya di browser (butuh DOM)
         ]);
-        if (batal || !wadahRef.current) return;
-        wadahRef.current.innerHTML = "";
-        await docx.renderAsync(buf, wadahRef.current, undefined, {
+        if (batal || !frameRef.current) return;
+        const doc = frameRef.current.contentDocument;
+        doc.head.innerHTML = "";
+        doc.body.innerHTML = "";
+        const style = doc.createElement("style");
+        style.textContent = GAYA_IFRAME;
+        doc.head.appendChild(style);
+        await docx.renderAsync(buf, doc.body, doc.head, {
           className: "docx",
           inWrapper: true,
+          breakPages: true,
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: true,
+          renderEndnotes: true,
           ignoreLastRenderedPageBreak: false,
+          useBase64URL: true, // gambar & font tersemat jadi data-URL (aman di iframe)
           experimental: true,
         });
+        if (batal) return;
+        const halaman = doc.querySelector("section.docx");
+        lebarHalamanRef.current = halaman ? halaman.offsetWidth : 0;
+        zoomRef.current = null; // mulai dari auto-fit
+        terapkanZoom();
       } catch (e) {
         if (!batal) setErr(`Gagal menampilkan dokumen: ${e.message}`);
       } finally {
@@ -65,7 +124,14 @@ export default function LaporanPage() {
     }
     render();
     return () => { batal = true; };
-  }, [info?.ada, info?.updated_at]);
+  }, [info?.ada, info?.updated_at, terapkanZoom]);
+
+  /* Auto-fit ulang saat ukuran jendela berubah. */
+  useEffect(() => {
+    const onResize = () => { if (zoomRef.current == null) terapkanZoom(); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [terapkanZoom]);
 
   const unggah = async () => {
     if (!file) { toast.err("Pilih berkas .docx dahulu"); return; }
@@ -100,7 +166,6 @@ export default function LaporanPage() {
     try {
       await api.deleteLaporan();
       toast.ok("Laporan dihapus");
-      if (wadahRef.current) wadahRef.current.innerHTML = "";
       revalidate("/api/laporan/info").catch(() => {});
     } catch (e) {
       toast.err(`Gagal menghapus: ${e.message}`);
@@ -148,38 +213,50 @@ export default function LaporanPage() {
         </div>
       )}
 
-      {/* ===== Info + aksi ===== */}
-      {info?.ada && (
-        <div className="card mt">
-          <div className="row spread">
-            <div style={{ minWidth: 0 }}>
-              <b>{info.nama}</b>
-              <p className="muted mts" style={{ marginBottom: 0 }}>
-                {fmtUkuran(info.ukuran)} · diunggah {fmtWaktu(info.updated_at)}
-              </p>
-            </div>
-            <div className="row" style={{ marginTop: 0 }}>
-              <a className="btn" style={{ textDecoration: "none" }}
-                 href={`${exportUrl("/api/laporan/file")}&unduh=1`}>
-                <Download className="lucide" /> Unduh
-              </a>
-              <button className="btn danger" onClick={hapus}>
-                <Trash2 className="lucide" /> Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ===== Penampil dokumen ===== */}
       {info?.ada ? (
         <div className="card mt docx-card">
-          {memuat && (
-            <p className="muted" style={{ padding: "14px 0" }}>
-              <RefreshCw className="lucide" /> Merender dokumen…
-            </p>
-          )}
-          <div ref={wadahRef} className="docx-wrap" />
+          <div className="row spread docx-bar">
+            <div style={{ minWidth: 0 }}>
+              <b className="docx-nama">{info.nama}</b>
+              <span className="muted docx-meta">
+                {fmtUkuran(info.ukuran)} · {fmtWaktu(info.updated_at)}
+              </span>
+            </div>
+            <div className="row docx-tools" style={{ marginTop: 0 }}>
+              <button className="btn sm" onClick={() => ubahZoom(-0.1)} title="Perkecil">
+                <ZoomOut className="lucide" />
+              </button>
+              <span className="docx-zoom">{memuat ? "…" : `${zoomPct ?? 100}%`}</span>
+              <button className="btn sm" onClick={() => ubahZoom(0.1)} title="Perbesar">
+                <ZoomIn className="lucide" />
+              </button>
+              <button className="btn sm" onClick={zoomPas} title="Pas lebar layar">
+                <Maximize className="lucide" />
+              </button>
+              <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
+                 href={`${exportUrl("/api/laporan/file")}&unduh=1`}>
+                <Download className="lucide" />
+              </a>
+              <button className="btn sm danger" onClick={hapus} title="Hapus laporan">
+                <Trash2 className="lucide" />
+              </button>
+            </div>
+          </div>
+
+          <div className="docx-frame-wrap">
+            {memuat && (
+              <div className="docx-loading">
+                <Loader className="lucide docx-spin" /> Merender dokumen…
+              </div>
+            )}
+            <iframe
+              ref={frameRef}
+              title="Pratinjau laporan kemajuan"
+              className="docx-frame"
+              sandbox="allow-same-origin"
+            />
+          </div>
         </div>
       ) : (
         info && !info.ada && (
