@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { retryFoto } from "@/lib/foto";
 
 export default function Lightbox({ items, index = 0, onClose }) {
   const [i, setI] = useState(index);
@@ -76,7 +77,7 @@ export default function Lightbox({ items, index = 0, onClose }) {
           <ChevronLeft className="lucide" />
         </button>
       )}
-      <img key={it.src} src={it.src} alt={it.judul || "foto"} />
+      <img key={it.src} src={it.src} alt={it.judul || "foto"} onError={retryFoto} />
       {n > 1 && (
         <button type="button" className="lb-btn lb-next" onClick={next} aria-label="Berikutnya">
           <ChevronRight className="lucide" />
