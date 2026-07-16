@@ -257,6 +257,8 @@ export const api = {
     return uploadChunked("/api/laporan", file, onProgress, { nama: file.name });
   },
   deleteLaporan: () => aFetch("/api/laporan", { method: "DELETE" }),
+  /** Tautan publik sementara (30 mnt) — dipakai penampil Microsoft Office. */
+  laporanTautan: () => aFetch("/api/laporan/tautan", { method: "POST" }),
   /** Ambil berkas laporan sebagai ArrayBuffer (untuk dirender docx-preview). */
   laporanFile: async () => {
     const res = await fetch(`${API_URL}/api/laporan/file`, {

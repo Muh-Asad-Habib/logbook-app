@@ -119,6 +119,11 @@ const SKEMA = [
      ukuran     INTEGER NOT NULL DEFAULT 0,
      updated_at TEXT NOT NULL
    )`,
+  `CREATE TABLE IF NOT EXISTS laporan_links (
+     kunci   TEXT PRIMARY KEY,
+     user_id TEXT NOT NULL,
+     exp     BIGINT NOT NULL
+   )`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */
