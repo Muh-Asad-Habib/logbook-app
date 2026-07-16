@@ -2,7 +2,7 @@
 import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
-import { getFileBuffer } from "../files.js";
+import { getFileBuffer, compressForEmbed } from "../files.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -37,7 +37,8 @@ export async function buildPdf(userId) {
       const ext = path.extname(k).toLowerCase();
       if (![".jpg", ".jpeg", ".png"].includes(ext)) return; // pdfkit hanya JPEG/PNG
       const buf = await getFileBuffer(k);
-      if (buf) bufferMap.set(k, buf);
+      // dikecilkan utk sematan dokumen — jaga total berkas < batas respons Vercel
+      if (buf) bufferMap.set(k, await compressForEmbed(buf));
     })
   );
 

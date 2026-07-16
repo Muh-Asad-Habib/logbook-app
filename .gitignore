@@ -27,3 +27,6 @@ Thumbs.db
 
 .vercel
 .env*
+
+# artefak uji ekspor (berisi data pribadi)
+tools/hasil-ekspor-uji.docx

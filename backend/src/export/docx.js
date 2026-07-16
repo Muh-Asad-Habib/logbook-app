@@ -9,7 +9,7 @@ import path from "node:path";
 import JSZip from "jszip";
 import { config } from "../config.js";
 import * as store from "../storage.js";
-import { getFileBuffer } from "../files.js";
+import { getFileBuffer, compressForEmbed } from "../files.js";
 
 /** Template resmi — ikut ter-bundle ke serverless function (backend/src/assets). */
 export const TEMPLATE = config.templatePath;
@@ -282,20 +282,24 @@ function fillTable(tblXml, entries, buildCells, refreshRow) {
   const emptyRows = rows.filter((r) => isEmptyRow(r) && cellCount(r) >= 2);
   const templateRow = emptyRows[0] || rows[rows.length - 1];
 
-  // Peta baris data lama: kunci kolom isi → baris (masing-masing sekali pakai)
+  // Peta baris data lama: kunci kolom isi → ANTREAN baris.
+  // Antrean (bukan satu baris) penting saat ada entri dengan teks kembar
+  // (mis. "Proses pengerjaan dataset…" dua tanggal) — tiap entri memakai
+  // satu baris, sehingga tidak ada yang salah dianggap baru lalu digandakan.
   const lama = new Map();
   rows.forEach((row, i) => {
     if (i === 0 || isHeaderRow(row) || isEmptyRow(row)) return;
     const k = rowKey(row);
-    if (k && !lama.has(k)) lama.set(k, row);
+    if (!k) return;
+    if (!lama.has(k)) lama.set(k, []);
+    lama.get(k).push(row);
   });
 
   let added = 0, skipped = 0;
   const newRows = [];
   for (const e of entries) {
-    const cocok = lama.get(e.dedup);
+    const cocok = lama.get(e.dedup)?.shift();
     if (cocok) {
-      lama.delete(e.dedup); // satu baris hanya untuk satu entri
       skipped += 1;
       if (refreshRow) {
         const baru = refreshRow(cocok, e);
@@ -320,29 +324,40 @@ function fillTable(tblXml, entries, buildCells, refreshRow) {
 }
 
 /** Entri yang BELUM ada di dokumen (untuk ditampilkan di UI).
- *  Memakai pencocokan per-baris yang sama dengan fillTable agar angkanya
+ *  Memakai pencocokan per-baris yang sama dengan fillTable — termasuk
+ *  hitungan per-kemunculan untuk teks kembar — agar angkanya selalu
  *  konsisten dengan hasil ekspor sesungguhnya. */
 export async function entriesToExport(userId) {
   if (!_docXmlCache) await warmTemplate();
-  const kunciKeg = new Set();
-  const kunciKeu = new Set();
+  const kunciKeg = new Map(); // kunci → berapa baris tersedia di dokumen
+  const kunciKeu = new Map();
   // Akun selain pemilik template memakai template kosong → semua entrinya baru.
   if (await store.isDefaultUser(userId)) {
     const tables = _docXmlCache.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [];
-    const kumpul = (tbl, set) => {
+    const kumpul = (tbl, peta) => {
       if (!tbl) return;
       rowsOf(tbl).forEach((row, i) => {
         if (i === 0 || isHeaderRow(row) || isEmptyRow(row)) return;
         const k = rowKey(row);
-        if (k) set.add(k);
+        if (k) peta.set(k, (peta.get(k) || 0) + 1);
       });
     };
     kumpul(tables[0], kunciKeg);
     kumpul(tables[1], kunciKeu);
   }
-  const keg = (await store.listKegiatan(userId)).filter((e) => !kunciKeg.has(norm(e.kegiatan)));
-  const keu = (await store.listKeuangan(userId)).filter((e) => !kunciKeu.has(norm(e.item)));
-  return { kegiatan: keg.length, keuangan: keu.length };
+  const hitungBaru = (list, ambilTeks, peta) => {
+    let baru = 0;
+    for (const e of list) {
+      const k = norm(ambilTeks(e));
+      const sisa = peta.get(k) || 0;
+      if (sisa > 0) peta.set(k, sisa - 1);
+      else baru += 1;
+    }
+    return baru;
+  };
+  const keg = hitungBaru(await store.listKegiatan(userId), (e) => e.kegiatan, kunciKeg);
+  const keu = hitungBaru(await store.listKeuangan(userId), (e) => e.item, kunciKeu);
+  return { kegiatan: keg, keuangan: keu };
 }
 
 let _docXmlCache = "";
@@ -364,6 +379,21 @@ export async function buildDocx(userId) {
   const relsRef = { value: await zip.file("word/_rels/document.xml.rels").async("string") };
   const ctRef = { value: await zip.file("[Content_Types].xml").async("string") };
 
+  // Kecilkan media bawaan template (foto lama tampil ±2,6 cm — 640px cukup).
+  // Ukuran tampilan diatur XML dokumen, jadi layout tidak berubah; ini menjaga
+  // hasil ekspor tetap jauh di bawah batas response serverless (±4,5 MB).
+  await Promise.all(
+    Object.keys(zip.files)
+      .filter((n) => /^word\/media\//i.test(n) && !zip.files[n].dir)
+      .map(async (n) => {
+        try {
+          const buf = await zip.file(n).async("nodebuffer");
+          const kecil = await compressForEmbed(buf);
+          if (kecil.length < buf.length) zip.file(n, kecil);
+        } catch {}
+      })
+  );
+
   // Ambil data & seluruh foto dari cloud SEKALIGUS (paralel) sebelum menyusun XML
   const [pemilikTemplate, kegList, keuList] = await Promise.all([
     store.isDefaultUser(userId),
@@ -378,7 +408,8 @@ export async function buildDocx(userId) {
   await Promise.all(
     [...new Set(semuaKey)].map(async (k) => {
       const buf = await getFileBuffer(k);
-      if (buf) bufferMap.set(k, buf);
+      // dikecilkan utk sematan dokumen — jaga total berkas < batas respons Vercel
+      if (buf) bufferMap.set(k, await compressForEmbed(buf));
     })
   );
   const imgs = makeImageStore(zip, relsRef, ctRef, bufferMap);

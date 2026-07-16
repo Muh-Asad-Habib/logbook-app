@@ -89,6 +89,33 @@ function buatKey(prefix, ext) {
   return `${prefix}_${Date.now()}-${crypto.randomBytes(3).toString("hex")}${ext}`;
 }
 
+/**
+ * Kompres gambar untuk DISEMATKAN ke dokumen ekspor (DOCX/PDF).
+ * Foto di dokumen hanya tampil ±2,6 cm, jadi 640px sudah melebihi kebutuhan
+ * cetak 300dpi — ini menjaga ukuran berkas ekspor jauh di bawah batas
+ * response Vercel (±4,5 MB). Format asli dipertahankan (jpeg→jpeg, png→png)
+ * agar relationship/content-type dokumen tidak berubah.
+ * Bila gagal atau hasil tidak lebih kecil → kembalikan buffer asli.
+ */
+export async function compressForEmbed(buffer, maxDim = 640, quality = 72) {
+  try {
+    if (!buffer || buffer.length < 24 * 1024) return buffer; // sudah kecil
+    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+    const isPng = buffer[0] === 0x89 && buffer[1] === 0x50;
+    if (!isJpeg && !isPng) return buffer; // gif/format lain: biarkan
+    let s = sharp(buffer, { failOn: "none" })
+      .rotate()
+      .resize(maxDim, maxDim, { fit: "inside", withoutEnlargement: true });
+    s = isPng
+      ? s.png({ compressionLevel: 9 })
+      : s.jpeg({ quality, progressive: true, mozjpeg: true });
+    const out = await s.toBuffer();
+    return out.length < buffer.length ? out : buffer;
+  } catch {
+    return buffer;
+  }
+}
+
 /* ---------------- adapter LOKAL (fallback dev) ---------------- */
 
 /** Path absolut yang aman (tolak path traversal seperti ../../). */
