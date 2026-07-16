@@ -12,11 +12,12 @@ const tc = (t) => `<w:tc><w:tcPr><w:tcW w:w="1000"/></w:tcPr><w:p><w:r><w:t>${es
 const tr = (...cells) => `<w:tr>${cells.map(tc).join("")}</w:tr>`;
 const trKosong = (n) => `<w:tr>${Array.from({ length: n }, () => "<w:tc><w:tcPr/><w:p/></w:tc>").join("")}</w:tr>`;
 
-// Tabel kegiatan tiruan: header + 2 baris isi + 2 baris kosong
+// Tabel kegiatan tiruan: header + 3 baris isi (dua terakhir TEKS KEMBAR) + 2 baris kosong
 const tbl = `<w:tbl>` +
   tr("Tanggal", "Kegiatan", "Capaian", "Waktu", "Foto") +
   tr("23 Mei 2026", "Membuat desain logo aplikasi", "10%", "60", "") +
   tr("26 Mei 2026", "Rapat koordinasi tim", "20%", "30", "") +
+  tr("26 Juni 2026", "Proses pengerjaan dataset untuk melatih algoritma", "22%", "120", "") +
   trKosong(5) + trKosong(5) +
   `</w:tbl>`;
 
@@ -69,14 +70,15 @@ function fillTable(tblXml, entries, buildCells, refreshRow) {
   rows.forEach((row, i) => {
     if (i === 0 || isHeaderRow(row) || isEmptyRow(row)) return;
     const k = rowKey(row);
-    if (k && !lama.has(k)) lama.set(k, row);
+    if (!k) return;
+    if (!lama.has(k)) lama.set(k, []);
+    lama.get(k).push(row);
   });
   let added = 0, skipped = 0;
   const newRows = [];
   for (const e of entries) {
-    const cocok = lama.get(e.dedup);
+    const cocok = lama.get(e.dedup)?.shift();
     if (cocok) {
-      lama.delete(e.dedup);
       skipped += 1;
       if (refreshRow) {
         const baru = refreshRow(cocok, e);
@@ -107,7 +109,11 @@ const entries = [
   // 3. BARU — teks pendek yang substring-nya ada di teks lain ("rapat…")
   //    → dulu salah ke-skip oleh dedup substring, sekarang harus DITAMBAHKAN
   { tanggal: "2026-07-01", kegiatan: "Rapat", capaian_total: 25, waktu_menit: 45 },
-  // 4. BARU — teks biasa
+  // 4 & 5. TEKS KEMBAR: satu cocok baris lama (refresh), satu lagi BARU —
+  //    dulu keduanya dianggap sudah ada / atau digandakan
+  { tanggal: "2026-06-26", kegiatan: "Proses pengerjaan dataset untuk melatih algoritma", capaian_total: 30, waktu_menit: 120 },
+  { tanggal: "2026-06-29", kegiatan: "Proses pengerjaan dataset untuk melatih algoritma", capaian_total: 35, waktu_menit: 330 },
+  // 6. BARU — teks biasa
   { tanggal: "2026-07-15", kegiatan: "Menyusun laporan akhir", capaian_total: 40, waktu_menit: 142 },
 ].map((e) => ({ ...e, dedup: norm(e.kegiatan) }));
 
@@ -121,18 +127,22 @@ const cek = (nama, kondisi) => {
   if (!kondisi) gagal += 1;
 };
 
-cek("2 entri lama terdeteksi cocok (skipped=2)", hasil.skipped === 2);
-cek("2 entri baru ditambahkan (added=2)", hasil.added === 2);
+cek("3 entri lama terdeteksi cocok (skipped=3)", hasil.skipped === 3);
+cek("3 entri baru ditambahkan (added=3)", hasil.added === 3);
 cek("waktu entri lama ter-refresh 60 → 82", hasil.xml.includes(">82<"));
 cek("capaian entri lama ter-refresh 10% → 15%", hasil.xml.includes(">15%<"));
 cek("entri pendek 'Rapat' ikut ditambahkan", /Rapat<\/w:t>/.test(hasil.xml));
 cek("entri 'Menyusun laporan akhir' ditambahkan", hasil.xml.includes("Menyusun laporan akhir"));
 cek("waktu 142 menit tertulis apa adanya (menit)", hasil.xml.includes(">142<"));
+cek("teks kembar muncul TEPAT 2× (tidak digandakan jadi 3)",
+  (hasil.xml.match(/Proses pengerjaan dataset untuk melatih algoritma/g) || []).length === 2);
+cek("baris kembar lama ter-refresh (waktu 120 tetap) & kembar baru berisi 330",
+  hasil.xml.includes(">120<") && hasil.xml.includes(">330<"));
 cek("baris teks lama tidak digandakan",
   (hasil.xml.match(/Membuat desain logo aplikasi/g) || []).length === 1);
 cek("tidak ada baris kosong tersisa",
   rowsOf(hasil.xml).filter((r) => isEmptyRow(r) && cellCount(r) >= 2).length === 0);
-cek("jumlah baris = header + 4 entri", rowsOf(hasil.xml).length === 5);
+cek("jumlah baris = header + 6 entri", rowsOf(hasil.xml).length === 7);
 
 console.log(gagal ? `\n${gagal} PENGUJIAN GAGAL` : "\nSEMUA PENGUJIAN LULUS");
 process.exit(gagal ? 1 : 0);
