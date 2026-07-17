@@ -102,11 +102,16 @@ async function tungguRef(ref, sisaCoba = 20) {
  * di kartu sempit (HP) zoom bawaannya bikin halaman kepotong, harus di-zoom
  * out manual. Karena itu iframe pihak ketiga & tak bisa kita atur zoom
  * internalnya, dipakai trik CSS umum: render iframe pada lebar virtual
- * "desktop" (di mana Office biasa auto-fit rapi ke lebar penuh), lalu
+ * "desktop" (di mana Office menampilkan halaman utuh pada zoom 100%), lalu
  * `transform: scale()` seluruh iframe agar pas ke wadah asli yang sempit.
  * Hasilnya: halaman penuh selalu tampil otomatis, tanpa perlu zoom manual.
+ *
+ * 860px dipilih pas: halaman A4 pada zoom 100% Office ≈ 816px + sedikit
+ * margin, jadi halaman mengisi hampir seluruh lebar kartu tanpa strip
+ * abu-abu lebar di kiri/kanan. (Tetap > ±768px supaya Office memakai UI
+ * desktop, bukan UI mobile yang zoom-nya bermasalah.)
  */
-const LEBAR_VIRTUAL_OFFICE = 1280;
+const LEBAR_VIRTUAL_OFFICE = 860;
 
 /** Amati ukuran elemen (ResizeObserver) — dipakai utk hitung skala iframe Office. */
 function useUkuranWadah() {
@@ -126,10 +131,13 @@ function useUkuranWadah() {
 }
 
 /** Bungkus <iframe> Office dgn wadah overflow:hidden + transform-scale agar
- *  halaman penuh selalu pas di lebar layar berapa pun (lihat catatan di atas). */
+ *  halaman penuh selalu pas di lebar layar berapa pun (lihat catatan di atas).
+ *  Di wadah lebar (>= lebar virtual) iframe dirender normal tanpa scale —
+ *  scale-up hanya bikin blur, tidak ada gunanya. */
 function OfficeFrame({ url, wrapUkuran, onLoad }) {
-  const skala = wrapUkuran.w > 0 ? wrapUkuran.w / LEBAR_VIRTUAL_OFFICE : 1;
-  const tinggiVirtual = wrapUkuran.h > 0 ? wrapUkuran.h / skala : "100%";
+  const w = wrapUkuran.w || 0;
+  const skala = w > 0 ? Math.min(1, w / LEBAR_VIRTUAL_OFFICE) : 1;
+  const perluScale = skala < 1;
   return (
     <div className="docx-office-scale">
       <iframe
@@ -139,9 +147,9 @@ function OfficeFrame({ url, wrapUkuran, onLoad }) {
         allowFullScreen
         onLoad={onLoad}
         style={{
-          width: LEBAR_VIRTUAL_OFFICE,
-          height: tinggiVirtual,
-          transform: `scale(${skala})`,
+          width: perluScale ? LEBAR_VIRTUAL_OFFICE : "100%",
+          height: perluScale && wrapUkuran.h > 0 ? wrapUkuran.h / skala : "100%",
+          transform: perluScale ? `scale(${skala})` : "none",
           transformOrigin: "0 0",
           border: 0,
         }}
