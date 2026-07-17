@@ -339,6 +339,34 @@ router.get("/data/tim/:id/fasilitator", async (req, res, next) => {
   }
 });
 
+/** Ganti seluruh fasilitator yang mengampu sebuah tim (kebalikan assignment fasilitator). */
+router.put("/data/tim/:id/fasilitator", async (req, res, next) => {
+  try {
+    const tim = await store.getUserById(req.params.id);
+    if (!tim || tim.role === "fasilitator") {
+      return res.status(404).json({ error: "Akun tim tidak ditemukan" });
+    }
+    const fasIds = Array.isArray(req.body?.fasilitator_ids)
+      ? req.body.fasilitator_ids.map(String) : [];
+    // Validasi semua target adalah akun FASILITATOR yang ada
+    for (const id of fasIds) {
+      const f = await store.getUserById(id);
+      if (!f || f.role !== "fasilitator") {
+        return res.status(400).json({ error: `Akun fasilitator tidak valid: ${id}` });
+      }
+    }
+    const hasil = await store.gantiFasilitatorTim(tim.id, fasIds);
+    adminStore.audit(req, "tim.fasilitator.ubah", {
+      target: tim.id,
+      username: tim.username,
+      ...hasil,
+    });
+    res.json({ ok: true, ...hasil });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Sajikan laporan .docx sebuah tim untuk panel (sesi panel; dukung ?t=). */
 router.get("/data/pengguna/:id/laporan-file", async (req, res, next) => {
   try {

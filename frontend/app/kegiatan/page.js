@@ -77,6 +77,7 @@ function KegiatanFasilitator() {
   const [items, setItems] = useState(null);
   const [gagal, setGagal] = useState("");
   const [cari, setCari] = useState("");
+  const [urut, setUrut] = useState("Terbaru");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("kegiatan", timId, !!timId);
 
@@ -120,8 +121,8 @@ function KegiatanFasilitator() {
   if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
 
   const view = [...items]
-    .filter((e) => !cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase()))
-    .reverse();
+    .filter((e) => !cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase()));
+  if (urut === "Terbaru") view.reverse();
   const grup = grupBulan(view);
 
   const bukaFoto = (e, idx) =>
@@ -140,6 +141,11 @@ function KegiatanFasilitator() {
             <span className="in-ic"><Search className="lucide" /></span>
             <input placeholder="Cari kegiatan…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
+          </div>
+          <div className="pills">
+            {["Terbaru", "Terlama"].map((u) => (
+              <button key={u} className={`pill ${urut === u ? "on" : ""}`} onClick={() => setUrut(u)}>{u}</button>
+            ))}
           </div>
           <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
         </div>

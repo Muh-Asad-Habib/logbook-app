@@ -571,6 +571,30 @@ export async function gantiTimFasilitator(fasilitatorId, timIds) {
   return { tambah: tambah.length, hapus: hapus.length, total: target.length };
 }
 
+/** Ganti seluruh fasilitator yang mengampu sebuah tim (kebalikan gantiTimFasilitator). */
+export async function gantiFasilitatorTim(timUserId, fasilitatorIds) {
+  const target = [...new Set((fasilitatorIds || []).map(String).filter(Boolean))];
+  const lama = (await q(
+    "SELECT fasilitator_id FROM fasilitator_tim WHERE tim_user_id = $1", [timUserId]
+  )).map((r) => r.fasilitator_id);
+  const tambah = target.filter((f) => !lama.includes(f));
+  const hapus = lama.filter((f) => !target.includes(f));
+  for (const f of tambah) {
+    await q(
+      `INSERT INTO fasilitator_tim (fasilitator_id, tim_user_id, created_at)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [f, timUserId, nowIso()]
+    );
+  }
+  if (hapus.length) {
+    await q(
+      "DELETE FROM fasilitator_tim WHERE tim_user_id = $1 AND fasilitator_id = ANY($2)",
+      [timUserId, hapus]
+    );
+  }
+  return { tambah: tambah.length, hapus: hapus.length, total: target.length };
+}
+
 /* ---------- Komentar (fasilitator ↔ tim, 2 arah) ----------
  * jenis: 'kegiatan' | 'keuangan' | 'laporan'
  * target_id: id entri (laporan → tim_user_id, karena 1 laporan per tim)
