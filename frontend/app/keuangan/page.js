@@ -129,8 +129,8 @@ function KeuanganFasilitator() {
   return (
     <>
       <div className="card mt">
-        <div className="row spread">
-          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+        <div className="row spread toolbar">
+          <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input placeholder="Cari item belanja…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
@@ -303,8 +303,8 @@ function KeuanganTim() {
   return (
     <>
       <div className="card mt">
-        <div className="row spread">
-          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+        <div className="row spread toolbar">
+          <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input
               placeholder="Cari item belanja…"

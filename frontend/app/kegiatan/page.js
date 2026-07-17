@@ -136,8 +136,8 @@ function KegiatanFasilitator() {
   return (
     <>
       <div className="card mt">
-        <div className="row spread">
-          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+        <div className="row spread toolbar">
+          <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input placeholder="Cari kegiatan…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
@@ -259,17 +259,17 @@ function KegiatanTim() {
     <>
       {/* Toolbar */}
       <div className="card mt">
-        <div className="row spread">
-          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+        <div className="row spread toolbar">
+          <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input
               placeholder="Cari kegiatan…"
               value={cari} onChange={(e) => setCari(e.target.value)}
             />
           </div>
-          <input type="date" style={{ flex: "1 1 140px", marginTop: 0 }} value={dari}
+          <input type="date" className="tb-tgl" value={dari}
                  onChange={(e) => setDari(e.target.value)} title="Dari tanggal" />
-          <input type="date" style={{ flex: "1 1 140px", marginTop: 0 }} value={sampai}
+          <input type="date" className="tb-tgl" value={sampai}
                  onChange={(e) => setSampai(e.target.value)} title="Sampai tanggal" />
           <div className="pills">
             {["Terbaru", "Terlama"].map((u) => (

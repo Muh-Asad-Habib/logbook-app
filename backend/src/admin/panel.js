@@ -162,7 +162,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .s1{--a:#818cf8}.s2{--a:#22d3ee}.s3{--a:#fbbf24}.s4{--a:#34d399}.s5{--a:#f0abfc}
 
   /* ---------- tabel ---------- */
-  .tbl{overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:13px}
+  .tbl{overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:13px;-webkit-overflow-scrolling:touch}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem;min-width:680px}
   th,td{text-align:left;padding:12px 15px;border-bottom:1px solid rgba(99,112,180,.13);vertical-align:middle}
   th{color:var(--mut);font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;
@@ -200,13 +200,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     border:1px solid var(--line2);border-radius:18px;color:var(--ink);
     background:linear-gradient(180deg,#0d1533,#0a112a);
     padding:0;width:calc(100% - 36px);box-shadow:0 40px 120px rgba(0,0,0,.65);
-    margin:auto;max-height:calc(100vh - 44px);
+    margin:auto;max-height:calc(100vh - 44px);max-height:calc(100dvh - 44px);
   }
   dialog[open]{animation:pop .24s ease}
   dialog::backdrop{background:rgba(3,6,15,.78);backdrop-filter:blur(5px)}
   dialog.mini{max-width:430px}
   dialog.besar{width:calc(100vw - 32px);max-width:1440px}
-  dialog.besar .dlg-b{max-height:calc(100vh - 168px);padding:20px 24px 24px}
+  dialog.besar .dlg-b{max-height:calc(100vh - 168px);max-height:calc(100dvh - 168px);padding:20px 24px 24px}
   dialog.besar table{font-size:.88rem;min-width:760px}
   dialog.besar th,dialog.besar td{padding:13px 15px}
   dialog.besar .th{width:54px;height:54px;border-radius:10px}
@@ -215,13 +215,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   dialog.besar .chip small{font-size:.64rem}
   dialog.besar .tabs button{font-size:.84rem;padding:9px 20px}
   dialog.besar .prog{min-width:110px;height:9px}
-  dialog.besar .tline{max-height:calc(100vh - 420px)}
+  dialog.besar .tline{max-height:calc(100vh - 420px);max-height:calc(100dvh - 420px)}
   .dlg-h{display:flex;align-items:center;gap:12px;padding:16px 20px;
     background:linear-gradient(120deg,rgba(99,102,241,.22),rgba(217,70,239,.12));
     border-bottom:1px solid var(--line)}
   .dlg-h h3{font-size:.98rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .dlg-h .x{margin-left:auto}
-  .dlg-b{padding:18px 20px 20px;max-height:calc(100vh - 230px);overflow:auto}
+  .dlg-b{padding:18px 20px 20px;max-height:calc(100vh - 230px);max-height:calc(100dvh - 230px);overflow:auto}
   dialog.besar .dlg-h{padding:18px 24px}
   dialog.besar .dlg-h h3{font-size:1.12rem}
   dialog.besar .dlg-h .mut{font-size:.82rem}
@@ -320,22 +320,59 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .login .hint{margin-top:18px;text-align:center;font-size:.66rem;color:#4d5a8c}
 
   @media(max-width:640px){
-    .top-in{padding:11px 14px;flex-wrap:wrap;row-gap:9px}
-    .top h1{flex-wrap:wrap}
+    /* --- topbar ringkas --- */
+    .top-in{padding:10px 12px;flex-wrap:wrap;row-gap:9px;gap:10px}
+    .top h1{flex-wrap:wrap;font-size:.92rem}
+    .top .sub{display:none}
     .top-act{margin-left:auto}
-    .wrap{padding:0 14px 70px}
+    .logo{width:36px;height:36px;flex:0 0 36px;border-radius:11px;font-size:1.05rem}
+    .wrap{padding:0 12px 70px}
     .search{width:100%}
-    .card{padding:16px 15px}
-    .tabs{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none}
+    .card{padding:15px 13px;border-radius:15px}
+    /* --- statistik 2 kolom padat --- */
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+    .stat{padding:12px 12px;gap:10px;border-radius:13px}
+    .stat .ic{width:34px;height:34px;flex:0 0 34px;border-radius:10px}
+    .stat .ic .i{width:16px;height:16px}
+    .stat b{font-size:1.16rem}
+    .stat .lbl{font-size:.56rem}
+    .stat>div:last-child{min-width:0}
+    /* --- form: 16px mencegah auto-zoom iOS saat fokus --- */
+    input{font-size:16px}
+    /* --- tab menggulir --- */
+    .tabs{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
     .tabs::-webkit-scrollbar{display:none}
-    .tabs button{white-space:nowrap;flex:1 0 auto;padding:8px 13px}
+    .tabs button{white-space:nowrap;flex:1 0 auto;padding:9px 13px}
     .chips{gap:7px}
     .chip{flex:1 1 calc(50% - 7px);min-width:0}
     .login{padding:26px 20px}
-    .dlg-h{padding:13px 15px}
-    .dlg-b{padding:15px;max-height:calc(100vh - 190px)}
-    dialog.besar .dlg-b{padding:14px 14px 18px}
-    .acts .btn.sm{padding:7px 9px}
+    /* --- tabel: gulir horizontal + sel lebih rapat --- */
+    table{min-width:620px;font-size:.78rem}
+    th,td{padding:10px 11px}
+    .u-cell{min-width:150px}
+    /* --- tombol ramah sentuh --- */
+    .btn{min-height:40px}
+    .btn.sm{min-height:36px}
+    .acts{gap:7px}
+    .acts .btn.sm{padding:8px 10px}
+    .acts .btn.sm.ic{padding:8px 11px}
+    /* --- dialog nyaris layar penuh --- */
+    dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}
+    dialog.besar{width:calc(100vw - 16px)}
+    dialog.besar .dlg-b{max-height:calc(100dvh - 140px);padding:13px 13px 17px}
+    dialog.besar table{min-width:620px;font-size:.8rem}
+    dialog.besar th,dialog.besar td{padding:11px 12px}
+    dialog.besar .chip{padding:9px 12px;font-size:.76rem;min-width:0}
+    dialog.besar .chip b{font-size:.92rem}
+    dialog.besar .tabs button{font-size:.78rem;padding:9px 14px}
+    dialog.besar .tline{max-height:calc(100dvh - 350px)}
+    .dlg-h{padding:12px 13px;gap:9px}
+    .dlg-h h3{font-size:.9rem}
+    .dlg-b{padding:14px 13px;max-height:calc(100dvh - 170px)}
+    .ava.lg{width:36px;height:36px;flex:0 0 36px;border-radius:11px;font-size:.9rem}
+    /* --- audit & linimasa --- */
+    .audit{-webkit-overflow-scrolling:touch}
+    .tline{-webkit-overflow-scrolling:touch;max-height:58vh}
   }
   @media(prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none!important;transition:none!important}
