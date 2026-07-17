@@ -104,6 +104,14 @@ const SKEMA = [
      exp     BIGINT NOT NULL,
      ua_hash TEXT NOT NULL DEFAULT ''
    )`,
+  // Penghitung brute-force login panel — DI DATABASE (bukan memori proses)
+  // supaya lockout tetap berlaku sekalipun Vercel menjalankan banyak instance
+  // serverless bersamaan (memori proses tidak dibagi antar-instance).
+  `CREATE TABLE IF NOT EXISTS admin_login_fails (
+     ip_key       TEXT PRIMARY KEY,
+     n            INTEGER NOT NULL DEFAULT 0,
+     locked_until BIGINT NOT NULL DEFAULT 0
+   )`,
   `CREATE TABLE IF NOT EXISTS import_chunks (
      id         TEXT NOT NULL,
      idx        INTEGER NOT NULL,

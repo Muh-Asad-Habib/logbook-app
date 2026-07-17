@@ -554,7 +554,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <div class="dlg-b">
     <p class="mut" id="d-pw-sub"></p>
     <form method="dialog" id="f-pw">
-      <label>Password baru (min. 6 karakter)
+      <label>Password baru (min. 8 karakter)
         <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
         <input id="d-pw-val" autocomplete="off"></span>
       </label>

@@ -40,7 +40,7 @@ const registerLimiter = rateLimit({
  *             required: [username, password]
  *             properties:
  *               username: { type: string, example: "timku" }
- *               password: { type: string, example: "rahasia123" }
+ *               password: { type: string, example: "rahasia123", minLength: 8 }
  *               sebagai_fasilitator: { type: boolean, example: false }
  *               kode_fasilitator: { type: string, example: "kode dari admin" }
  *     responses:
@@ -58,8 +58,8 @@ router.post("/register", registerLimiter, async (req, res, next) => {
     if (username.length < 3 || username.length > 40) {
       return res.status(400).json({ error: "Username minimal 3 karakter (maks. 40)" });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ error: "Password minimal 6 karakter" });
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password minimal 8 karakter" });
     }
     if (sebagaiFasilitator) {
       const hash = await store.getMeta("kodeFasilitator");
@@ -227,7 +227,7 @@ router.put("/username", authRequired, async (req, res, next) => {
  *             required: [password_lama, password_baru]
  *             properties:
  *               password_lama: { type: string }
- *               password_baru: { type: string, example: "minimal 6 karakter" }
+ *               password_baru: { type: string, example: "minimal 8 karakter", minLength: 8 }
  *     responses:
  *       200: { description: Password diperbarui — sesi lain dicabut }
  *       400: { description: Input tidak valid }
@@ -237,8 +237,8 @@ router.put("/password", authRequired, async (req, res, next) => {
   try {
     const lama = String(req.body?.password_lama || "");
     const baru = String(req.body?.password_baru || "");
-    if (baru.length < 6) {
-      return res.status(400).json({ error: "Password baru minimal 6 karakter" });
+    if (baru.length < 8) {
+      return res.status(400).json({ error: "Password baru minimal 8 karakter" });
     }
     const user = await store.getUserById(req.userId);
     if (!user || !verifyPassword(lama, user.passHash)) {

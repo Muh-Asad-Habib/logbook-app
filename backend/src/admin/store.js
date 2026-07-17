@@ -8,7 +8,9 @@
  * - Sesi panel disimpan di tabel `admin_sessions` (umur pendek, terikat
  *   User-Agent) — di serverless memori tidak bertahan antar-request,
  *   jadi sesi harus di database.
- * - Login dibatasi (rate limit per-IP + global, di memori per instance).
+ * - Login dibatasi (rate limit per-IP + global, disimpan di Postgres —
+ *   tabel admin_login_fails — jadi tetap berlaku sekalipun Vercel melayani
+ *   permintaan lewat banyak instance serverless berbeda).
  * - Semua aksi dicatat ke tabel `audit` (tanpa pernah mencatat password).
  * - Tidak ada satu byte pun tentang modul ini di bundel frontend.
  */
@@ -25,8 +27,6 @@ const MAX_FAILS_GLOBAL = 25;             // rem darurat lintas-IP
 let admin = null;                        // cache kredensial (per proses)
 let adminMuatPada = 0;                   // kapan cache terakhir dimuat
 const CACHE_MS = 30 * 1000;              // segarkan cache tiap 30 detik
-const fails = new Map();                 // ipKey -> { n, until } (per instance)
-let globalFails = { n: 0, resetAt: 0 };
 
 /* ---------------- kredensial ---------------- */
 
@@ -93,7 +93,15 @@ export async function setCredentials({ username, password, panel }) {
   await simpan();
 }
 
-/* ---------------- rate limit (per instance — pertahanan tambahan) ---------------- */
+/* ---------------- rate limit (PERSISTEN DI DATABASE) ----------------
+ * PENTING: sebelumnya penghitung gagal-login disimpan di Map biasa (memori
+ * proses). Di Vercel, permintaan bersamaan bisa dilayani oleh BEBERAPA
+ * instance serverless berbeda yang masing-masing punya memori sendiri —
+ * penghitung tidak sinkron antar-instance, sehingga lockout 5x-gagal bisa
+ * dilewati dengan mengirim percobaan brute-force secara paralel/berulang
+ * (memicu cold start baru = penghitung balik ke nol). Disimpan di Postgres
+ * (tabel admin_login_fails) supaya SATU sumber kebenaran dipakai semua
+ * instance, tahan restart maupun cold start. */
 
 function ipKey(req) {
   const sock = String(req.socket?.remoteAddress || "?");
@@ -111,26 +119,52 @@ function ipKey(req) {
   );
 }
 
-function locked(req) {
-  const now = Date.now();
-  if (globalFails.n >= MAX_FAILS_GLOBAL && now < globalFails.resetAt) return true;
-  const f = fails.get(ipKey(req));
-  return !!f && f.n >= MAX_FAILS_PER_IP && now < f.until;
-}
+const GLOBAL_KEY = "__global__";
 
-function noteFail(req) {
+async function locked(req) {
   const now = Date.now();
   const key = ipKey(req);
-  const f = fails.get(key) || { n: 0, until: 0 };
-  f.n += 1;
-  f.until = now + LOCK_MS;
-  fails.set(key, f);
-  if (now > globalFails.resetAt) globalFails = { n: 0, resetAt: now + LOCK_MS };
-  globalFails.n += 1;
+  const rows = await q(
+    "SELECT ip_key, n, locked_until FROM admin_login_fails WHERE ip_key = $1 OR ip_key = $2",
+    [key, GLOBAL_KEY]
+  );
+  const glob = rows.find((r) => r.ip_key === GLOBAL_KEY);
+  if (glob && Number(glob.n) >= MAX_FAILS_GLOBAL && now < Number(glob.locked_until)) return true;
+  const per = rows.find((r) => r.ip_key === key);
+  return !!per && Number(per.n) >= MAX_FAILS_PER_IP && now < Number(per.locked_until);
 }
 
-function noteOk(req) {
-  fails.delete(ipKey(req));
+async function noteFail(req) {
+  const now = Date.now();
+  const key = ipKey(req);
+  // Per-IP: jendela BERGULIR — setiap gagal memperbarui locked_until (n hanya
+  // nol lagi lewat login sukses, lihat noteOk).
+  await q(
+    `INSERT INTO admin_login_fails (ip_key, n, locked_until) VALUES ($1, 1, $2)
+     ON CONFLICT (ip_key) DO UPDATE SET n = admin_login_fails.n + 1, locked_until = $2`,
+    [key, now + LOCK_MS]
+  ).catch(() => {});
+  // Global (lintas-IP): jendela TETAP — nol ulang hanya setelah jendela lewat.
+  await q(
+    "UPDATE admin_login_fails SET n = 0 WHERE ip_key = $1 AND locked_until <= $2",
+    [GLOBAL_KEY, now]
+  ).catch(() => {});
+  await q(
+    `INSERT INTO admin_login_fails (ip_key, n, locked_until) VALUES ($1, 1, $2)
+     ON CONFLICT (ip_key) DO UPDATE SET
+       n = admin_login_fails.n + 1,
+       locked_until = CASE WHEN admin_login_fails.locked_until <= $3 THEN $2 ELSE admin_login_fails.locked_until END`,
+    [GLOBAL_KEY, now + LOCK_MS, now]
+  ).catch(() => {});
+  // Bersihkan baris lawas sesekali (IP yang sudah lama tidak mencoba lagi)
+  if (Math.random() < 0.05) {
+    q("DELETE FROM admin_login_fails WHERE ip_key <> $1 AND locked_until < $2",
+      [GLOBAL_KEY, now - 24 * 60 * 60 * 1000]).catch(() => {});
+  }
+}
+
+async function noteOk(req) {
+  await q("DELETE FROM admin_login_fails WHERE ip_key = $1", [ipKey(req)]).catch(() => {});
 }
 
 /* ---------------- sesi (di database — tahan restart/serverless) ---------------- */
@@ -143,7 +177,7 @@ const uaHash = (req) =>
  * durasi respons tidak membocorkan mana yang salah (anti user-enumeration).
  */
 export async function login(req, username, password) {
-  if (locked(req)) {
+  if (await locked(req)) {
     audit(req, "login.terkunci", {});
     return { ok: false, error: "Terlalu banyak percobaan. Coba lagi nanti." };
   }
@@ -153,11 +187,11 @@ export async function login(req, username, password) {
   // jeda acak kecil — samarkan sisa perbedaan timing
   await new Promise((r) => setTimeout(r, 150 + crypto.randomInt(200)));
   if (!okUser || !okPass) {
-    noteFail(req);
+    await noteFail(req);
     audit(req, "login.gagal", {});
     return { ok: false, error: "Akses ditolak" };
   }
-  noteOk(req);
+  await noteOk(req);
   const token = newToken(48);
   await q(
     "INSERT INTO admin_sessions (token, exp, ua_hash) VALUES ($1, $2, $3)",
