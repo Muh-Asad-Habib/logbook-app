@@ -9,6 +9,7 @@
 import crypto from "node:crypto";
 import { q, angka, larik } from "./db.js";
 import { hashPassword, newToken } from "./passwords.js";
+import { putFileRaw, getFileBuffer, removeFiles } from "./files.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -28,6 +29,7 @@ const petaUser = (r) =>
     passHash: r.pass_hash,
     createdAt: r.created_at,
     updatedAt: r.updated_at || "",
+    role: r.role || "tim",
   };
 
 const petaKegiatan = (r) => ({
@@ -94,17 +96,18 @@ export async function isDefaultUser(userId) {
   return (await getMeta("templateOwnerId")) === userId;
 }
 
-export async function createUser(username, password) {
+export async function createUser(username, password, role = "tim") {
   const u = {
     id: newId(),
     username: String(username).trim(),
     usernameLower: String(username).trim().toLowerCase(),
     passHash: hashPassword(password),
     createdAt: nowIso(),
+    role: role === "fasilitator" ? "fasilitator" : "tim",
   };
   await q(
-    "INSERT INTO users (id, username, username_lower, pass_hash, created_at) VALUES ($1, $2, $3, $4, $5)",
-    [u.id, u.username, u.usernameLower, u.passHash, u.createdAt]
+    "INSERT INTO users (id, username, username_lower, pass_hash, created_at, role) VALUES ($1, $2, $3, $4, $5, $6)",
+    [u.id, u.username, u.usernameLower, u.passHash, u.createdAt, u.role]
   );
   return u;
 }
@@ -140,13 +143,16 @@ export async function revokeUserSessions(userId, exceptToken = "") {
 /** Daftar semua akun + ringkasan datanya (tanpa hash password). */
 export async function listUsersWithStats() {
   const rows = await q(
-    `SELECT u.id, u.username, u.created_at, u.updated_at,
+    `SELECT u.id, u.username, u.created_at, u.updated_at, u.role,
             (SELECT COUNT(*) FROM kegiatan k WHERE k.user_id = u.id)                    AS n_keg,
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id)                    AS n_keu,
             (SELECT COALESCE(SUM(jsonb_array_length(k.foto_keys)), 0)
                FROM kegiatan k WHERE k.user_id = u.id)                                  AS n_foto_keg,
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id AND b.bukti_key <> '') AS n_foto_keu,
             (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id)                    AS n_sesi,
+            (SELECT COUNT(*) FROM laporan_docx l WHERE l.user_id = u.id)                AS n_laporan,
+            (SELECT COUNT(*) FROM fasilitator_tim ft WHERE ft.tim_user_id = u.id)       AS n_fasilitator,
+            (SELECT COUNT(*) FROM fasilitator_tim ft WHERE ft.fasilitator_id = u.id)    AS n_tim_diampu,
             GREATEST(
               COALESCE((SELECT MAX(k.created_at) FROM kegiatan k WHERE k.user_id = u.id), ''),
               COALESCE((SELECT MAX(b.created_at) FROM keuangan b WHERE b.user_id = u.id), '')
@@ -162,10 +168,14 @@ export async function listUsersWithStats() {
     username: r.username,
     createdAt: r.created_at,
     updatedAt: r.updated_at || "",
+    role: r.role || "tim",
     kegiatan: angka(r.n_keg),
     keuangan: angka(r.n_keu),
     foto: angka(r.n_foto_keg) + angka(r.n_foto_keu),
     sesi: angka(r.n_sesi),
+    punya_laporan: angka(r.n_laporan) > 0,
+    n_fasilitator: angka(r.n_fasilitator),
+    n_tim_diampu: angka(r.n_tim_diampu),
     aktivitasTerakhir: r.last_at || "",
     pemilikTemplate: ownerId === r.id,
     dana_awal: r.dana_awal || "",
@@ -199,9 +209,10 @@ export async function getUserDetail(userId) {
   const danaAwal = Number(await getSetting(userId, "dana_awal", "0")) || 0;
   const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
   return {
-    user: { id: u.id, username: u.username, createdAt: u.createdAt },
+    user: { id: u.id, username: u.username, createdAt: u.createdAt, role: u.role },
     kegiatan,
     keuangan,
+    laporan: await infoLaporan(userId),
     ringkasan: {
       dana_awal: danaAwal,
       pengeluaran,
@@ -229,10 +240,26 @@ export async function deleteUser(userId) {
   )) {
     fileKeys.push(r.bukti_key);
   }
+  // Laporan .docx di ImageKit ikut dihapus lewat fileKeys
+  for (const r of await q(
+    "SELECT file_key FROM laporan_docx WHERE user_id = $1 AND file_key <> ''", [userId]
+  )) {
+    fileKeys.push(r.file_key);
+  }
   await q("DELETE FROM kegiatan   WHERE user_id = $1", [userId]);
   await q("DELETE FROM keuangan   WHERE user_id = $1", [userId]);
   await q("DELETE FROM pengaturan WHERE user_id = $1", [userId]);
   await q("DELETE FROM sessions   WHERE user_id = $1", [userId]);
+  await q("DELETE FROM laporan_docx  WHERE user_id = $1", [userId]);
+  await q("DELETE FROM laporan_links WHERE user_id = $1", [userId]);
+  await q("DELETE FROM fasilitator_tim WHERE fasilitator_id = $1 OR tim_user_id = $1", [userId]);
+  await q(
+    `DELETE FROM komentar_baca WHERE user_id = $1
+        OR komentar_id IN (SELECT id FROM komentar WHERE tim_user_id = $1)`,
+    [userId]
+  );
+  await q("DELETE FROM komentar  WHERE tim_user_id = $1 OR penulis_id = $1", [userId]);
+  await q("DELETE FROM aktivitas WHERE user_id = $1", [userId]);
   await q("DELETE FROM users      WHERE id      = $1", [userId]);
   if ((await getMeta("templateOwnerId")) === userId) {
     await q("DELETE FROM meta WHERE kunci = 'templateOwnerId'");
@@ -413,16 +440,25 @@ export async function setSetting(userId, kunci, nilai) {
 
 /* ---------- Laporan kemajuan (.docx — SATU file per user) ----------
  * Kunci utama = user_id, jadi setiap unggahan baru otomatis MENIMPA
- * file lama (UPSERT) — tidak pernah ada dua laporan tersimpan. */
+ * file lama (UPSERT) — tidak pernah ada dua laporan tersimpan.
+ * Berkas fisik disimpan di ImageKit (kolom file_key); kolom `data` (base64)
+ * hanya untuk baris lama — dimigrasi malas ke ImageKit saat pertama diakses. */
 
 export async function saveLaporan(userId, nama, buffer) {
-  await q(
-    `INSERT INTO laporan_docx (user_id, nama, data, ukuran, updated_at)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
-       data = EXCLUDED.data, ukuran = EXCLUDED.ukuran, updated_at = EXCLUDED.updated_at`,
-    [userId, nama, buffer.toString("base64"), buffer.length, nowIso()]
+  // Hapus berkas lama di ImageKit (bila ada) supaya tidak jadi sampah
+  const lama = await q(
+    "SELECT file_key FROM laporan_docx WHERE user_id = $1 AND file_key <> ''", [userId]
   );
+  const key = await putFileRaw(nama, buffer, "lap");
+  await q(
+    `INSERT INTO laporan_docx (user_id, nama, data, ukuran, updated_at, file_key)
+     VALUES ($1, $2, '', $3, $4, $5)
+     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
+       data = '', ukuran = EXCLUDED.ukuran, updated_at = EXCLUDED.updated_at,
+       file_key = EXCLUDED.file_key`,
+    [userId, nama, buffer.length, nowIso(), key]
+  );
+  if (lama[0]?.file_key) await removeFiles([lama[0].file_key]);
   return { nama, ukuran: buffer.length };
 }
 
@@ -441,16 +477,245 @@ export async function infoLaporan(userId) {
 
 export async function getLaporan(userId) {
   const rows = await q(
-    "SELECT nama, data FROM laporan_docx WHERE user_id = $1", [userId]
+    "SELECT nama, data, file_key FROM laporan_docx WHERE user_id = $1", [userId]
   );
   if (!rows[0]) return null;
-  return { nama: rows[0].nama, buffer: Buffer.from(rows[0].data, "base64") };
+  const { nama, data, file_key: fileKey } = rows[0];
+  if (fileKey) {
+    const buffer = await getFileBuffer(fileKey);
+    if (buffer) return { nama, buffer };
+    // Berkas hilang di cloud tapi masih ada base64 lama → pakai itu
+    if (data) return { nama, buffer: Buffer.from(data, "base64") };
+    return null;
+  }
+  if (!data) return null;
+  const buffer = Buffer.from(data, "base64");
+  // Migrasi malas: baris lama (base64 di Neon) → unggah ke ImageKit sekali,
+  // lalu kosongkan kolom data agar kuota Neon lega. Gagal → tetap terbaca.
+  try {
+    const key = await putFileRaw(nama || "laporan-kemajuan.docx", buffer, "lap");
+    await q(
+      "UPDATE laporan_docx SET file_key = $1, data = '' WHERE user_id = $2",
+      [key, userId]
+    );
+  } catch {}
+  return { nama, buffer };
 }
 
 export async function deleteLaporan(userId) {
   const rows = await q(
-    "DELETE FROM laporan_docx WHERE user_id = $1 RETURNING nama", [userId]
+    "DELETE FROM laporan_docx WHERE user_id = $1 RETURNING nama, file_key", [userId]
+  );
+  if (rows[0]?.file_key) await removeFiles([rows[0].file_key]);
+  return rows.length > 0;
+}
+
+/* ---------- Fasilitator ↔ Tim (assignment many-to-many) ----------
+ * 1 tim boleh diampu banyak fasilitator; 1 fasilitator boleh mengampu
+ * banyak tim. Assignment hanya diubah lewat pusat kendali. */
+
+/** Daftar tim yang diampu seorang fasilitator. */
+export async function listTimUntukFasilitator(fasilitatorId) {
+  const rows = await q(
+    `SELECT u.id, u.username, ft.created_at AS sejak
+       FROM fasilitator_tim ft JOIN users u ON u.id = ft.tim_user_id
+      WHERE ft.fasilitator_id = $1
+      ORDER BY u.username`,
+    [fasilitatorId]
+  );
+  return rows.map((r) => ({ id: r.id, username: r.username, sejak: r.sejak }));
+}
+
+/** Daftar fasilitator yang mengampu sebuah tim. */
+export async function listFasilitatorUntukTim(timUserId) {
+  const rows = await q(
+    `SELECT u.id, u.username, ft.created_at AS sejak
+       FROM fasilitator_tim ft JOIN users u ON u.id = ft.fasilitator_id
+      WHERE ft.tim_user_id = $1
+      ORDER BY u.username`,
+    [timUserId]
+  );
+  return rows.map((r) => ({ id: r.id, username: r.username, sejak: r.sejak }));
+}
+
+/** Apakah fasilitator boleh mengakses data tim ini? */
+export async function bolehAksesTim(fasilitatorId, timUserId) {
+  const rows = await q(
+    "SELECT 1 FROM fasilitator_tim WHERE fasilitator_id = $1 AND tim_user_id = $2",
+    [fasilitatorId, timUserId]
   );
   return rows.length > 0;
+}
+
+/** Ganti seluruh assignment tim milik seorang fasilitator (diff insert/delete). */
+export async function gantiTimFasilitator(fasilitatorId, timIds) {
+  const target = [...new Set((timIds || []).map(String).filter(Boolean))];
+  const lama = (await q(
+    "SELECT tim_user_id FROM fasilitator_tim WHERE fasilitator_id = $1", [fasilitatorId]
+  )).map((r) => r.tim_user_id);
+  const tambah = target.filter((t) => !lama.includes(t));
+  const hapus = lama.filter((t) => !target.includes(t));
+  for (const t of tambah) {
+    await q(
+      `INSERT INTO fasilitator_tim (fasilitator_id, tim_user_id, created_at)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [fasilitatorId, t, nowIso()]
+    );
+  }
+  if (hapus.length) {
+    await q(
+      "DELETE FROM fasilitator_tim WHERE fasilitator_id = $1 AND tim_user_id = ANY($2)",
+      [fasilitatorId, hapus]
+    );
+  }
+  return { tambah: tambah.length, hapus: hapus.length, total: target.length };
+}
+
+/* ---------- Komentar (fasilitator ↔ tim, 2 arah) ----------
+ * jenis: 'kegiatan' | 'keuangan' | 'laporan'
+ * target_id: id entri (laporan → tim_user_id, karena 1 laporan per tim)
+ * parent_id: '' = komentar induk; terisi = balasan. */
+
+const petaKomentar = (r) => ({
+  id: r.id,
+  jenis: r.jenis,
+  target_id: r.target_id,
+  tim_user_id: r.tim_user_id,
+  penulis_id: r.penulis_id,
+  penulis_username: r.penulis_username || "",
+  penulis_role: r.penulis_role || "tim",
+  parent_id: r.parent_id || "",
+  isi: r.isi,
+  selesai: !!r.selesai,
+  edited_at: r.edited_at || "",
+  createdAt: r.created_at,
+});
+
+export async function addKomentar({ jenis, targetId, timUserId, penulisId, parentId = "", isi }) {
+  const k = {
+    id: newId(),
+    jenis,
+    target_id: String(targetId),
+    tim_user_id: String(timUserId),
+    penulis_id: String(penulisId),
+    parent_id: String(parentId || ""),
+    isi: String(isi),
+    createdAt: nowIso(),
+  };
+  await q(
+    `INSERT INTO komentar (id, jenis, target_id, tim_user_id, penulis_id, parent_id, isi, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [k.id, k.jenis, k.target_id, k.tim_user_id, k.penulis_id, k.parent_id, k.isi, k.createdAt]
+  );
+  // Penulis otomatis dianggap sudah membaca komentarnya sendiri
+  await tandaiDibaca(penulisId, [k.id]);
+  return k;
+}
+
+/** Komentar sebuah target (atau semua milik tim bila targetId null) + info penulis. */
+export async function listKomentar(jenis, targetId, timUserId) {
+  const params = [timUserId, jenis];
+  let where = "k.tim_user_id = $1 AND k.jenis = $2";
+  if (targetId != null) {
+    params.push(String(targetId));
+    where += " AND k.target_id = $3";
+  }
+  const rows = await q(
+    `SELECT k.*, u.username AS penulis_username, COALESCE(u.role, 'tim') AS penulis_role
+       FROM komentar k LEFT JOIN users u ON u.id = k.penulis_id
+      WHERE ${where}
+      ORDER BY k.created_at`,
+    params
+  );
+  return rows.map(petaKomentar);
+}
+
+/** Hitung komentar per target untuk badge daftar entri: { [target_id]: n }. */
+export async function hitungKomentarPerTarget(timUserId, jenis) {
+  const rows = await q(
+    `SELECT target_id, COUNT(*) AS n FROM komentar
+      WHERE tim_user_id = $1 AND jenis = $2 GROUP BY target_id`,
+    [timUserId, jenis]
+  );
+  const peta = {};
+  for (const r of rows) peta[r.target_id] = angka(r.n);
+  return peta;
+}
+
+export async function getKomentarById(id) {
+  const rows = await q(
+    `SELECT k.*, u.username AS penulis_username, COALESCE(u.role, 'tim') AS penulis_role
+       FROM komentar k LEFT JOIN users u ON u.id = k.penulis_id
+      WHERE k.id = $1`,
+    [String(id || "")]
+  );
+  return rows[0] ? petaKomentar(rows[0]) : null;
+}
+
+/** Edit isi komentar milik sendiri → tandai edited_at (label "(diedit)"). */
+export async function updateKomentarIsi(id, isi) {
+  const rows = await q(
+    "UPDATE komentar SET isi = $1, edited_at = $2 WHERE id = $3 RETURNING id",
+    [String(isi), nowIso(), id]
+  );
+  return rows.length > 0;
+}
+
+export async function deleteKomentar(id) {
+  // Balasan ikut terhapus supaya thread tidak menggantung
+  const rows = await q(
+    "DELETE FROM komentar WHERE id = $1 OR parent_id = $1 RETURNING id", [id]
+  );
+  const ids = rows.map((r) => r.id);
+  if (ids.length) {
+    await q("DELETE FROM komentar_baca WHERE komentar_id = ANY($1)", [ids]);
+  }
+  return ids.length;
+}
+
+export async function setKomentarSelesai(id, selesai) {
+  const rows = await q(
+    "UPDATE komentar SET selesai = $1 WHERE id = $2 RETURNING id",
+    [!!selesai, id]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Hitung komentar BELUM DIBACA milik user ini, per jenis.
+ * - tim  : komentar orang lain di logbook-nya.
+ * - fasilitator: komentar orang lain di semua tim yang ia ampu.
+ * Return: { kegiatan: n, keuangan: n, laporan: n, total: n }
+ */
+export async function hitungBelumDibaca(userId, role) {
+  const scope =
+    role === "fasilitator"
+      ? `k.tim_user_id IN (SELECT tim_user_id FROM fasilitator_tim WHERE fasilitator_id = $1)`
+      : `k.tim_user_id = $1`;
+  const rows = await q(
+    `SELECT k.jenis, COUNT(*) AS n
+       FROM komentar k
+       LEFT JOIN komentar_baca b ON b.komentar_id = k.id AND b.user_id = $1
+      WHERE ${scope} AND k.penulis_id <> $1 AND b.user_id IS NULL
+      GROUP BY k.jenis`,
+    [userId]
+  );
+  const hasil = { kegiatan: 0, keuangan: 0, laporan: 0, total: 0 };
+  for (const r of rows) {
+    hasil[r.jenis] = angka(r.n);
+    hasil.total += angka(r.n);
+  }
+  return hasil;
+}
+
+/** Tandai daftar komentar sudah dibaca oleh user ini (idempoten). */
+export async function tandaiDibaca(userId, komentarIds) {
+  for (const kid of komentarIds || []) {
+    await q(
+      `INSERT INTO komentar_baca (komentar_id, user_id) VALUES ($1, $2)
+       ON CONFLICT DO NOTHING`,
+      [String(kid), String(userId)]
+    );
+  }
 }
 

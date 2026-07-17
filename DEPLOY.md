@@ -107,6 +107,11 @@ ke layanan cloud gratis yang memang khusus untuk itu:
 > backend cek token login → balas **redirect ke signed URL** ImageKit
 > (berlaku 1 jam) → foto meluncur langsung dari CDN. Cepat & tetap privat.
 
+> 📄 **Laporan kemajuan (.docx) juga tersimpan di ImageKit** — bukan di Neon.
+> Kuota Neon (0,5 GB) tetap lega walau tiap tim mengunggah laporan puluhan MB;
+> ImageKit menampung sampai 20 GB. Baris laporan lama (base64 di Neon) otomatis
+> **dimigrasikan** ke ImageKit saat pertama kali diakses — tanpa langkah manual.
+
 ---
 
 ## Bagian 4 — Isi file `.env` di laptop

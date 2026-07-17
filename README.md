@@ -83,6 +83,29 @@ dan impornya tidak saling terlihat antar akun.
 >   (tanpa bisa melihat password lama), lalu segera ganti sendiri lewat
 >   menu Pengaturan akun.
 
+### 🎓 Peran Fasilitator
+
+Selain akun **tim** (default), ada peran **fasilitator** — pembimbing yang
+memantau logbook tim:
+
+- **Daftar**: di tab Daftar, isi konfirmasi password lalu centang
+  **"Daftar sebagai Fasilitator"** → masukkan **kode fasilitator** yang
+  ditetapkan admin di pusat kendali (tanpa kode yang benar, pendaftaran ditolak).
+- **Akses**: fasilitator hanya bisa **melihat & mengomentari** kegiatan,
+  keuangan, dan laporan kemajuan tim yang **ditugaskan pusat kendali** —
+  tidak bisa menambah/mengubah/menghapus data apa pun (dipagari di server).
+- **Many-to-many**: satu tim boleh punya banyak fasilitator, dan satu
+  fasilitator boleh mengampu banyak tim (ada pemilih tim di bilah atas).
+- **Komentar 2 arah**: fasilitator memulai komentar pada entri; tim membalas,
+  menandai selesai, dan keduanya bisa mengedit (berlabel *"(diedit)"*) atau
+  menghapus komentar miliknya. Ada badge jumlah komentar belum dibaca di menu.
+- **Belum ditugaskan?** Setelah login, fasilitator melihat pesan
+  *"Hubungi admin untuk menjadikan kamu fasilitator di tim kamu"* sampai
+  pusat kendali menetapkan timnya.
+- **Pusat kendali**: tabel akun kini bertab **👥 Tim / 🎓 Fasilitator** —
+  kelola kode pendaftaran, tetapkan tim per fasilitator (multi-pilih),
+  dan lihat laporan kemajuan tiap tim di tab **📄 Laporan**.
+
 ### Opsi
 
 | Perintah | Fungsi |

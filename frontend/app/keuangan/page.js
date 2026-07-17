@@ -2,9 +2,13 @@
 
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
-import { api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData } from "@/lib/api";
+import {
+  api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData,
+  isFasilitator, getTimAktif,
+} from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
+import KomentarPanel from "@/components/Komentar";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -20,13 +24,147 @@ const labelBulan = (kunci) => {
   return `${NAMA_BULAN[m - 1]} ${y}`;
 };
 
+/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
+function useJumlahKomentar(jenis, timId, aktif = true) {
+  const [peta, setPeta] = useState({});
+  useEffect(() => {
+    if (!aktif) return;
+    let hidup = true;
+    api.komentar.jumlah(jenis, timId || undefined)
+      .then((m) => { if (hidup) setPeta(m); })
+      .catch(() => {});
+    return () => { hidup = false; };
+  }, [jenis, timId, aktif]);
+  return peta;
+}
+
 export default function KeuanganPage() {
+  const [fas, setFas] = useState(null);
+  useEffect(() => { setFas(isFasilitator()); }, []);
+  if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
+  return fas ? <KeuanganFasilitator /> : <KeuanganTim />;
+}
+
+/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+function KeuanganFasilitator() {
+  const [timId, setTimId] = useState("");
+  const [items, setItems] = useState(null);
+  const [gagal, setGagal] = useState("");
+  const [cari, setCari] = useState("");
+  const [lb, setLb] = useState(null);
+  const peta = useJumlahKomentar("keuangan", timId, !!timId);
+
+  useEffect(() => {
+    const muatTim = async () => {
+      let id = getTimAktif();
+      try {
+        const tim = await api.fasilitator.tim();
+        if (!tim.length) { setGagal("belum-assign"); return; }
+        if (!tim.some((t) => t.id === id)) id = tim[0].id;
+        setTimId(id);
+      } catch (e) {
+        setGagal(e.message);
+      }
+    };
+    muatTim();
+    const ganti = (e) => setTimId(String(e.detail || getTimAktif()));
+    window.addEventListener("tim-aktif-berubah", ganti);
+    return () => window.removeEventListener("tim-aktif-berubah", ganti);
+  }, []);
+
+  useEffect(() => {
+    if (!timId) return;
+    let hidup = true;
+    setItems(null);
+    api.fasilitator.keuangan(timId)
+      .then((rows) => { if (hidup) setItems(rows); })
+      .catch((e) => { if (hidup) setGagal(e.message); });
+    return () => { hidup = false; };
+  }, [timId]);
+
+  if (gagal === "belum-assign")
+    return (
+      <div className="empty mt">
+        <div className="big">📞</div>
+        <p>Hubungi admin untuk menjadikan kamu fasilitator di tim kamu.</p>
+      </div>
+    );
+  if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
+  if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
+
+  const view = [...items]
+    .filter((e) => !cari || e.item.toLowerCase().includes(cari.toLowerCase()))
+    .reverse();
+  const total = items.reduce((s, e) => s + e.total, 0);
+
+  const bukaBukti = (e) =>
+    setLb({
+      items: [{ src: fotoUrl(e.bukti_key), judul: fmtTgl(e.tanggal), ket: e.item }],
+      index: 0,
+    });
+
+  return (
+    <>
+      <div className="card mt">
+        <div className="row spread">
+          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+            <span className="in-ic"><Search className="lucide" /></span>
+            <input placeholder="Cari item belanja…" value={cari}
+                   onChange={(e) => setCari(e.target.value)} />
+          </div>
+          <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
+        </div>
+      </div>
+
+      <p className="muted mt">
+        {view.length} entri belanja tim · total{" "}
+        <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
+      </p>
+
+      {view.length === 0 && (
+        <div className="empty">
+          <div className="big"><Wallet className="lucide" /></div>
+          <p>Tim belum mencatat belanja.</p>
+        </div>
+      )}
+
+      <div className="stagger">
+        {view.map((e) => (
+          <div key={e.id} className="card mt">
+            <div className="row spread">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b>{fmtTgl(e.tanggal)}</b> — {e.item}
+                <p className="muted mts">
+                  {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
+                  <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
+                </p>
+                {e.bukti_key && (
+                  <div className="foto-row">
+                    <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
+                         onError={retryFoto} onClick={() => bukaBukti(e)} />
+                  </div>
+                )}
+                <KomentarPanel jenis="keuangan" targetId={e.id} timId={timId}
+                               n={peta[e.id] || 0} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
+    </>
+  );
+}
+
+/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+function KeuanganTim() {
   const { data: items, error: loadErr } = useApi("/api/keuangan");
   const [cari, setCari] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [edit, setEdit] = useState(null);
   const [lb, setLb] = useState(null);
   const dlgRef = useRef(null);
+  const petaKomentar = useJumlahKomentar("keuangan", "");
 
   useEffect(() => { if (edit && dlgRef.current) dlgRef.current.showModal(); }, [edit]);
   // Di layar sempit tabel 7 kolom sesak — mulai dengan tampilan kartu
@@ -162,6 +300,8 @@ export default function KeuanganPage() {
                       <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
                         <Trash2 className="lucide" />
                       </button>
+                      <KomentarPanel jenis="keuangan" targetId={r.e.id}
+                                     n={petaKomentar[r.e.id] || 0} />
                     </td>
                   </tr>
                 )
@@ -188,6 +328,8 @@ export default function KeuanganPage() {
                            onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}
+                  <KomentarPanel jenis="keuangan" targetId={e.id}
+                                 n={petaKomentar[e.id] || 0} />
                 </div>
                 <div className="entry-actions">
                   <button className="btn sm" onClick={() => setEdit(e)}>

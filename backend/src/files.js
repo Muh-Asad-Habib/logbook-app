@@ -170,6 +170,46 @@ export async function putFile(originalName, buffer, prefix = "img") {
   return key;
 }
 
+/**
+ * Simpan berkas NON-gambar apa adanya (tanpa kompresi sharp) — dipakai untuk
+ * laporan kemajuan .docx. Whitelist ketat: hanya .docx yang diterima.
+ * Cloud: upload ke ImageKit + catat fileId di tabel `files` (jalur sama
+ * dengan foto). Lokal: tulis ke folder uploads/.
+ */
+export async function putFileRaw(originalName, buffer, prefix = "lap") {
+  const ext = path.extname(originalName || "").toLowerCase();
+  if (ext !== ".docx") throw new Error("Hanya berkas .docx yang diizinkan");
+  const key = buatKey(prefix, ext);
+
+  if (pakaiCloud()) {
+    const form = new FormData();
+    form.append("file", buffer.toString("base64"));
+    form.append("fileName", key);
+    form.append("folder", IK.folder);
+    form.append("useUniqueFileName", "false");
+    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: { Authorization: authHeader() },
+      body: form,
+    });
+    if (!res.ok) {
+      const pesan = await res.text().catch(() => "");
+      throw new Error(`Upload ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
+    }
+    const info = await res.json(); // { fileId, url, filePath, ... }
+    await q(
+      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
+       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
+      [key, info.fileId || "", info.url || ""]
+    );
+    return key;
+  }
+
+  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  fs.writeFileSync(safePath(key), buffer);
+  return key;
+}
+
 /** Hapus banyak berkas (abaikan yang sudah tidak ada / gagal). */
 export async function removeFiles(keys) {
   for (const k of keys || []) {

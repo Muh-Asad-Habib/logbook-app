@@ -11,6 +11,9 @@ export default function LoginPage() {
   const [mode, setMode] = useState("login"); // "login" | "daftar"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [konfirmasi, setKonfirmasi] = useState("");
+  const [sebagaiFas, setSebagaiFas] = useState(false);
+  const [kodeFas, setKodeFas] = useState("");
   const [lihatPass, setLihatPass] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,12 +30,28 @@ export default function LoginPage() {
       setErr("Username dan password wajib diisi");
       return;
     }
+    if (mode === "daftar") {
+      if (password !== konfirmasi) {
+        setErr("Konfirmasi password tidak cocok");
+        return;
+      }
+      if (sebagaiFas && !kodeFas.trim()) {
+        setErr("Masukkan kode fasilitator dari admin");
+        return;
+      }
+    }
     setBusy(true);
     try {
       const r =
         mode === "login"
           ? await api.login(username.trim(), password)
-          : await api.register(username.trim(), password);
+          : await api.register(
+              username.trim(),
+              password,
+              sebagaiFas
+                ? { sebagai_fasilitator: true, kode_fasilitator: kodeFas.trim() }
+                : {}
+            );
       setAuth(r.token, r.user);
       location.replace("/"); // muat ulang bersih dengan sesi baru
     } catch (e) {
@@ -44,6 +63,9 @@ export default function LoginPage() {
   const ganti = (m) => {
     setMode(m);
     setErr("");
+    setKonfirmasi("");
+    setSebagaiFas(false);
+    setKodeFas("");
   };
 
   return (
@@ -120,6 +142,61 @@ export default function LoginPage() {
               </button>
             </div>
           </label>
+
+          {mode === "daftar" && (
+            <>
+              <label className="field">
+                Konfirmasi password
+                <div className="input-wrap">
+                  <span className="in-ic" aria-hidden="true"><Lock className="lucide" /></span>
+                  <input
+                    type={lihatPass ? "text" : "password"}
+                    value={konfirmasi}
+                    onChange={(e) => setKonfirmasi(e.target.value)}
+                    placeholder="ulangi password"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </label>
+
+              <label
+                className="field"
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  cursor: "pointer", userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={sebagaiFas}
+                  onChange={(e) => setSebagaiFas(e.target.checked)}
+                  style={{ width: "auto", margin: 0 }}
+                />
+                <span>
+                  Daftar sebagai <b>Fasilitator</b>
+                  <small style={{ display: "block", opacity: 0.7 }}>
+                    Hanya melihat &amp; mengomentari logbook tim yang ditugaskan admin
+                  </small>
+                </span>
+              </label>
+
+              {sebagaiFas && (
+                <label className="field">
+                  Kode fasilitator
+                  <div className="input-wrap">
+                    <span className="in-ic" aria-hidden="true"><KeyRound className="lucide" /></span>
+                    <input
+                      type="text"
+                      value={kodeFas}
+                      onChange={(e) => setKodeFas(e.target.value)}
+                      placeholder="kode dari admin / pusat kendali"
+                      autoComplete="off"
+                    />
+                  </div>
+                </label>
+              )}
+            </>
+          )}
 
           {err && <div className="error-box">{err}</div>}
 

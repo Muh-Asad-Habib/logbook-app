@@ -51,11 +51,33 @@ export async function authRequired(req, res, next) {
       simpanCache(token, user);
     }
     req.userId = user.id;
-    req.user = { id: user.id, username: user.username };
+    req.user = { id: user.id, username: user.username, role: user.role || "tim" };
     req.token = token;
     next();
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * Pagar tulis: hanya akun TIM yang boleh lewat.
+ * Dipasang di seluruh router aksi data (kegiatan/keuangan/laporan/ekspor/impor)
+ * supaya fasilitator mustahil mengubah data — bahkan lewat API langsung.
+ */
+export function hanyaTim(req, res, next) {
+  if (req.user?.role === "fasilitator") {
+    return res.status(403).json({
+      error: "Akun fasilitator hanya dapat melihat & mengomentari",
+    });
+  }
+  next();
+}
+
+/** Kebalikan hanyaTim — dipakai router /api/fasilitator. */
+export function hanyaFasilitator(req, res, next) {
+  if (req.user?.role !== "fasilitator") {
+    return res.status(403).json({ error: "Khusus akun fasilitator" });
+  }
+  next();
 }
 

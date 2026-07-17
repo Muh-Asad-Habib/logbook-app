@@ -4,9 +4,13 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import {
   Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange,
 } from "lucide-react";
-import { api, fotoUrl, fmtDurasi, fmtTgl, useApi, refreshData } from "@/lib/api";
+import {
+  api, fotoUrl, fmtDurasi, fmtTgl, useApi, refreshData,
+  isFasilitator, getTimAktif,
+} from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
+import KomentarPanel from "@/components/Komentar";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -45,7 +49,152 @@ function grupBulan(items) {
   return out;
 }
 
+/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
+function useJumlahKomentar(jenis, timId, aktif = true) {
+  const [peta, setPeta] = useState({});
+  useEffect(() => {
+    if (!aktif) return;
+    let hidup = true;
+    api.komentar.jumlah(jenis, timId || undefined)
+      .then((m) => { if (hidup) setPeta(m); })
+      .catch(() => {});
+    return () => { hidup = false; };
+  }, [jenis, timId, aktif]);
+  return peta;
+}
+
 export default function KegiatanPage() {
+  // Fasilitator: read-only + komentar; Tim: halaman penuh seperti biasa
+  const [fas, setFas] = useState(null);
+  useEffect(() => { setFas(isFasilitator()); }, []);
+  if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
+  return fas ? <KegiatanFasilitator /> : <KegiatanTim />;
+}
+
+/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+function KegiatanFasilitator() {
+  const [timId, setTimId] = useState("");
+  const [items, setItems] = useState(null);
+  const [gagal, setGagal] = useState("");
+  const [cari, setCari] = useState("");
+  const [lb, setLb] = useState(null);
+  const peta = useJumlahKomentar("kegiatan", timId, !!timId);
+
+  // Ikuti tim aktif dari switcher topbar
+  useEffect(() => {
+    const muatTim = async () => {
+      let id = getTimAktif();
+      try {
+        const tim = await api.fasilitator.tim();
+        if (!tim.length) { setGagal("belum-assign"); return; }
+        if (!tim.some((t) => t.id === id)) id = tim[0].id;
+        setTimId(id);
+      } catch (e) {
+        setGagal(e.message);
+      }
+    };
+    muatTim();
+    const ganti = (e) => setTimId(String(e.detail || getTimAktif()));
+    window.addEventListener("tim-aktif-berubah", ganti);
+    return () => window.removeEventListener("tim-aktif-berubah", ganti);
+  }, []);
+
+  useEffect(() => {
+    if (!timId) return;
+    let hidup = true;
+    setItems(null);
+    api.fasilitator.kegiatan(timId)
+      .then((rows) => { if (hidup) setItems(rows); })
+      .catch((e) => { if (hidup) setGagal(e.message); });
+    return () => { hidup = false; };
+  }, [timId]);
+
+  if (gagal === "belum-assign")
+    return (
+      <div className="empty mt">
+        <div className="big">📞</div>
+        <p>Hubungi admin untuk menjadikan kamu fasilitator di tim kamu.</p>
+      </div>
+    );
+  if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
+  if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
+
+  const view = [...items]
+    .filter((e) => !cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase()))
+    .reverse();
+  const grup = grupBulan(view);
+
+  const bukaFoto = (e, idx) =>
+    setLb({
+      items: e.foto_keys.map((k) => ({
+        src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.kegiatan.slice(0, 90),
+      })),
+      index: idx,
+    });
+
+  return (
+    <>
+      <div className="card mt">
+        <div className="row spread">
+          <div className="input-wrap" style={{ flex: "2 1 220px", marginTop: 0 }}>
+            <span className="in-ic"><Search className="lucide" /></span>
+            <input placeholder="Cari kegiatan…" value={cari}
+                   onChange={(e) => setCari(e.target.value)} />
+          </div>
+          <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
+        </div>
+      </div>
+
+      <p className="muted mt">{view.length} entri kegiatan tim</p>
+      {view.length === 0 && (
+        <div className="empty">
+          <div className="big"><CalendarDays className="lucide" /></div>
+          <p>Tim belum mencatat kegiatan.</p>
+        </div>
+      )}
+
+      {grup.map((g) => (
+        <div key={g.kunci}>
+          <div className="month-head">
+            <CalendarRange className="lucide" /> {g.label}
+            <span className="badge info">{g.items.length} entri</span>
+          </div>
+          <div className="stagger">
+            {g.items.map((e) => (
+              <div key={e.id} className="card mt">
+                <div className="entry">
+                  <DateTile iso={e.tanggal} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div>
+                      <span className="badge ok">+{e.capaian_delta}%</span>
+                      <span className="badge info">{fmtDurasi(e.waktu_menit)}</span>
+                      <span className="badge warn">total {e.capaian_total}%</span>
+                    </div>
+                    <p className="mts" style={{ fontSize: "0.92rem" }}>{e.kegiatan}</p>
+                    {e.foto_keys.length > 0 && (
+                      <div className="foto-row">
+                        {e.foto_keys.map((k, i) => (
+                          <img key={k} src={fotoUrl(k)} alt="foto kegiatan" loading="lazy"
+                               onError={retryFoto} onClick={() => bukaFoto(e, i)} />
+                        ))}
+                      </div>
+                    )}
+                    <KomentarPanel jenis="kegiatan" targetId={e.id} timId={timId}
+                                   n={peta[e.id] || 0} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
+    </>
+  );
+}
+
+/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+function KegiatanTim() {
   const { data: items, error: loadErr } = useApi("/api/kegiatan");
   const [cari, setCari] = useState("");
   const [dari, setDari] = useState("");
@@ -54,6 +203,7 @@ export default function KegiatanPage() {
   const [edit, setEdit] = useState(null);
   const [lb, setLb] = useState(null);
   const dlgRef = useRef(null);
+  const petaKomentar = useJumlahKomentar("kegiatan", "");
 
   useEffect(() => { if (edit && dlgRef.current) dlgRef.current.showModal(); }, [edit]);
 
@@ -162,6 +312,8 @@ export default function KegiatanPage() {
                         ))}
                       </div>
                     )}
+                    <KomentarPanel jenis="kegiatan" targetId={e.id}
+                                   n={petaKomentar[e.id] || 0} />
                   </div>
                   <div className="entry-actions">
                     <button className="btn sm" onClick={() => setEdit(e)}>

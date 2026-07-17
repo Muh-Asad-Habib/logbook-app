@@ -11,7 +11,7 @@ import fs from "node:fs";
 import { q, angka } from "../db.js";
 import * as store from "../storage.js";
 import * as adminStore from "./store.js";
-import { verifyPasswordStrong } from "../passwords.js";
+import { verifyPasswordStrong, hashPassword } from "../passwords.js";
 import { removeFiles, safePath, contentType, signedUrl, pakaiCloud } from "../files.js";
 import { PANEL_HTML } from "./panel.js";
 import { bus } from "../bus.js";
@@ -75,17 +75,21 @@ router.post("/keluar", async (req, res, next) => {
 
 router.get("/data/ringkas", async (_req, res, next) => {
   try {
-    const [u, k, b, s] = await Promise.all([
+    const [u, k, b, s, f, l] = await Promise.all([
       q("SELECT COUNT(*) AS n FROM users"),
       q("SELECT COUNT(*) AS n FROM kegiatan"),
       q("SELECT COUNT(*) AS n FROM keuangan"),
       q("SELECT COUNT(*) AS n FROM sessions"),
+      q("SELECT COUNT(*) AS n FROM users WHERE role = 'fasilitator'"),
+      q("SELECT COUNT(*) AS n FROM laporan_docx"),
     ]);
     res.json({
       users: angka(u[0]?.n),
       kegiatan: angka(k[0]?.n),
       keuangan: angka(b[0]?.n),
       sesi: angka(s[0]?.n),
+      fasilitator: angka(f[0]?.n),
+      laporan: angka(l[0]?.n),
     });
   } catch (err) {
     next(err);
@@ -250,6 +254,103 @@ router.delete("/data/pengguna/:id", async (req, res, next) => {
       berkasDihapus: hasil.fileKeys.length,
     });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------- fitur fasilitator ---------- */
+
+/** Status kode pendaftaran fasilitator (kode asli tidak pernah bisa dibaca). */
+router.get("/data/kode-fasilitator", async (_req, res, next) => {
+  try {
+    const hash = await store.getMeta("kodeFasilitator");
+    const updatedAt = await store.getMeta("kodeFasilitatorUpdatedAt");
+    res.json({ ada: !!hash, updatedAt: updatedAt || "" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Set/ganti kode pendaftaran fasilitator (disimpan sebagai hash scrypt). */
+router.put("/data/kode-fasilitator", async (req, res, next) => {
+  try {
+    const kode = String(req.body?.kode || "");
+    if (kode.length < 6) {
+      return res.status(400).json({ error: "Kode minimal 6 karakter" });
+    }
+    await store.setMeta("kodeFasilitator", hashPassword(kode));
+    await store.setMeta("kodeFasilitatorUpdatedAt", new Date().toISOString());
+    adminStore.audit(req, "fasilitator.kode.ubah", {});
+    res.json({ ok: true, catatan: "Kode baru langsung berlaku untuk pendaftaran berikutnya" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Daftar tim yang diampu seorang fasilitator. */
+router.get("/data/fasilitator/:id/tim", async (req, res, next) => {
+  try {
+    const fas = await store.getUserById(req.params.id);
+    if (!fas || fas.role !== "fasilitator") {
+      return res.status(404).json({ error: "Akun fasilitator tidak ditemukan" });
+    }
+    res.json({ tim: await store.listTimUntukFasilitator(fas.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Ganti seluruh assignment tim seorang fasilitator (many-to-many). */
+router.put("/data/fasilitator/:id/tim", async (req, res, next) => {
+  try {
+    const fas = await store.getUserById(req.params.id);
+    if (!fas || fas.role !== "fasilitator") {
+      return res.status(404).json({ error: "Akun fasilitator tidak ditemukan" });
+    }
+    const timIds = Array.isArray(req.body?.tim_ids) ? req.body.tim_ids.map(String) : [];
+    // Validasi semua target adalah akun TIM yang ada
+    for (const id of timIds) {
+      const t = await store.getUserById(id);
+      if (!t || t.role === "fasilitator") {
+        return res.status(400).json({ error: `Akun tim tidak valid: ${id}` });
+      }
+    }
+    const hasil = await store.gantiTimFasilitator(fas.id, timIds);
+    adminStore.audit(req, "fasilitator.tim.ubah", {
+      target: fas.id,
+      username: fas.username,
+      ...hasil,
+    });
+    res.json({ ok: true, ...hasil });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Daftar fasilitator yang mengampu sebuah tim (info di tab Tim). */
+router.get("/data/tim/:id/fasilitator", async (req, res, next) => {
+  try {
+    const tim = await store.getUserById(req.params.id);
+    if (!tim) return res.status(404).json({ error: "Akun tidak ditemukan" });
+    res.json({ fasilitator: await store.listFasilitatorUntukTim(tim.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Sajikan laporan .docx sebuah tim untuk panel (sesi panel; dukung ?t=). */
+router.get("/data/pengguna/:id/laporan-file", async (req, res, next) => {
+  try {
+    const l = await store.getLaporan(req.params.id);
+    if (!l) return res.status(404).json({ error: "Belum ada laporan tersimpan" });
+    adminStore.audit(req, "user.laporan.lihat", { target: req.params.id });
+    res.setHeader("Content-Type",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const unduh = req.query.unduh ? "attachment" : "inline";
+    res.setHeader("Content-Disposition",
+      `${unduh}; filename="${encodeURIComponent(l.nama)}"`);
+    res.send(l.buffer);
   } catch (err) {
     next(err);
   }

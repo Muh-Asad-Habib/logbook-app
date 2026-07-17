@@ -157,7 +157,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .stat .ic .i{width:20px;height:20px;stroke-width:1.8}
   .stat b{font-size:1.55rem;letter-spacing:-.03em;display:block;line-height:1.1;font-variant-numeric:tabular-nums}
   .stat .lbl{color:var(--mut);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-  .s1{--a:#818cf8}.s2{--a:#22d3ee}.s3{--a:#fbbf24}.s4{--a:#34d399}
+  .s1{--a:#818cf8}.s2{--a:#22d3ee}.s3{--a:#fbbf24}.s4{--a:#34d399}.s5{--a:#f0abfc}
 
   /* ---------- tabel ---------- */
   .tbl{overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:13px}
@@ -415,9 +415,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
         <span class="search"><svg class="i"><use href="#i-search"/></svg>
         <input id="cari" placeholder="Cari username…"></span>
       </div>
+      <div class="tabs" style="margin-top:12px">
+        <button class="on" data-role-tab="tim">👥 Tim</button>
+        <button data-role-tab="fasilitator">🎓 Fasilitator</button>
+      </div>
       <div class="tbl">
         <table>
-          <thead><tr>
+          <thead><tr id="t-users-head">
             <th>Akun</th><th class="num">Kegiatan</th><th class="num">Belanja</th>
             <th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th>
             <th style="text-align:right">Aksi</th>
@@ -432,25 +436,39 @@ export const PANEL_HTML = /* html */ `<!doctype html>
         <h2><svg class="i"><use href="#i-scroll"/></svg> Jejak audit <span class="tag">60 terakhir</span></h2>
         <div class="audit" id="audit"></div>
       </div>
-      <div class="card">
-        <h2><svg class="i"><use href="#i-lock"/></svg> Akun pemeliharaan</h2>
-        <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
-        hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
-        <form id="f-self">
-          <label>Username baru (opsional)
-            <span class="in-wrap"><svg class="i"><use href="#i-user"/></svg>
-            <input id="s-u" autocomplete="off"></span>
-          </label>
-          <label>Password baru (opsional, min. 10)
-            <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
-            <input id="s-p" type="password" autocomplete="off"></span>
-          </label>
-          <label>Password saat ini (wajib)
-            <span class="in-wrap"><svg class="i"><use href="#i-lock"/></svg>
-            <input id="s-cur" type="password" autocomplete="off"></span>
-          </label>
-          <button class="btn p" style="margin-top:16px"><svg class="i"><use href="#i-save"/></svg> Simpan kredensial</button>
-        </form>
+      <div>
+        <div class="card" style="margin-top:16px">
+          <h2>🎓 Kode pendaftaran fasilitator <span class="tag" id="kode-status">—</span></h2>
+          <p class="mut" style="margin-top:8px">Kode ini wajib dimasukkan saat seseorang mendaftar
+          sebagai fasilitator. Disimpan sebagai hash — tidak bisa dilihat lagi, hanya bisa diganti.</p>
+          <form id="f-kode">
+            <label>Kode baru (min. 6 karakter)
+              <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+              <input id="k-val" autocomplete="off" placeholder="kode rahasia fasilitator"></span>
+            </label>
+            <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2><svg class="i"><use href="#i-lock"/></svg> Akun pemeliharaan</h2>
+          <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
+          hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
+          <form id="f-self">
+            <label>Username baru (opsional)
+              <span class="in-wrap"><svg class="i"><use href="#i-user"/></svg>
+              <input id="s-u" autocomplete="off"></span>
+            </label>
+            <label>Password baru (opsional, min. 10)
+              <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+              <input id="s-p" type="password" autocomplete="off"></span>
+            </label>
+            <label>Password saat ini (wajib)
+              <span class="in-wrap"><svg class="i"><use href="#i-lock"/></svg>
+              <input id="s-cur" type="password" autocomplete="off"></span>
+            </label>
+            <button class="btn p" style="margin-top:16px"><svg class="i"><use href="#i-save"/></svg> Simpan kredensial</button>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -473,9 +491,25 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     <div class="tabs">
       <button class="on" data-tab="keg">🗓️ Kegiatan</button>
       <button data-tab="keu">💰 Keuangan</button>
+      <button data-tab="lap">📄 Laporan</button>
       <button data-tab="akt">📜 Aktivitas</button>
     </div>
     <div id="dt-isi"></div>
+  </div>
+</dialog>
+
+<!-- ===== DIALOG ASSIGN TIM FASILITATOR ===== -->
+<dialog id="d-tim" class="mini">
+  <div class="dlg-h"><h3>🔗 Tim yang diampu</h3></div>
+  <div class="dlg-b">
+    <p class="mut" id="d-tim-sub"></p>
+    <form method="dialog" id="f-tim">
+      <div id="d-tim-list" style="margin-top:10px;max-height:46vh;overflow:auto"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button value="batal" class="btn">Batal</button>
+        <button value="ok" class="btn p">Simpan</button>
+      </div>
+    </form>
   </div>
 </dialog>
 
@@ -527,6 +561,7 @@ var USERS = [];
 var DETAIL = null;
 var AKTIVITAS = [];
 var TAB = "keg";
+var VIEW_ROLE = "tim";  // tab aktif tabel akun: 'tim' | 'fasilitator'
 var ES = null;          // EventSource siaran langsung
 var muatTimer = null;   // debounce pembaruan live
 
@@ -657,17 +692,25 @@ function segarkanDetail(){
 /* ---------- muat data ---------- */
 function muat(){
   var rb = $("#btn-muat"); if (rb) rb.classList.add("memuat");
-  Promise.all([call("/data/ringkas"), call("/data/pengguna"), call("/data/audit")])
+  Promise.all([
+    call("/data/ringkas"), call("/data/pengguna"), call("/data/audit"),
+    call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; })
+  ])
     .then(function(rs){
       var ov = rs[0]; USERS = rs[1].users;
       $("#statistik").innerHTML =
-        stat("users","Akun terdaftar",ov.users,"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
-        stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4");
+        stat("users","Akun tim",(ov.users - (ov.fasilitator||0)),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
+        stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
+        stat("user","Fasilitator",(ov.fasilitator||0),"s5");
       document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
         hitungNaik(b, Number(b.dataset.n));
       });
       $("#jml-user").textContent = ov.users + " akun";
       renderUsers();
+      var ks = $("#kode-status");
+      if (ks) ks.textContent = rs[3].ada
+        ? "diset" + (rs[3].updatedAt ? " · " + tgl(rs[3].updatedAt) : "")
+        : "belum diset";
       $("#audit").innerHTML = rs[2].rows.map(function(r){
         var aksi = r.aksi || r.raw || "";
         return '<div class="row-a"><span class="t">' + esc(tglJam(r.ts)) + '</span>' +
@@ -709,9 +752,25 @@ function namaTarget(r){
 
 function renderUsers(){
   var q = ($("#cari").value || "").toLowerCase();
-  var rows = USERS.filter(function(u){ return u.username.toLowerCase().indexOf(q) >= 0; });
-  $("#t-users").innerHTML = rows.map(barisUser).join("") ||
-    '<tr><td colspan="7"><div class="kosong"><div class="big">🔍</div>Tidak ada akun yang cocok.</div></td></tr>';
+  var rows = USERS.filter(function(u){
+    var role = u.role || "tim";
+    if (VIEW_ROLE === "fasilitator" ? role !== "fasilitator" : role === "fasilitator") return false;
+    return u.username.toLowerCase().indexOf(q) >= 0;
+  });
+  var head = $("#t-users-head");
+  if (head) {
+    head.innerHTML = VIEW_ROLE === "fasilitator"
+      ? "<th>Akun</th><th>Tim diampu</th><th>Sesi</th><th>Dibuat</th><th style='text-align:right'>Aksi</th>"
+      : '<th>Akun</th><th class="num">Kegiatan</th><th class="num">Belanja</th>' +
+        '<th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th><th style="text-align:right">Aksi</th>';
+  }
+  var kolom = VIEW_ROLE === "fasilitator" ? 5 : 7;
+  $("#t-users").innerHTML = rows.map(VIEW_ROLE === "fasilitator" ? barisFasilitator : barisUser).join("") ||
+    '<tr><td colspan="' + kolom + '"><div class="kosong"><div class="big">' +
+    (VIEW_ROLE === "fasilitator" ? "🎓" : "🔍") + '</div>' +
+    (VIEW_ROLE === "fasilitator" && !q
+      ? "Belum ada akun fasilitator.<div class='mut' style='margin-top:6px'>Set kode pendaftaran di kartu bawah, lalu bagikan ke fasilitator.</div>"
+      : "Tidak ada akun yang cocok.") + "</div></td></tr>";
 }
 function barisUser(u){
   var ini = (u.username || "?").charAt(0).toUpperCase();
@@ -719,6 +778,8 @@ function barisUser(u){
     '<td><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
       "<b>" + esc(u.username) + "</b>" +
       (u.pemilikTemplate ? ' <span class="badge b">arsip</span>' : "") +
+      (u.punya_laporan ? ' <span class="badge c">📄 laporan</span>' : "") +
+      (u.n_fasilitator ? ' <span class="badge y">🎓 ' + u.n_fasilitator + '</span>' : "") +
       '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
     "</div></div></td>" +
     '<td class="num">' + u.kegiatan + "</td>" +
@@ -728,6 +789,26 @@ function barisUser(u){
     "<td style='white-space:nowrap'>" + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
+      '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
+      '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
+      '<button class="btn sm ic" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' + u.id + '">' + sv("power") + '</button>' +
+      '<button class="btn sm ic d" title="Hapus akun" data-act="hapus" data-id="' + u.id + '">' + sv("trash") + '</button>' +
+    "</div></td></tr>";
+}
+function barisFasilitator(u){
+  var ini = (u.username || "?").charAt(0).toUpperCase();
+  return "<tr>" +
+    '<td><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
+      "<b>" + esc(u.username) + "</b> <span class='badge y'>🎓 fasilitator</span>" +
+      '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
+    "</div></div></td>" +
+    "<td>" + (u.n_tim_diampu
+      ? '<span class="badge b">' + u.n_tim_diampu + " tim</span>"
+      : '<span class="mut">belum di-assign</span>') + "</td>" +
+    "<td>" + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
+    "<td style='white-space:nowrap'>" + tgl(u.createdAt) + "</td>" +
+    '<td class="acts-cell"><div class="acts">' +
+      '<button class="btn sm p" data-act="tim" data-id="' + u.id + '">🔗 Tim</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
       '<button class="btn sm ic" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' + u.id + '">' + sv("power") + '</button>' +
@@ -775,7 +856,29 @@ function renderTab(){
   $("#dt-isi").innerHTML =
     TAB === "keg" ? tabelKegiatan(DETAIL.kegiatan) :
     TAB === "keu" ? tabelKeuangan(DETAIL.keuangan) :
+    TAB === "lap" ? tabelLaporan(DETAIL) :
     tabelAktivitas(AKTIVITAS);
+}
+function ukur(b){
+  b = Number(b || 0);
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+  if (b >= 1024) return Math.round(b / 1024) + " KB";
+  return b + " B";
+}
+function tabelLaporan(d){
+  var l = d.laporan || { ada: false };
+  if (!l.ada) return '<div class="kosong"><div class="big">📄</div>Tim ini belum mengunggah laporan kemajuan.</div>';
+  var url = B + "/data/pengguna/" + d.user.id + "/laporan-file?t=" + encodeURIComponent(TOK);
+  return '<div class="card" style="margin-top:14px">' +
+    '<div class="row spread">' +
+      '<div><b style="font-size:.95rem">📄 ' + esc(l.nama) + '</b>' +
+      '<div class="mut" style="margin-top:4px">' + ukur(l.ukuran) +
+      ' · diunggah ' + esc(tglJam(l.updated_at)) + '</div></div>' +
+      '<div class="row" style="gap:8px">' +
+        '<a class="btn sm p" href="' + url + '" target="_blank" rel="noopener">' + sv("folder") + ' Buka</a>' +
+        '<a class="btn sm" href="' + url + '&unduh=1">' + sv("save") + ' Unduh</a>' +
+      '</div>' +
+    '</div></div>';
 }
 
 /* peta aksi → [ikon, warna, label] */
@@ -791,11 +894,20 @@ var AKSI_INFO = {
   "keuangan.tambah":      ["coins","g","Menambah belanja"],
   "keuangan.ubah":        ["edit","y","Mengubah belanja"],
   "keuangan.hapus":       ["trash","r","Menghapus belanja"],
+  "laporan.unggah":       ["save","g","Mengunggah laporan kemajuan"],
+  "laporan.hapus":        ["trash","r","Menghapus laporan kemajuan"],
+  "komentar.tambah":      ["scroll","c","Komentar baru"],
+  "komentar.ubah":        ["edit","y","Komentar diedit"],
+  "komentar.hapus":       ["trash","r","Komentar dihapus"],
+  "komentar.selesai":     ["save","g","Komentar ditandai selesai"],
   "user.lihat":           ["search","c","Data dilihat lewat panel"],
   "user.username":        ["edit","y","Username diganti lewat panel"],
   "user.password.reset":  ["key","r","Password direset lewat panel"],
   "user.sesi.cabut":      ["power","r","Sesi dicabut lewat panel"],
-  "user.hapus":           ["trash","r","Akun dihapus lewat panel"]
+  "user.hapus":           ["trash","r","Akun dihapus lewat panel"],
+  "user.laporan.lihat":   ["folder","c","Laporan dilihat lewat panel"],
+  "fasilitator.kode.ubah":["key","y","Kode fasilitator diganti"],
+  "fasilitator.tim.ubah": ["users","y","Assignment tim fasilitator diubah"]
 };
 function tabelAktivitas(list){
   if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
@@ -810,6 +922,10 @@ function tabelAktivitas(list){
     if (r.dari && r.jadi) meta.push(r.dari + " → " + r.jadi);
     if (r.jumlah != null && r.aksi === "user.sesi.cabut") meta.push(r.jumlah + " sesi");
     if (r.sesiLainDicabut != null) meta.push(r.sesiLainDicabut + " sesi lain keluar");
+    if (r.oleh) meta.push("oleh " + r.oleh);
+    if (r.jenis && String(r.aksi || "").indexOf("komentar.") === 0) meta.push("di " + r.jenis);
+    if (r.balasan) meta.push("balasan");
+    if (r.nama && String(r.aksi || "").indexOf("laporan.") === 0) meta.push(r.nama);
     out += '<div class="tl-item">' +
       '<div class="tl-dot ' + info[1] + '">' + sv(info[0]) + '</div>' +
       '<div class="tl-body"><b>' + esc(info[2]) + '</b>' +
@@ -918,11 +1034,50 @@ function hapusUser(id){
     .then(function(){ toast("Akun " + u.username + " dihapus"); muat(); })
     .catch(function(e){ toast(e.message, true); });
 }
+function assignTim(id){
+  var u = findU(id); if (!u) return;
+  call("/data/fasilitator/" + id + "/tim").then(function(j){
+    var terpilih = {};
+    (j.tim || []).forEach(function(t){ terpilih[t.id] = true; });
+    var timSemua = USERS.filter(function(x){ return (x.role || "tim") !== "fasilitator"; });
+    $("#d-tim-sub").textContent = "Fasilitator: " + u.username +
+      " — centang tim yang diampu (boleh lebih dari satu).";
+    $("#d-tim-list").innerHTML = timSemua.length ? timSemua.map(function(t){
+      return '<label class="row" style="margin-top:8px;gap:9px;cursor:pointer;font-size:.84rem;color:var(--ink)">' +
+        '<input type="checkbox" style="width:auto;margin:0" value="' + t.id + '"' +
+        (terpilih[t.id] ? " checked" : "") + '> ' +
+        '<span class="ava" style="width:26px;height:26px;flex:0 0 26px;font-size:.7rem;' + avaStyle(t.username) + '">' +
+        esc((t.username || "?").charAt(0).toUpperCase()) + '</span> ' + esc(t.username) + '</label>';
+    }).join("") : '<div class="mut">Belum ada akun tim.</div>';
+    var dlg = $("#d-tim");
+    dlg.showModal();
+    dlg.addEventListener("close", function h(){
+      dlg.removeEventListener("close", h);
+      if (dlg.returnValue !== "ok") return;
+      var ids = Array.prototype.map.call(
+        document.querySelectorAll("#d-tim-list input:checked"),
+        function(c){ return c.value; });
+      call("/data/fasilitator/" + id + "/tim", {
+        method: "PUT", body: JSON.stringify({ tim_ids: ids })
+      }).then(function(r){
+        toast("Assignment disimpan (" + r.total + " tim)"); muat();
+      }).catch(function(e){ toast(e.message, true); });
+    });
+  }).catch(function(e){ toast(e.message, true); });
+}
 
 /* ---------- event delegation ---------- */
 document.addEventListener("click", function(ev){
-  var el = ev.target.closest("[data-act],[data-tab]");
+  var el = ev.target.closest("[data-act],[data-tab],[data-role-tab]");
   if (!el) return;
+  if (el.dataset.roleTab) {
+    VIEW_ROLE = el.dataset.roleTab;
+    document.querySelectorAll("[data-role-tab]").forEach(function(b){
+      b.classList.toggle("on", b === el);
+    });
+    renderUsers();
+    return;
+  }
   if (el.dataset.tab) {
     TAB = el.dataset.tab;
     document.querySelectorAll("#d-detail .tabs button").forEach(function(b){
@@ -941,6 +1096,7 @@ document.addEventListener("click", function(ev){
     case "pw": resetPassword(el.dataset.id); break;
     case "sesi": cabutSesi(el.dataset.id); break;
     case "hapus": hapusUser(el.dataset.id); break;
+    case "tim": assignTim(el.dataset.id); break;
     case "tutup-detail": $("#d-detail").close(); break;
     case "foto": window.open(fotoUrl(el.dataset.key), "_blank"); break;
   }
@@ -970,6 +1126,18 @@ $("#f-self").addEventListener("submit", function(e){
     toast("Kredensial tersimpan. " + (j.catatan || ""));
     $("#s-u").value = $("#s-p").value = $("#s-cur").value = "";
   }).catch(function(ex){ toast(ex.message, true); });
+});
+
+$("#f-kode").addEventListener("submit", function(e){
+  e.preventDefault();
+  var v = $("#k-val").value;
+  if (v.length < 6) { toast("Kode minimal 6 karakter", true); return; }
+  call("/data/kode-fasilitator", { method: "PUT", body: JSON.stringify({ kode: v }) })
+    .then(function(){
+      toast("Kode fasilitator tersimpan");
+      $("#k-val").value = "";
+      muat();
+    }).catch(function(ex){ toast(ex.message, true); });
 });
 
 // sudah punya sesi? langsung buka panel

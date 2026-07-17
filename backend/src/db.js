@@ -124,6 +124,41 @@ const SKEMA = [
      user_id TEXT NOT NULL,
      exp     BIGINT NOT NULL
    )`,
+  // ---- Fitur Fasilitator (aditif — data lama tidak tersentuh) ----
+  // Peran akun: 'tim' (default, perilaku lama) atau 'fasilitator'.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'tim'`,
+  // Assignment many-to-many: 1 tim ↔ banyak fasilitator, 1 fasilitator ↔ banyak tim.
+  `CREATE TABLE IF NOT EXISTS fasilitator_tim (
+     fasilitator_id TEXT NOT NULL,
+     tim_user_id    TEXT NOT NULL,
+     created_at     TEXT NOT NULL,
+     PRIMARY KEY (fasilitator_id, tim_user_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS fastim_fas_idx ON fasilitator_tim (fasilitator_id)`,
+  `CREATE INDEX IF NOT EXISTS fastim_tim_idx ON fasilitator_tim (tim_user_id)`,
+  // Komentar fasilitator ↔ tim pada entri kegiatan/keuangan/laporan.
+  `CREATE TABLE IF NOT EXISTS komentar (
+     id          TEXT PRIMARY KEY,
+     jenis       TEXT NOT NULL,
+     target_id   TEXT NOT NULL,
+     tim_user_id TEXT NOT NULL,
+     penulis_id  TEXT NOT NULL,
+     parent_id   TEXT NOT NULL DEFAULT '',
+     isi         TEXT NOT NULL,
+     selesai     BOOLEAN NOT NULL DEFAULT FALSE,
+     edited_at   TEXT NOT NULL DEFAULT '',
+     created_at  TEXT NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS komentar_target_idx ON komentar (tim_user_id, jenis, target_id)`,
+  // Tanda "sudah dibaca" per pengguna (akurat untuk banyak fasilitator per tim).
+  `CREATE TABLE IF NOT EXISTS komentar_baca (
+     komentar_id TEXT NOT NULL,
+     user_id     TEXT NOT NULL,
+     PRIMARY KEY (komentar_id, user_id)
+   )`,
+  // Laporan .docx kini disimpan di ImageKit — kolom data lama dibiarkan
+  // (baris lama tetap terbaca, dimigrasi malas saat pertama diakses).
+  `ALTER TABLE laporan_docx ADD COLUMN IF NOT EXISTS file_key TEXT NOT NULL DEFAULT ''`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */

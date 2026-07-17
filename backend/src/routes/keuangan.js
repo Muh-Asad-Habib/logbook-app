@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import * as store from "../storage.js";
 import { putFile, removeFiles, isAllowedImage } from "../files.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 
 const upload = multer({
@@ -17,6 +17,7 @@ const upload = multer({
 
 const router = Router();
 router.use(authRequired); // semua endpoint keuangan milik user yang login
+router.use(hanyaTim); // fasilitator: baca lewat /api/fasilitator, bukan di sini
 
 /**
  * @openapi

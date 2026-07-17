@@ -8,7 +8,7 @@ import { Router } from "express";
 import multer from "multer";
 import crypto from "node:crypto";
 import * as store from "../storage.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
 
@@ -52,6 +52,7 @@ router.get("/publik/:kunci", async (req, res, next) => {
 });
 
 router.use(authRequired);
+router.use(hanyaTim); // fasilitator baca laporan lewat /api/fasilitator
 
 /**
  * @openapi

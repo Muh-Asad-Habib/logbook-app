@@ -7,7 +7,7 @@ import { rateLimit } from "../ratelimit.js";
 
 const router = Router();
 
-const publicUser = (u) => ({ id: u.id, username: u.username });
+const publicUser = (u) => ({ id: u.id, username: u.username, role: u.role || "tim" });
 
 // Anti brute-force: batasi percobaan login/daftar per IP
 const loginLimiter = rateLimit({
@@ -27,6 +27,10 @@ const registerLimiter = rateLimit({
  *   post:
  *     tags: [Auth]
  *     summary: Daftar akun baru (langsung login, dapat token)
+ *     description: >
+ *       Daftar sebagai TIM (default) atau FASILITATOR — centang
+ *       `sebagai_fasilitator` dan sertakan `kode_fasilitator` yang
+ *       ditetapkan pusat kendali.
  *     requestBody:
  *       required: true
  *       content:
@@ -37,27 +41,46 @@ const registerLimiter = rateLimit({
  *             properties:
  *               username: { type: string, example: "timku" }
  *               password: { type: string, example: "rahasia123" }
+ *               sebagai_fasilitator: { type: boolean, example: false }
+ *               kode_fasilitator: { type: string, example: "kode dari admin" }
  *     responses:
  *       201: { description: Akun dibuat — token & profil dikembalikan }
  *       400: { description: Input tidak valid }
+ *       401: { description: Kode fasilitator salah }
+ *       403: { description: Pendaftaran fasilitator belum dibuka }
  *       409: { description: Username sudah dipakai }
  */
 router.post("/register", registerLimiter, async (req, res, next) => {
   try {
     const username = String(req.body?.username || "").trim();
     const password = String(req.body?.password || "");
+    const sebagaiFasilitator = !!req.body?.sebagai_fasilitator;
     if (username.length < 3 || username.length > 40) {
       return res.status(400).json({ error: "Username minimal 3 karakter (maks. 40)" });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: "Password minimal 6 karakter" });
     }
+    if (sebagaiFasilitator) {
+      const hash = await store.getMeta("kodeFasilitator");
+      if (!hash) {
+        return res.status(403).json({
+          error: "Pendaftaran fasilitator belum dibuka — hubungi admin",
+        });
+      }
+      const kode = String(req.body?.kode_fasilitator || "");
+      if (!kode || !verifyPassword(kode, hash)) {
+        return res.status(401).json({ error: "Kode fasilitator salah" });
+      }
+    }
     if (await store.findUserByUsername(username)) {
       return res.status(409).json({ error: "Username sudah dipakai — silakan pilih yang lain" });
     }
-    const user = await store.createUser(username, password);
+    const user = await store.createUser(
+      username, password, sebagaiFasilitator ? "fasilitator" : "tim"
+    );
     const token = await store.createSession(user.id);
-    catatAktivitas(user.id, "akun.daftar", {});
+    catatAktivitas(user.id, "akun.daftar", sebagaiFasilitator ? { role: "fasilitator" } : {});
     res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {
     next(err);
@@ -109,8 +132,16 @@ router.post("/login", loginLimiter, async (req, res, next) => {
  *       200: { description: Profil pengguna }
  *       401: { description: Belum login }
  */
-router.get("/me", authRequired, (req, res) => {
-  res.json({ user: req.user });
+router.get("/me", authRequired, async (req, res, next) => {
+  try {
+    const hasil = { user: req.user };
+    if (req.user.role === "fasilitator") {
+      hasil.tim = await store.listTimUntukFasilitator(req.user.id);
+    }
+    res.json(hasil);
+  } catch (err) {
+    next(err);
+  }
 });
 
 /**

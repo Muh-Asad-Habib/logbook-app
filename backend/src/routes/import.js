@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { importDocx } from "../import/docx.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hanyaTim } from "../auth.js";
 import { q } from "../db.js";
 
 const upload = multer({
@@ -11,6 +11,7 @@ const upload = multer({
 
 const router = Router();
 router.use(authRequired); // hasil impor masuk ke akun user yang login
+router.use(hanyaTim); // fasilitator tidak boleh mengubah data tim
 
 /**
  * @openapi
