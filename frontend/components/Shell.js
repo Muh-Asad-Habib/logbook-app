@@ -13,11 +13,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BookOpenText, LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
+  LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
   FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, PanelLeftClose, PanelLeftOpen,
-  Target, Flame, Banknote, Users,
+  Trophy, Flame, Banknote, Users,
   Link as LinkIcon, Copy, Check,
 } from "lucide-react";
+import LogoMark from "./Logo";
 import Prefetch from "./Prefetch";
 import ToastHost from "./Toast";
 import {
@@ -107,7 +108,7 @@ function TopChips() {
   if (!stat) return null;
   return (
     <div className="top-chips">
-      <span className="chip"><Target className="lucide" /> {stat.capaian_total}%</span>
+      <span className="chip"><Trophy className="lucide" /> {stat.capaian_total}%</span>
       <span className="chip"><Flame className="lucide" /> {hitungStreak(keg)} hari</span>
       <span className="chip"><Banknote className="lucide" /> {fmtRupiah(stat.sisa_dana)} tersisa</span>
       {tunnel && (
@@ -277,7 +278,7 @@ export default function Shell({ children }) {
   if (!siap) {
     return (
       <div className="auth-splash">
-        <div className="auth-splash-ic"><BookOpenText className="lucide" /></div>
+        <div className="auth-splash-ic"><LogoMark /></div>
         <p>Memuat…</p>
       </div>
     );
@@ -297,7 +298,7 @@ export default function Shell({ children }) {
       {/* ===== Sidebar (desktop) ===== */}
       <aside className="sidebar">
         <div className="sb-brand">
-          <div className="sb-logo"><BookOpenText className="lucide" /></div>
+          <div className="sb-logo"><LogoMark /></div>
           <div className="sb-txt">
             <b>Logbook</b>
             <small>{fasilitator ? "Mode Fasilitator" : "Kegiatan & Keuangan"}</small>
@@ -357,7 +358,7 @@ export default function Shell({ children }) {
         <header className="topbar">
           <div className="topbar-inner">
             <div className="mob-head">
-              <div className="mob-logo"><BookOpenText className="lucide" /></div>
+              <div className="mob-logo"><LogoMark /></div>
               <b>{judul}</b>
             </div>
             <h1 className="pg-title">{judul}</h1>

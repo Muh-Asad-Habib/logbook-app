@@ -7,12 +7,24 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <!-- buku terbuka -->
-  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M256 168c-30-24-72-36-116-36v212c44 0 86 12 116 36 30-24 72-36 116-36V132c-44 0-86 12-116 36z"/>
-    <path d="M256 168v212"/>
+  <!-- buku logbook terbuka -->
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 172c-38-30-90-42-142-36-10 1-18 10-18 20v202c0 12 11 21 23 19 48-6 92 4 137 34 45-30 89-40 137-34 12 2 23-7 23-19V156c0-10-8-19-18-20-52-6-104 6-142 36z"/>
+    <path d="M256 172v239"/>
   </g>
-  <!-- garis grafik naik -->
-  <path d="M175 275l40-36 32 22 46-44" fill="none" stroke="#a5f3fc" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+  <!-- halaman kiri: catatan + ceklis -->
+  <g fill="none" stroke="#c7d2fe" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M148 226h56M148 272h56"/>
+    <path d="m146 330 18 18 32-32" stroke="#6ee7b7"/>
+  </g>
+  <!-- halaman kanan: grafik batang naik -->
+  <g stroke-linecap="round">
+    <path d="M318 344v-40" stroke="#7fe3d2" stroke-width="26"/>
+    <path d="M360 344v-66" stroke="#a5b4fc" stroke-width="26"/>
+    <path d="M402 344v-94" stroke="#fcd34d" stroke-width="26"/>
+  </g>
+  <!-- percikan bintang -->
+  <path d="M400 88l10 24 24 10-24 10-10 24-10-24-24-10 24-10z" fill="#fde68a"/>
+  <circle cx="122" cy="120" r="9" fill="#a5f3fc" opacity=".9"/>
 </svg>
 

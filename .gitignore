@@ -16,6 +16,9 @@ uploads/
 # alat bantu lokal
 tools/cloudflared.exe
 
+# referensi desain (gambar lokal, tidak dipakai aplikasi)
+Referensi Desain UI/
+
 # salinan template di root (yang dipakai aplikasi: backend/src/assets/)
 /template-logbook.docx
 

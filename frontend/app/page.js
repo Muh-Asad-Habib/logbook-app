@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Target, CalendarDays, Timer, TrendingDown, PiggyBank, Rocket, Flame,
+  Trophy, CalendarCheck, Hourglass, Receipt, Coins, TrendingDown, Rocket, Flame,
   TrendingUp, ChartColumn, ChartPie, Banknote, History, Save, Check, Plus, NotebookPen,
 } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isFasilitator } from "@/lib/api";
@@ -114,7 +114,7 @@ function DashboardTim() {
       {/* ===== Kartu metrik ===== */}
       <div className="grid metrics mt stagger">
         <div className="card metric">
-          <div className="metric-ic v1"><Target className="lucide" /></div>
+          <div className="metric-ic v1"><Trophy className="lucide" /></div>
           <div>
             <div className="metric-label">CAPAIAN</div>
             <div className="metric-value">{stat.capaian_total}%</div>
@@ -123,14 +123,14 @@ function DashboardTim() {
           </div>
         </div>
         <div className="card metric">
-          <div className="metric-ic v2"><CalendarDays className="lucide" /></div>
+          <div className="metric-ic v2"><CalendarCheck className="lucide" /></div>
           <div>
             <div className="metric-label">KEGIATAN</div>
             <div className="metric-value">{stat.jumlah_kegiatan}</div>
           </div>
         </div>
         <div className="card metric">
-          <div className="metric-ic v3"><Timer className="lucide" /></div>
+          <div className="metric-ic v3"><Hourglass className="lucide" /></div>
           <div>
             <div className="metric-label">TOTAL WAKTU</div>
             <div className="metric-value">{fmtDurasi(stat.total_waktu_menit)}</div>
@@ -138,7 +138,7 @@ function DashboardTim() {
           </div>
         </div>
         <div className="card metric">
-          <div className="metric-ic v4"><TrendingDown className="lucide" /></div>
+          <div className="metric-ic v4"><Receipt className="lucide" /></div>
           <div>
             <div className="metric-label">PENGELUARAN</div>
             <div className="metric-value">{fmtRupiah(stat.total_pengeluaran)}</div>
@@ -147,7 +147,7 @@ function DashboardTim() {
           </div>
         </div>
         <div className="card metric">
-          <div className="metric-ic v5"><PiggyBank className="lucide" /></div>
+          <div className="metric-ic v5"><Coins className="lucide" /></div>
           <div>
             <div className="metric-label">SISA DANA</div>
             <div className="metric-value">{fmtRupiah(stat.sisa_dana)}</div>
@@ -158,7 +158,7 @@ function DashboardTim() {
       {/* ===== Gauge + heatmap ===== */}
       <div className="grid two mt stagger">
         <div className="card">
-          <h3><Target className="lucide" /> Capaian total</h3>
+          <h3><Trophy className="lucide" /> Capaian total</h3>
           <p className="sub">akumulasi seluruh kegiatan</p>
           <Gauge value={stat.capaian_total} />
         </div>
