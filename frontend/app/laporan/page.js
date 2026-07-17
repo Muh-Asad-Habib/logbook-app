@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText, Upload, Download, Trash2, Info, TriangleAlert,
-  ZoomIn, ZoomOut, Maximize, Loader,
+  ZoomIn, ZoomOut, Maximize, Loader, RefreshCw,
 } from "lucide-react";
 import {
   api, exportUrl, useApi, revalidate, fmtTgl, isFasilitator, getTimAktif,
@@ -133,6 +133,23 @@ function LaporanFasilitator() {
     }
   }, [timId]);
 
+  /** Beralih manual ke Word Online — pakai tautan yang sudah ada, atau minta baru bila belum. */
+  const pakaiOffice = useCallback(async () => {
+    if (officeUrl) { setModeCadangan(false); return; }
+    setMemuat(true);
+    try {
+      const { url } = await api.fasilitator.laporanTautan(timId);
+      setOfficeUrl(
+        "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url)
+      );
+      setModeCadangan(false);
+    } catch (e) {
+      setGagal(`Gagal memuat Word Online: ${e.message}`);
+    } finally {
+      setMemuat(false);
+    }
+  }, [officeUrl, timId]);
+
   useEffect(() => {
     let batal = false;
     async function siapkan() {
@@ -180,12 +197,28 @@ function LaporanFasilitator() {
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
+              <button className="btn sm" onClick={modeCadangan ? pakaiOffice : renderCadangan}
+                      title={modeCadangan ? "Coba tampilkan via Word Online" : "Halaman kosong/rusak? Coba tampilan cadangan"}>
+                <RefreshCw className="lucide" />
+              </button>
               <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
                  href={`${exportUrl(`/api/fasilitator/tim/${timId}/laporan-file`)}&unduh=1`}>
                 <Download className="lucide" />
               </a>
             </div>
           </div>
+          {!modeCadangan && officeUrl && (
+            <p className="muted" style={{ fontSize: "0.78rem", margin: "-4px 0 10px" }}>
+              Halaman tampak kosong atau rusak?{" "}
+              <button onClick={renderCadangan} style={{
+                background: "none", border: "none", padding: 0, color: "inherit",
+                textDecoration: "underline", cursor: "pointer", font: "inherit",
+              }}>
+                Coba tampilan cadangan
+              </button>
+              {" "}(kadang terjadi pada cover page bawaan Word — filenya sendiri aman).
+            </p>
+          )}
           <div className="docx-frame-wrap">
             {memuat && (
               <div className="docx-loading">
@@ -289,6 +322,24 @@ function LaporanTim() {
       setMemuat(false);
     }
   }, [terapkanZoom]);
+
+  /** Beralih manual ke Word Online — pakai tautan yang sudah ada, atau minta baru bila belum. */
+  const pakaiOffice = useCallback(async () => {
+    if (officeUrl) { setModeCadangan(false); return; }
+    setMemuat(true);
+    setErr("");
+    try {
+      const { url } = await api.laporanTautan();
+      setOfficeUrl(
+        "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url)
+      );
+      setModeCadangan(false);
+    } catch (e) {
+      setErr(`Gagal memuat Word Online: ${e.message}`);
+    } finally {
+      setMemuat(false);
+    }
+  }, [officeUrl]);
 
   /* ---------- pilih penampil ---------- */
   useEffect(() => {
@@ -435,6 +486,10 @@ function LaporanTim() {
                   </button>
                 </>
               )}
+              <button className="btn sm" onClick={modeCadangan ? pakaiOffice : renderCadangan}
+                      title={modeCadangan ? "Coba tampilkan via Word Online" : "Halaman kosong/rusak? Coba tampilan cadangan"}>
+                <RefreshCw className="lucide" />
+              </button>
               <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
                  href={`${exportUrl("/api/laporan/file")}&unduh=1`}>
                 <Download className="lucide" />
@@ -444,6 +499,19 @@ function LaporanTim() {
               </button>
             </div>
           </div>
+
+          {!modeCadangan && officeUrl && (
+            <p className="muted" style={{ fontSize: "0.78rem", margin: "-4px 0 10px" }}>
+              Halaman tampak kosong atau rusak?{" "}
+              <button onClick={renderCadangan} style={{
+                background: "none", border: "none", padding: 0, color: "inherit",
+                textDecoration: "underline", cursor: "pointer", font: "inherit",
+              }}>
+                Coba tampilan cadangan
+              </button>
+              {" "}(kadang terjadi pada cover page bawaan Word — filenya sendiri aman, coba unduh untuk memastikan).
+            </p>
+          )}
 
           <div className="docx-frame-wrap">
             {memuat && (
