@@ -97,6 +97,59 @@ async function tungguRef(ref, sisaCoba = 20) {
   return ref.current;
 }
 
+/**
+ * Word Online (view.officeapps.live.com) TIDAK auto-fit ke lebar wadah kita —
+ * di kartu sempit (HP) zoom bawaannya bikin halaman kepotong, harus di-zoom
+ * out manual. Karena itu iframe pihak ketiga & tak bisa kita atur zoom
+ * internalnya, dipakai trik CSS umum: render iframe pada lebar virtual
+ * "desktop" (di mana Office biasa auto-fit rapi ke lebar penuh), lalu
+ * `transform: scale()` seluruh iframe agar pas ke wadah asli yang sempit.
+ * Hasilnya: halaman penuh selalu tampil otomatis, tanpa perlu zoom manual.
+ */
+const LEBAR_VIRTUAL_OFFICE = 1280;
+
+/** Amati ukuran elemen (ResizeObserver) — dipakai utk hitung skala iframe Office. */
+function useUkuranWadah() {
+  const ref = useRef(null);
+  const [ukuran, setUkuran] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setUkuran({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, ukuran];
+}
+
+/** Bungkus <iframe> Office dgn wadah overflow:hidden + transform-scale agar
+ *  halaman penuh selalu pas di lebar layar berapa pun (lihat catatan di atas). */
+function OfficeFrame({ url, wrapUkuran, onLoad }) {
+  const skala = wrapUkuran.w > 0 ? wrapUkuran.w / LEBAR_VIRTUAL_OFFICE : 1;
+  const tinggiVirtual = wrapUkuran.h > 0 ? wrapUkuran.h / skala : "100%";
+  return (
+    <div className="docx-office-scale">
+      <iframe
+        key={url}
+        src={url}
+        title="Pratinjau laporan kemajuan (Word Online)"
+        allowFullScreen
+        onLoad={onLoad}
+        style={{
+          width: LEBAR_VIRTUAL_OFFICE,
+          height: tinggiVirtual,
+          transform: `scale(${skala})`,
+          transformOrigin: "0 0",
+          border: 0,
+        }}
+      />
+    </div>
+  );
+}
+
 export default function LaporanPage() {
   const [fas, setFas] = useState(null);
   useEffect(() => { setFas(isFasilitator()); }, []);
@@ -113,6 +166,7 @@ function LaporanFasilitator() {
   const [officeUrl, setOfficeUrl] = useState("");
   const [modeCadangan, setModeCadangan] = useState(false);
   const frameRef = useRef(null);
+  const [wrapRef, wrapUkuran] = useUkuranWadah();
 
   useEffect(() => {
     const muatTim = async () => {
@@ -252,17 +306,14 @@ function LaporanFasilitator() {
               {" "}(kadang terjadi pada cover page bawaan Word — filenya sendiri aman).
             </p>
           )}
-          <div className="docx-frame-wrap">
+          <div className="docx-frame-wrap" ref={wrapRef}>
             {memuat && (
               <div className="docx-loading">
                 <Loader className="lucide docx-spin" /> Memuat dokumen…
               </div>
             )}
             {officeUrl && !modeCadangan ? (
-              <iframe key={officeUrl} src={officeUrl}
-                      title="Pratinjau laporan kemajuan (Word Online)"
-                      className="docx-frame" allowFullScreen
-                      onLoad={() => setMemuat(false)} />
+              <OfficeFrame url={officeUrl} wrapUkuran={wrapUkuran} onLoad={() => setMemuat(false)} />
             ) : (
               <div ref={frameRef} title="Pratinjau laporan kemajuan"
                    className="docx-frame" />
@@ -299,6 +350,7 @@ function LaporanTim() {
   const [modeCadangan, setModeCadangan] = useState(false);
   const [zoomPct, setZoomPct] = useState(null);
   const frameRef = useRef(null); // host shadow DOM cadangan (docx-preview)
+  const [wrapRef, wrapUkuran] = useUkuranWadah();
   const inputRef = useRef(null);
   const zoomRef = useRef(null);
   const lebarHalamanRef = useRef(0);
@@ -543,21 +595,14 @@ function LaporanTim() {
             </p>
           )}
 
-          <div className="docx-frame-wrap">
+          <div className="docx-frame-wrap" ref={wrapRef}>
             {memuat && (
               <div className="docx-loading">
                 <Loader className="lucide docx-spin" /> Memuat dokumen…
               </div>
             )}
             {officeUrl && !modeCadangan ? (
-              <iframe
-                key={officeUrl}
-                src={officeUrl}
-                title="Pratinjau laporan kemajuan (Word Online)"
-                className="docx-frame"
-                allowFullScreen
-                onLoad={() => setMemuat(false)}
-              />
+              <OfficeFrame url={officeUrl} wrapUkuran={wrapUkuran} onLoad={() => setMemuat(false)} />
             ) : (
               <div
                 ref={frameRef}
