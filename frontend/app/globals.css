@@ -254,6 +254,15 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .chip.link .chip-url { max-width: min(30vw, 260px); overflow: hidden; text-overflow: ellipsis; }
 .chip.copy { cursor: pointer; font-family: inherit; }
 
+/* Pemilih tim aktif (fasilitator) — select polos di dalam chip */
+.chip select.tim-select {
+  width: auto; max-width: 46vw; margin: 0; padding: 0 2px;
+  border: none; background: transparent; color: inherit;
+  font: inherit; font-weight: 700; cursor: pointer; outline: none;
+}
+.chip select.tim-select:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.4); border-radius: 6px; }
+.chip select.tim-select option { color: var(--ink); background: var(--card-solid); }
+
 .mob-head { display: none; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .mob-logo {
   width: 34px; height: 34px; border-radius: 10px; flex: 0 0 34px;
@@ -284,7 +293,9 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   backdrop-filter: blur(18px) saturate(1.5);
   border-top: 1px solid var(--line);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-  grid-template-columns: repeat(5, 1fr);
+  /* Satu baris berapa pun jumlah menunya (4 utk fasilitator, 6 utk tim) */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   box-shadow: 0 -8px 28px -10px rgba(18, 20, 46, 0.18);
 }
 .bottom-nav a {
@@ -293,6 +304,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   padding: 6px 2px 5px; border-radius: 12px; text-decoration: none;
   color: var(--muted); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.01em;
   transition: color 0.15s ease, transform 0.15s ease; min-height: 48px; justify-content: center;
+  min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .bottom-nav a svg.lucide { font-size: 1.3rem; }
 .bottom-nav a:active { transform: scale(0.94); }
@@ -321,8 +333,13 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .bottom-nav { display: grid; }
   .fab { display: flex; }
   .container { padding: 14px 14px calc(86px + env(safe-area-inset-bottom)); }
-  .topbar-inner { padding: 10px 14px; min-height: 56px; }
+  .topbar-inner { padding: 10px 14px; min-height: 56px; flex-wrap: wrap; row-gap: 8px; }
   .topbar .top-chips { display: none; }
+  /* Pemilih tim fasilitator TETAP tampil di HP — baris kedua topbar */
+  .topbar .top-chips.tim-chips { display: flex; flex-basis: 100%; order: 9; margin-left: 0; }
+  .tim-chips .chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
+  .tim-chips .chip.chip-role { display: none; }
+  .chip select.tim-select { flex: 1; width: 100%; max-width: none; min-height: 32px; font-size: 16px; }
 }
 
 /* ================= Kartu & metrik ================= */
@@ -390,13 +407,19 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   /* Susun ulang kartu metrik: baris 1 = ikon + label, lalu angka, delta &
      sparkline memakai lebar penuh kartu — angka rupiah panjang tidak lagi
      patah di tengah dan sparkline tidak meluber keluar kartu. */
-  .metric { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 10px; row-gap: 3px; align-items: center; }
+  .metric { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 3px; align-items: center; }
   .metric > div:last-child { display: contents; }
-  .metric-ic { width: 38px; height: 38px; flex: 0 0 38px; font-size: 1.1rem; border-radius: 11px; grid-row: 1; }
+  .metric-ic { width: 38px; height: 38px; flex: 0 0 38px; font-size: 1.1rem; border-radius: 11px; grid-row: 1; grid-column: 1; }
   .metric-label { font-size: 0.62rem; align-self: center; }
   .metric-value { font-size: 1.08rem; grid-column: 1 / -1; }
+  /* Kartu "judul" (metric-value tanpa label kecil) duduk di samping ikon */
+  .metric > div:last-child > .metric-value:first-child { grid-column: 2; grid-row: 1; }
+  /* Teks deskripsi memakai lebar penuh kartu — tidak terjepit di kolom ikon */
+  .metric .muted { grid-column: 1 / -1; }
   .metric-delta { font-size: 0.66rem; grid-column: 1 / -1; }
   .metric-spark { grid-column: 1 / -1; width: 100%; margin-top: 3px; }
+  /* Avatar profil di kartu pengaturan akun tetap di baris pertama */
+  .metric .profil-ava { grid-row: 1; grid-column: 1; width: 44px; height: 44px; flex: 0 0 44px; font-size: 1.15rem; border-radius: 13px; }
 }
 
 /* ================= Badge, tombol, progress ================= */
@@ -456,6 +479,20 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .pill:hover { border-color: var(--line-hover); color: var(--p1); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(79, 70, 229, 0.12); }
 .pill:active { transform: scale(0.96); }
 .pill.on { background: var(--grad); color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(79, 70, 229, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+
+/* ---------- Toolbar filter halaman (kegiatan/keuangan) ---------- */
+.toolbar .tb-cari { flex: 2 1 220px; margin-top: 0; }
+.toolbar .tb-tgl { flex: 1 1 140px; margin-top: 0; }
+
+@media (max-width: 640px) {
+  .toolbar { gap: 8px; }
+  .toolbar .tb-cari { flex: 1 1 100%; }
+  .toolbar .tb-tgl { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .toolbar .pills { display: flex; flex: 1 1 100%; }
+  .toolbar .pills .pill { flex: 1 1 auto; }
+  .toolbar > .btn { flex: 1 1 100%; }
+  .toolbar .badge { flex: 1 1 100%; justify-content: center; margin-right: 0; }
+}
 
 .progress { height: 12px; background: var(--soft); border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(18, 20, 46, 0.08); }
 .progress > div {

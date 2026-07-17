@@ -161,19 +161,17 @@ function TimSwitcher() {
   }, [tim, aktif]);
   if (!Array.isArray(tim) || tim.length === 0) return null;
   return (
-    <div className="top-chips">
+    <div className="top-chips tim-chips">
       <span className="chip" title="Tim yang sedang dilihat">
         <Users className="lucide" />
         {tim.length === 1 ? (
           <b>{tim[0].username}</b>
         ) : (
           <select
+            className="tim-select"
             value={aktif}
             onChange={(e) => { setAktif(e.target.value); setTimAktif(e.target.value); }}
-            style={{
-              background: "transparent", border: "none", color: "inherit",
-              font: "inherit", fontWeight: 700, cursor: "pointer", outline: "none",
-            }}
+            aria-label="Pilih tim yang dilihat"
           >
             {tim.map((t) => (
               <option key={t.id} value={t.id}>{t.username}</option>
@@ -181,7 +179,7 @@ function TimSwitcher() {
           </select>
         )}
       </span>
-      <span className="chip" title="Peran akun">🎓 Fasilitator</span>
+      <span className="chip chip-role" title="Peran akun">🎓 Fasilitator</span>
     </div>
   );
 }
