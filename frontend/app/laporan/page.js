@@ -8,9 +8,14 @@
  * (termasuk text-frame, kotak "Mengetahui", stempel, tanda tangan, dll.).
  * Berkas diambil Microsoft lewat tautan publik acak berumur 30 menit.
  *
- * CADANGAN: docx-preview di iframe terisolasi — otomatis dipakai bila
- * berjalan di jaringan lokal (Microsoft tak bisa menjangkau) atau file
- * terlalu besar untuk penampil Office (>10 MB).
+ * CADANGAN: docx-preview dirender di Shadow DOM terisolasi — otomatis
+ * dipakai bila berjalan di jaringan lokal (Microsoft tak bisa menjangkau)
+ * atau file terlalu besar untuk penampil Office (>10 MB).
+ * (Catatan: docx-preview membuat elemen lewat `document.createElement`
+ * GLOBAL, jadi wadahnya WAJIB berada di dokumen yang sama seperti halaman
+ * — memakai <iframe> terpisah bikin node "lintas-dokumen" dan di banyak
+ * browser/WebView Android hasilnya blank tanpa error. Shadow DOM tetap
+ * mengisolasi gaya CSS tanpa masalah itu.)
  *
  * Penyimpanan hanya SATU file per akun: unggahan baru menggantikan yang lama.
  */
@@ -43,12 +48,8 @@ const hostLokal = () =>
   typeof window !== "undefined" &&
   /^(localhost|127\.|0\.0\.0\.0|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(window.location.hostname);
 
-/* Gaya dasar DI DALAM iframe cadangan (docx-preview). */
-const GAYA_IFRAME = `
-  html, body { margin: 0; padding: 0; background: #525659; }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: #7a7d84; border-radius: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+/* Gaya dasar DI DALAM shadow root cadangan (docx-preview). */
+const GAYA_CADANGAN = `
   .docx-wrapper {
     background: transparent !important;
     padding: 22px 14px !important;
@@ -60,6 +61,41 @@ const GAYA_IFRAME = `
   }
   .docx-wrapper > section.docx:last-child { margin-bottom: 0 !important; }
 `;
+
+/**
+ * Siapkan shadow root KOSONG di elemen host, berisi dua kontainer:
+ * styleBox (utk <style> yang dihasilkan docx-preview) & bodyBox (isi dokumen).
+ * Shadow DOM dipilih (bukan iframe) supaya elemen yang dibuat docx-preview
+ * lewat `document.createElement` global tetap satu dokumen dengan wadahnya.
+ */
+function siapkanShadow(host) {
+  if (!host) return null;
+  const root = host.shadowRoot || host.attachShadow({ mode: "open" });
+  root.innerHTML = "";
+  const styleBox = document.createElement("div");
+  const bodyBox = document.createElement("div");
+  bodyBox.className = "docx-cadangan-body";
+  root.append(styleBox, bodyBox);
+  return { root, styleBox, bodyBox };
+}
+
+/** Tambahkan gaya tampilan cadangan — panggil SETELAH renderAsync selesai
+ *  (renderAsync mengosongkan styleBox saat mulai, jadi gaya kita akan
+ *  tertimpa bila ditambahkan sebelum itu). */
+function tambahkanGayaCadangan(root) {
+  const style = document.createElement("style");
+  style.textContent = GAYA_CADANGAN;
+  root.appendChild(style);
+}
+
+/** Tunggu sampai ref elemen ter-mount (jaga-jaga bila render React belum
+ *  selesai saat promise unduh/impor sudah keburu resolve). */
+async function tungguRef(ref, sisaCoba = 20) {
+  for (let i = 0; i < sisaCoba && !ref.current; i++) {
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+  return ref.current;
+}
 
 export default function LaporanPage() {
   const [fas, setFas] = useState(null);
@@ -113,19 +149,16 @@ function LaporanFasilitator() {
       const [buf, docx] = await Promise.all([
         api.fasilitator.laporanFile(timId), import("docx-preview"),
       ]);
-      const doc = frameRef.current?.contentDocument;
-      if (!doc) return;
-      doc.head.innerHTML = "";
-      doc.body.innerHTML = "";
-      const style = doc.createElement("style");
-      style.textContent = GAYA_IFRAME;
-      doc.head.appendChild(style);
-      await docx.renderAsync(buf, doc.body, doc.head, {
+      const host = await tungguRef(frameRef);
+      const shadow = siapkanShadow(host);
+      if (!shadow) { setGagal("Wadah pratinjau belum siap, coba lagi."); return; }
+      await docx.renderAsync(buf, shadow.bodyBox, shadow.styleBox, {
         className: "docx", inWrapper: true, breakPages: true,
         renderHeaders: true, renderFooters: true, renderFootnotes: true,
         renderEndnotes: true, ignoreLastRenderedPageBreak: false,
         useBase64URL: true, experimental: true,
       });
+      tambahkanGayaCadangan(shadow.root);
     } catch (e) {
       setGagal(`Gagal menampilkan dokumen: ${e.message}`);
     } finally {
@@ -231,8 +264,8 @@ function LaporanFasilitator() {
                       className="docx-frame" allowFullScreen
                       onLoad={() => setMemuat(false)} />
             ) : (
-              <iframe ref={frameRef} title="Pratinjau laporan kemajuan"
-                      className="docx-frame" sandbox="allow-same-origin" />
+              <div ref={frameRef} title="Pratinjau laporan kemajuan"
+                   className="docx-frame" />
             )}
           </div>
         </div>
@@ -265,19 +298,19 @@ function LaporanTim() {
   const [officeUrl, setOfficeUrl] = useState("");   // penampil utama (Word Online)
   const [modeCadangan, setModeCadangan] = useState(false);
   const [zoomPct, setZoomPct] = useState(null);
-  const frameRef = useRef(null); // iframe cadangan (docx-preview)
+  const frameRef = useRef(null); // host shadow DOM cadangan (docx-preview)
   const inputRef = useRef(null);
   const zoomRef = useRef(null);
   const lebarHalamanRef = useRef(0);
 
-  /* ---------- cadangan: docx-preview di iframe terisolasi ---------- */
+  /* ---------- cadangan: docx-preview di shadow DOM terisolasi ---------- */
   const terapkanZoom = useCallback(() => {
-    const iframe = frameRef.current;
-    const doc = iframe?.contentDocument;
-    if (!doc?.body || !lebarHalamanRef.current) return;
-    const fit = Math.min(1, (iframe.clientWidth - 30) / lebarHalamanRef.current);
+    const host = frameRef.current;
+    const bodyBox = host?.shadowRoot?.querySelector(".docx-cadangan-body");
+    if (!bodyBox || !lebarHalamanRef.current) return;
+    const fit = Math.min(1, (host.clientWidth - 30) / lebarHalamanRef.current);
     const z = zoomRef.current ?? fit;
-    doc.body.style.zoom = String(z);
+    bodyBox.style.zoom = String(z);
     setZoomPct(Math.round(z * 100));
   }, []);
 
@@ -293,14 +326,10 @@ function LaporanTim() {
     setMemuat(true);
     try {
       const [buf, docx] = await Promise.all([api.laporanFile(), import("docx-preview")]);
-      const doc = frameRef.current?.contentDocument;
-      if (!doc) return;
-      doc.head.innerHTML = "";
-      doc.body.innerHTML = "";
-      const style = doc.createElement("style");
-      style.textContent = GAYA_IFRAME;
-      doc.head.appendChild(style);
-      await docx.renderAsync(buf, doc.body, doc.head, {
+      const host = await tungguRef(frameRef);
+      const shadow = siapkanShadow(host);
+      if (!shadow) { setErr("Wadah pratinjau belum siap, coba lagi."); return; }
+      await docx.renderAsync(buf, shadow.bodyBox, shadow.styleBox, {
         className: "docx",
         inWrapper: true,
         breakPages: true,
@@ -312,7 +341,8 @@ function LaporanTim() {
         useBase64URL: true,
         experimental: true,
       });
-      const halaman = doc.querySelector("section.docx");
+      tambahkanGayaCadangan(shadow.root);
+      const halaman = shadow.bodyBox.querySelector("section.docx");
       lebarHalamanRef.current = halaman ? halaman.offsetWidth : 0;
       zoomRef.current = null;
       terapkanZoom();
@@ -529,11 +559,10 @@ function LaporanTim() {
                 onLoad={() => setMemuat(false)}
               />
             ) : (
-              <iframe
+              <div
                 ref={frameRef}
                 title="Pratinjau laporan kemajuan"
                 className="docx-frame"
-                sandbox="allow-same-origin"
               />
             )}
           </div>
