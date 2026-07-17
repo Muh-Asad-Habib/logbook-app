@@ -1053,6 +1053,13 @@ tr.subtotal td {
 .docx-frame::-webkit-scrollbar { width: 10px; height: 10px; }
 .docx-frame::-webkit-scrollbar-thumb { background: #7a7d84; border-radius: 8px; }
 .docx-frame::-webkit-scrollbar-track { background: transparent; }
+/* Wadah iframe Word Online yang di-scale (lihat OfficeFrame di laporan/page.js):
+ * iframe dirender lebar (LEBAR_VIRTUAL_OFFICE) lalu di-CSS-scale agar pas —
+ * wadah ini yang meng-crop sisa & memberi latar gelap seperti Office asli. */
+.docx-office-scale {
+  position: absolute; inset: 0; overflow: hidden; background: #525659;
+}
+.docx-office-scale iframe { display: block; }
 .docx-loading {
   position: absolute; inset: 0; z-index: 2;
   display: flex; align-items: center; justify-content: center; gap: 8px;
