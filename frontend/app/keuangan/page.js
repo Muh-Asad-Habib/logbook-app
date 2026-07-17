@@ -51,6 +51,7 @@ function KeuanganFasilitator() {
   const [items, setItems] = useState(null);
   const [gagal, setGagal] = useState("");
   const [cari, setCari] = useState("");
+  const [mode, setMode] = useState("Tabel");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("keuangan", timId, !!timId);
 
@@ -82,6 +83,11 @@ function KeuanganFasilitator() {
     return () => { hidup = false; };
   }, [timId]);
 
+  // Di layar sempit tabel 7 kolom sesak — mulai dengan tampilan kartu (sama seperti tim)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 640) setMode("Kartu");
+  }, []);
+
   if (gagal === "belum-assign")
     return (
       <div className="empty mt">
@@ -97,6 +103,23 @@ function KeuanganFasilitator() {
     .reverse();
   const total = items.reduce((s, e) => s + e.total, 0);
 
+  // Baris tabel dengan subtotal per bulan (sama seperti mode tim)
+  const subtotal = {};
+  for (const e of view) {
+    const k = e.tanggal.slice(0, 7);
+    subtotal[k] = (subtotal[k] || 0) + e.total;
+  }
+  const rows = [];
+  let bulanAktif = "";
+  for (const e of view) {
+    const k = e.tanggal.slice(0, 7);
+    if (k !== bulanAktif) {
+      rows.push({ jenis: "sub", kunci: k, total: subtotal[k] });
+      bulanAktif = k;
+    }
+    rows.push({ jenis: "entri", e });
+  }
+
   const bukaBukti = (e) =>
     setLb({
       items: [{ src: fotoUrl(e.bukti_key), judul: fmtTgl(e.tanggal), ket: e.item }],
@@ -111,6 +134,11 @@ function KeuanganFasilitator() {
             <span className="in-ic"><Search className="lucide" /></span>
             <input placeholder="Cari item belanja…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
+          </div>
+          <div className="pills">
+            {["Tabel", "Kartu"].map((m) => (
+              <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
+            ))}
           </div>
           <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
         </div>
@@ -128,29 +156,74 @@ function KeuanganFasilitator() {
         </div>
       )}
 
-      <div className="stagger">
-        {view.map((e) => (
-          <div key={e.id} className="card mt">
-            <div className="row spread">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <b>{fmtTgl(e.tanggal)}</b> — {e.item}
-                <p className="muted mts">
-                  {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
-                  <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
-                </p>
-                {e.bukti_key && (
-                  <div className="foto-row">
-                    <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
-                         onError={retryFoto} onClick={() => bukaBukti(e)} />
-                  </div>
-                )}
-                <KomentarPanel jenis="keuangan" targetId={e.id} timId={timId}
-                               n={peta[e.id] || 0} />
+      {view.length > 0 && mode === "Tabel" && (
+        <div className="card mt table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th><th>Item</th><th>Harga satuan</th><th>Jml</th>
+                <th>Total</th><th>Bukti</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) =>
+                r.jenis === "sub" ? (
+                  <tr key={`sub-${r.kunci}`} className="subtotal">
+                    <td colSpan={4}>{labelBulan(r.kunci)}</td>
+                    <td colSpan={3}>{fmtRupiah(r.total)}</td>
+                  </tr>
+                ) : (
+                  <tr key={r.e.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
+                    <td>{r.e.item}</td>
+                    <td>{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
+                    <td>{r.e.jumlah}</td>
+                    <td><b>{fmtRupiah(r.e.total)}</b></td>
+                    <td>
+                      {r.e.bukti_key ? (
+                        <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
+                             onError={retryFoto} onClick={() => bukaBukti(r.e)}
+                             style={{ width: 44, height: 44, objectFit: "cover",
+                                      borderRadius: 8, cursor: "zoom-in" }} />
+                      ) : "—"}
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <KomentarPanel jenis="keuangan" targetId={r.e.id} timId={timId}
+                                     n={peta[r.e.id] || 0} />
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {view.length > 0 && mode === "Kartu" && (
+        <div className="stagger">
+          {view.map((e) => (
+            <div key={e.id} className="card mt">
+              <div className="row spread">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <b>{fmtTgl(e.tanggal)}</b> — {e.item}
+                  <p className="muted mts">
+                    {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
+                    <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
+                  </p>
+                  {e.bukti_key && (
+                    <div className="foto-row">
+                      <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
+                           onError={retryFoto} onClick={() => bukaBukti(e)} />
+                    </div>
+                  )}
+                  <KomentarPanel jenis="keuangan" targetId={e.id} timId={timId}
+                                 n={peta[e.id] || 0} />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
   );

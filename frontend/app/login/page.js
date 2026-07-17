@@ -189,7 +189,7 @@ export default function LoginPage() {
                       type="text"
                       value={kodeFas}
                       onChange={(e) => setKodeFas(e.target.value)}
-                      placeholder="kode dari admin / pusat kendali"
+                      placeholder="kode dari admin"
                       autoComplete="off"
                     />
                   </div>

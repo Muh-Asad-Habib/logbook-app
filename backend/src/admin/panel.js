@@ -94,6 +94,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   }
   .card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;
     background:linear-gradient(90deg,transparent,rgba(139,92,246,.35),transparent)}
+  .card{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+  .card:hover{transform:translateY(-2px);border-color:var(--line2);box-shadow:0 22px 52px -20px rgba(0,0,0,.62)}
   .card h2{font-size:.95rem;display:flex;align-items:center;gap:9px}
   .card h2 .i{width:16px;height:16px;color:#a5b4fc}
   .card h2 .tag{font-size:.66rem;color:var(--mut);font-weight:600;background:#111b3a;
@@ -162,7 +164,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   /* ---------- tabel ---------- */
   .tbl{overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:13px}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem;min-width:680px}
-  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid rgba(99,112,180,.13);vertical-align:middle}
+  th,td{text-align:left;padding:12px 15px;border-bottom:1px solid rgba(99,112,180,.13);vertical-align:middle}
   th{color:var(--mut);font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;
      background:rgba(9,14,32,.95);position:sticky;top:0;z-index:1;backdrop-filter:blur(6px)}
   tbody tr{transition:background .13s}
@@ -513,6 +515,21 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   </div>
 </dialog>
 
+<!-- ===== DIALOG ASSIGN FASILITATOR KE TIM ===== -->
+<dialog id="d-fas" class="mini">
+  <div class="dlg-h"><h3>🎓 Fasilitator pengampu</h3></div>
+  <div class="dlg-b">
+    <p class="mut" id="d-fas-sub"></p>
+    <form method="dialog" id="f-fas">
+      <div id="d-fas-list" style="margin-top:10px;max-height:46vh;overflow:auto"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button value="batal" class="btn">Batal</button>
+        <button value="ok" class="btn p">Simpan</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <!-- ===== DIALOG GANTI USERNAME ===== -->
 <dialog id="d-un" class="mini">
   <div class="dlg-h"><h3>✏️ Ganti username</h3></div>
@@ -789,6 +806,8 @@ function barisUser(u){
     "<td style='white-space:nowrap'>" + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
+      '<button class="btn sm ic" title="Fasilitator pengampu tim ini" data-act="fas" data-id="' + u.id + '">🎓</button>' +
+      '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
       '<button class="btn sm ic" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' + u.id + '">' + sv("power") + '</button>' +
@@ -809,6 +828,7 @@ function barisFasilitator(u){
     "<td style='white-space:nowrap'>" + tgl(u.createdAt) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="tim" data-id="' + u.id + '">🔗 Tim</button>' +
+      '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
       '<button class="btn sm ic" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' + u.id + '">' + sv("power") + '</button>' +
@@ -818,15 +838,15 @@ function barisFasilitator(u){
 function findU(id){ return USERS.find(function(x){ return x.id === id; }); }
 
 /* ---------- detail data pengguna ---------- */
-function bukaDetail(id){
+function bukaDetail(id, tabAwal){
   Promise.all([
     call("/data/pengguna/" + id),
     call("/data/pengguna/" + id + "/aktivitas").catch(function(){ return { rows: [] }; })
   ]).then(function(rs){
-    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || []; TAB = "keg";
+    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || []; TAB = tabAwal || "keg";
     isiKepalaDetail();
     var tb = document.querySelectorAll("#d-detail .tabs button");
-    tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === "keg"); });
+    tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === TAB); });
     renderTab();
     $("#d-detail").showModal();
   }).catch(function(e){ toast(e.message, true); });
@@ -907,7 +927,8 @@ var AKSI_INFO = {
   "user.hapus":           ["trash","r","Akun dihapus lewat panel"],
   "user.laporan.lihat":   ["folder","c","Laporan dilihat lewat panel"],
   "fasilitator.kode.ubah":["key","y","Kode fasilitator diganti"],
-  "fasilitator.tim.ubah": ["users","y","Assignment tim fasilitator diubah"]
+  "fasilitator.tim.ubah": ["users","y","Assignment tim fasilitator diubah"],
+  "tim.fasilitator.ubah": ["users","y","Fasilitator pengampu tim diubah"]
 };
 function tabelAktivitas(list){
   if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
@@ -1066,6 +1087,39 @@ function assignTim(id){
   }).catch(function(e){ toast(e.message, true); });
 }
 
+/* Kebalikan assignTim: dari baris TIM, pilih fasilitator yang mengampunya. */
+function assignFasilitator(id){
+  var u = findU(id); if (!u) return;
+  call("/data/tim/" + id + "/fasilitator").then(function(j){
+    var terpilih = {};
+    (j.fasilitator || []).forEach(function(f){ terpilih[f.id] = true; });
+    var fasSemua = USERS.filter(function(x){ return (x.role || "tim") === "fasilitator"; });
+    $("#d-fas-sub").textContent = "Tim: " + u.username +
+      " — centang fasilitator yang mengampu (boleh lebih dari satu).";
+    $("#d-fas-list").innerHTML = fasSemua.length ? fasSemua.map(function(f){
+      return '<label class="row" style="margin-top:8px;gap:9px;cursor:pointer;font-size:.84rem;color:var(--ink)">' +
+        '<input type="checkbox" style="width:auto;margin:0" value="' + f.id + '"' +
+        (terpilih[f.id] ? " checked" : "") + '> ' +
+        '<span class="ava" style="width:26px;height:26px;flex:0 0 26px;font-size:.7rem;' + avaStyle(f.username) + '">' +
+        esc((f.username || "?").charAt(0).toUpperCase()) + '</span> ' + esc(f.username) + '</label>';
+    }).join("") : '<div class="mut">Belum ada akun fasilitator. Set kode pendaftaran fasilitator lalu bagikan.</div>';
+    var dlg = $("#d-fas");
+    dlg.showModal();
+    dlg.addEventListener("close", function h(){
+      dlg.removeEventListener("close", h);
+      if (dlg.returnValue !== "ok") return;
+      var ids = Array.prototype.map.call(
+        document.querySelectorAll("#d-fas-list input:checked"),
+        function(c){ return c.value; });
+      call("/data/tim/" + id + "/fasilitator", {
+        method: "PUT", body: JSON.stringify({ fasilitator_ids: ids })
+      }).then(function(r){
+        toast("Fasilitator tim disimpan (" + r.total + ")"); muat();
+      }).catch(function(e){ toast(e.message, true); });
+    });
+  }).catch(function(e){ toast(e.message, true); });
+}
+
 /* ---------- event delegation ---------- */
 document.addEventListener("click", function(ev){
   var el = ev.target.closest("[data-act],[data-tab],[data-role-tab]");
@@ -1092,11 +1146,13 @@ document.addEventListener("click", function(ev){
       call("/keluar", { method: "POST" }).catch(function(){});
       lihatLogin(); break;
     case "detail": bukaDetail(el.dataset.id); break;
+    case "akt-cepat": bukaDetail(el.dataset.id, "akt"); break;
     case "un": gantiUsername(el.dataset.id); break;
     case "pw": resetPassword(el.dataset.id); break;
     case "sesi": cabutSesi(el.dataset.id); break;
     case "hapus": hapusUser(el.dataset.id); break;
     case "tim": assignTim(el.dataset.id); break;
+    case "fas": assignFasilitator(el.dataset.id); break;
     case "tutup-detail": $("#d-detail").close(); break;
     case "foto": window.open(fotoUrl(el.dataset.key), "_blank"); break;
   }

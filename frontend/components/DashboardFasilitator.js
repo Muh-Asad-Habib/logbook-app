@@ -3,7 +3,7 @@
 /**
  * Dashboard untuk akun FASILITATOR — ringkasan tim yang diampu.
  *
- * - Belum di-assign pusat kendali → layar "hubungi admin".
+ * - Belum di-assign admin → layar "hubungi admin".
  * - Sudah → kartu metrik tim aktif (capaian, kegiatan, waktu, dana),
  *   5 kegiatan terakhir, info laporan, pintasan ke halaman lain.
  * - Multi-tim: pilih lewat switcher di topbar (Shell) — komponen ini
@@ -16,14 +16,17 @@ import {
   History, NotebookPen, FileText, Wallet, MessageCircle,
 } from "lucide-react";
 import {
-  api, useApi, fmtRupiah, fmtDurasi, fmtTgl, getTimAktif,
+  api, useApi, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, getTimAktif,
 } from "@/lib/api";
+import { retryFoto } from "@/lib/foto";
+import Lightbox from "@/components/Lightbox";
 
 export default function DashboardFasilitator() {
   const { data: timList, error: timErr } = useApi("/api/fasilitator/tim");
   const [timAktif, setAktif] = useState("");
   const [ringkas, setRingkas] = useState(null);
   const [gagal, setGagal] = useState("");
+  const [lb, setLb] = useState(null);
 
   // Ikuti tim aktif dari switcher topbar
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function DashboardFasilitator() {
         <div className="big"><Phone className="lucide" /></div>
         <h3>Belum ditugaskan ke tim mana pun</h3>
         <p className="mts" style={{ maxWidth: 440, margin: "8px auto 0" }}>
-          Akun fasilitatormu sudah aktif, tetapi pusat kendali belum menugaskanmu
+          Akun fasilitatormu sudah aktif, tetapi admin belum menugaskanmu
           ke tim mana pun. <b>Hubungi admin untuk menjadikan kamu fasilitator di
           tim kamu</b> — setelah ditugaskan, ringkasan tim langsung tampil di sini.
         </p>
@@ -146,7 +149,16 @@ export default function DashboardFasilitator() {
               <div key={e.id} className="tl-item">
                 <div className="tl-dot" />
                 <div className="tl-card">
-                  <div className="tl-img"><NotebookPen className="lucide" /></div>
+                  {e.foto_keys?.length > 0
+                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])} alt="" loading="lazy"
+                           onError={retryFoto}
+                           onClick={() => setLb({
+                             items: e.foto_keys.map((k) => ({
+                               src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.kegiatan.slice(0, 90),
+                             })),
+                             index: 0,
+                           })} />
+                    : <div className="tl-img"><NotebookPen className="lucide" /></div>}
                   <div style={{ minWidth: 0 }}>
                     <div className="tl-date">
                       {fmtTgl(e.tanggal)} · +{e.capaian_delta}% · {fmtDurasi(e.waktu_menit)}
@@ -182,6 +194,7 @@ export default function DashboardFasilitator() {
           </div>
         </div>
       </div>
+      {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
   );
 }
