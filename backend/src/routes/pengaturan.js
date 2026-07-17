@@ -1,9 +1,10 @@
 import { Router } from "express";
 import * as store from "../storage.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hanyaTim } from "../auth.js";
 
 const router = Router();
 router.use(authRequired); // pengaturan per akun
+router.use(hanyaTim); // fasilitator tidak punya pengaturan dana
 
 /**
  * @openapi
@@ -69,6 +70,7 @@ router.put("/:kunci", async (req, res, next) => {
  */
 export const statistikRouter = Router();
 statistikRouter.use(authRequired);
+statistikRouter.use(hanyaTim); // fasilitator pakai /api/fasilitator/tim/:id/statistik
 statistikRouter.get("/", async (req, res, next) => {
   try {
     const [kegiatan, keuangan, danaAwalStr] = await Promise.all([

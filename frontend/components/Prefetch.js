@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import { preload } from "@/lib/api";
+import { preload, isFasilitator } from "@/lib/api";
 
 /** Muat data SEMUA halaman di latar begitu aplikasi dibuka,
- *  supaya pindah menu (Kegiatan, Keuangan, Galeri, dll.) terasa instan. */
+ *  supaya pindah menu (Kegiatan, Keuangan, Galeri, dll.) terasa instan.
+ *  Fasilitator: cukup daftar tim + hitungan komentar (data tim dimuat
+ *  per tim aktif oleh masing-masing halaman). */
 export default function Prefetch() {
   useEffect(() => {
     // Beri jeda singkat agar data halaman aktif dimuat lebih dulu
     const t = setTimeout(() => {
-      ["/api/statistik", "/api/kegiatan", "/api/keuangan", "/api/export/info",
-       "/api/laporan/info", "/api/tunnel"]
-        .forEach(preload);
+      const paths = isFasilitator()
+        ? ["/api/fasilitator/tim", "/api/komentar/belum-dibaca"]
+        : ["/api/statistik", "/api/kegiatan", "/api/keuangan", "/api/export/info",
+           "/api/laporan/info", "/api/tunnel", "/api/komentar/belum-dibaca"];
+      paths.forEach(preload);
     }, 250);
     return () => clearTimeout(t);
   }, []);

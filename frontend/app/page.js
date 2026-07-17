@@ -6,17 +6,27 @@ import {
   Target, CalendarDays, Timer, TrendingDown, PiggyBank, Rocket, Flame,
   TrendingUp, ChartColumn, ChartPie, Banknote, History, Save, Check, Plus, NotebookPen,
 } from "lucide-react";
-import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate } from "@/lib/api";
+import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isFasilitator } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
 import {
   Gauge, Heatmap, AreaChart, BarChart, Breakdown, Sparkline,
 } from "@/components/Charts";
 import Lightbox from "@/components/Lightbox";
+import DashboardFasilitator from "@/components/DashboardFasilitator";
 import { toast } from "@/components/Toast";
 
 const fmtJt = (v) => (v >= 1_000_000 ? `Rp${(v / 1_000_000).toFixed(1)}jt` : fmtRupiah(v));
 
 export default function Dashboard() {
+  // Fasilitator melihat dashboard ringkasan tim (read-only) — bukan dashboard pribadi
+  const [roleFas, setRoleFas] = useState(null);
+  useEffect(() => { setRoleFas(isFasilitator()); }, []);
+  if (roleFas === null) return <div className="skel mt" style={{ height: 220 }} />;
+  if (roleFas) return <DashboardFasilitator />;
+  return <DashboardTim />;
+}
+
+function DashboardTim() {
   const { data: stat, error: loadErr } = useApi("/api/statistik");
   const { data: kegData } = useApi("/api/kegiatan");
   const { data: keuData } = useApi("/api/keuangan");

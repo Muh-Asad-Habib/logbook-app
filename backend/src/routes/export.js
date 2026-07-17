@@ -2,10 +2,11 @@ import { Router } from "express";
 import { buildDocx, entriesToExport } from "../export/docx.js";
 import { buildPdf } from "../export/pdf.js";
 import { buildXlsx } from "../export/xlsx.js";
-import { authRequired } from "../auth.js";
+import { authRequired, hanyaTim } from "../auth.js";
 
 const router = Router();
 router.use(authRequired); // ekspor berisi data milik user yang login
+router.use(hanyaTim); // fasilitator tidak punya data untuk diekspor
 
 /**
  * @openapi

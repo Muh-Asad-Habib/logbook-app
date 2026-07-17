@@ -19,7 +19,10 @@ import {
   FileText, Upload, Download, Trash2, Info, TriangleAlert,
   ZoomIn, ZoomOut, Maximize, Loader,
 } from "lucide-react";
-import { api, exportUrl, useApi, revalidate, fmtTgl } from "@/lib/api";
+import {
+  api, exportUrl, useApi, revalidate, fmtTgl, isFasilitator, getTimAktif,
+} from "@/lib/api";
+import KomentarPanel from "@/components/Komentar";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
@@ -59,6 +62,167 @@ const GAYA_IFRAME = `
 `;
 
 export default function LaporanPage() {
+  const [fas, setFas] = useState(null);
+  useEffect(() => { setFas(isFasilitator()); }, []);
+  if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
+  return fas ? <LaporanFasilitator /> : <LaporanTim />;
+}
+
+/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+function LaporanFasilitator() {
+  const [timId, setTimId] = useState("");
+  const [info, setInfo] = useState(null);
+  const [gagal, setGagal] = useState("");
+  const [memuat, setMemuat] = useState(false);
+  const [officeUrl, setOfficeUrl] = useState("");
+  const [modeCadangan, setModeCadangan] = useState(false);
+  const frameRef = useRef(null);
+
+  useEffect(() => {
+    const muatTim = async () => {
+      let id = getTimAktif();
+      try {
+        const tim = await api.fasilitator.tim();
+        if (!tim.length) { setGagal("belum-assign"); return; }
+        if (!tim.some((t) => t.id === id)) id = tim[0].id;
+        setTimId(id);
+      } catch (e) {
+        setGagal(e.message);
+      }
+    };
+    muatTim();
+    const ganti = (e) => setTimId(String(e.detail || getTimAktif()));
+    window.addEventListener("tim-aktif-berubah", ganti);
+    return () => window.removeEventListener("tim-aktif-berubah", ganti);
+  }, []);
+
+  useEffect(() => {
+    if (!timId) return;
+    let hidup = true;
+    setInfo(null);
+    api.fasilitator.laporanInfo(timId)
+      .then((r) => { if (hidup) setInfo(r); })
+      .catch((e) => { if (hidup) setGagal(e.message); });
+    return () => { hidup = false; };
+  }, [timId]);
+
+  const renderCadangan = useCallback(async () => {
+    setModeCadangan(true);
+    setMemuat(true);
+    try {
+      const [buf, docx] = await Promise.all([
+        api.fasilitator.laporanFile(timId), import("docx-preview"),
+      ]);
+      const doc = frameRef.current?.contentDocument;
+      if (!doc) return;
+      doc.head.innerHTML = "";
+      doc.body.innerHTML = "";
+      const style = doc.createElement("style");
+      style.textContent = GAYA_IFRAME;
+      doc.head.appendChild(style);
+      await docx.renderAsync(buf, doc.body, doc.head, {
+        className: "docx", inWrapper: true, breakPages: true,
+        renderHeaders: true, renderFooters: true, renderFootnotes: true,
+        renderEndnotes: true, ignoreLastRenderedPageBreak: false,
+        useBase64URL: true, experimental: true,
+      });
+    } catch (e) {
+      setGagal(`Gagal menampilkan dokumen: ${e.message}`);
+    } finally {
+      setMemuat(false);
+    }
+  }, [timId]);
+
+  useEffect(() => {
+    let batal = false;
+    async function siapkan() {
+      if (!info?.ada || !timId) return;
+      setOfficeUrl("");
+      setModeCadangan(false);
+      if (hostLokal() || info.ukuran > BATAS_OFFICE) {
+        renderCadangan();
+        return;
+      }
+      setMemuat(true);
+      try {
+        const { url } = await api.fasilitator.laporanTautan(timId);
+        if (batal) return;
+        setOfficeUrl(
+          "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url)
+        );
+      } catch {
+        if (!batal) renderCadangan();
+      }
+    }
+    siapkan();
+    return () => { batal = true; };
+  }, [info?.ada, info?.updated_at, timId, renderCadangan]);
+
+  if (gagal === "belum-assign")
+    return (
+      <div className="empty mt">
+        <div className="big">📞</div>
+        <p>Hubungi admin untuk menjadikan kamu fasilitator di tim kamu.</p>
+      </div>
+    );
+  if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
+  if (info === null) return <div className="skel mt" style={{ height: 220 }} />;
+
+  return (
+    <>
+      {info.ada ? (
+        <div className="card mt docx-card">
+          <div className="row spread docx-bar">
+            <div style={{ minWidth: 0 }}>
+              <b className="docx-nama">{info.nama}</b>
+              <span className="muted docx-meta">
+                {fmtUkuran(info.ukuran)} · {fmtWaktu(info.updated_at)} · 👁 mode fasilitator
+              </span>
+            </div>
+            <div className="row docx-tools" style={{ marginTop: 0 }}>
+              <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
+                 href={`${exportUrl(`/api/fasilitator/tim/${timId}/laporan-file`)}&unduh=1`}>
+                <Download className="lucide" />
+              </a>
+            </div>
+          </div>
+          <div className="docx-frame-wrap">
+            {memuat && (
+              <div className="docx-loading">
+                <Loader className="lucide docx-spin" /> Memuat dokumen…
+              </div>
+            )}
+            {officeUrl && !modeCadangan ? (
+              <iframe key={officeUrl} src={officeUrl}
+                      title="Pratinjau laporan kemajuan (Word Online)"
+                      className="docx-frame" allowFullScreen
+                      onLoad={() => setMemuat(false)} />
+            ) : (
+              <iframe ref={frameRef} title="Pratinjau laporan kemajuan"
+                      className="docx-frame" sandbox="allow-same-origin" />
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="empty mt">
+          <div className="big"><FileText className="lucide" /></div>
+          <p>Tim belum mengunggah laporan kemajuan.</p>
+        </div>
+      )}
+
+      {/* Komentar laporan (target = id tim, satu laporan per tim) */}
+      {info.ada && timId && (
+        <div className="card mt">
+          <h3>💬 Komentar laporan</h3>
+          <KomentarPanel jenis="laporan" targetId={timId} timId={timId} />
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+function LaporanTim() {
   const { data: info, error: infoErr } = useApi("/api/laporan/info");
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -315,7 +479,26 @@ export default function LaporanPage() {
           </div>
         )
       )}
+
+      {/* Komentar fasilitator pada laporan (target = id akun tim sendiri) */}
+      {info?.ada && <KomentarLaporanTim />}
     </>
+  );
+}
+
+/** Panel komentar laporan milik tim — target_id = id akun sendiri. */
+function KomentarLaporanTim() {
+  const [idKu, setIdKu] = useState("");
+  useEffect(() => {
+    api.me().then((r) => setIdKu(r.user?.id || "")).catch(() => {});
+  }, []);
+  if (!idKu) return null;
+  return (
+    <div className="card mt">
+      <h3>💬 Komentar laporan</h3>
+      <p className="sub">diskusi dengan fasilitator tentang laporan kemajuan</p>
+      <KomentarPanel jenis="laporan" targetId={idKu} />
+    </div>
   );
 }
 

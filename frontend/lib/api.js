@@ -38,7 +38,27 @@ export function setUser(user) {
 export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TIM_AKTIF_KEY);
   clearCache();
+}
+
+/* ---------- Peran fasilitator ---------- */
+const TIM_AKTIF_KEY = "logbook_tim_aktif";
+
+/** Apakah user yang login berperan fasilitator? */
+export const isFasilitator = () => getUser()?.role === "fasilitator";
+
+/** Tim yang sedang dipilih fasilitator (id akun tim). */
+export const getTimAktif = () =>
+  typeof window === "undefined" ? "" : localStorage.getItem(TIM_AKTIF_KEY) || "";
+
+/** Simpan tim aktif + beri tahu halaman (event) supaya data dimuat ulang. */
+export function setTimAktif(timId) {
+  localStorage.setItem(TIM_AKTIF_KEY, String(timId || ""));
+  clearCache();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("tim-aktif-berubah", { detail: timId }));
+  }
 }
 
 function authHeaders(extra = {}) {
@@ -180,11 +200,11 @@ const LANGSUNG_MAKS = 3 * 1024 * 1024; // ≤3 MB → satu request multipart
 
 export const api = {
   // ---- Auth ----
-  register: (username, password) =>
+  register: (username, password, opts = {}) =>
     fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, ...opts }),
     }).then(parse),
   login: (username, password) =>
     fetch(`${API_URL}/api/auth/login`, {
@@ -270,6 +290,71 @@ export const api = {
       throw new Error(msg);
     }
     return res.arrayBuffer();
+  },
+
+  // ---- Fasilitator (read-only terhadap tim yang di-assign) ----
+  fasilitator: {
+    tim: () => aFetch("/api/fasilitator/tim", { cache: "no-store" }),
+    kegiatan: (timId) => aFetch(`/api/fasilitator/tim/${timId}/kegiatan`, { cache: "no-store" }),
+    keuangan: (timId) => aFetch(`/api/fasilitator/tim/${timId}/keuangan`, { cache: "no-store" }),
+    statistik: (timId) => aFetch(`/api/fasilitator/tim/${timId}/statistik`, { cache: "no-store" }),
+    ringkasan: (timId) => aFetch(`/api/fasilitator/tim/${timId}/ringkasan`, { cache: "no-store" }),
+    laporanInfo: (timId) => aFetch(`/api/fasilitator/tim/${timId}/laporan-info`, { cache: "no-store" }),
+    laporanTautan: (timId) =>
+      aFetch(`/api/fasilitator/tim/${timId}/laporan-tautan`, { method: "POST" }),
+    laporanFile: async (timId) => {
+      const res = await fetch(`${API_URL}/api/fasilitator/tim/${timId}/laporan-file`, {
+        headers: authHeaders(), cache: "no-store",
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { msg = (await res.json()).error || msg; } catch {}
+        throw new Error(msg);
+      }
+      return res.arrayBuffer();
+    },
+  },
+
+  // ---- Komentar (fasilitator ↔ tim, 2 arah) ----
+  komentar: {
+    /** list("kegiatan", targetId, timId?) — timId hanya untuk fasilitator. */
+    list: (jenis, targetId, timId) => {
+      const p = new URLSearchParams({ jenis });
+      if (targetId != null && targetId !== "") p.set("target_id", targetId);
+      if (timId) p.set("tim", timId);
+      return aFetch(`/api/komentar?${p}`, { cache: "no-store" });
+    },
+    jumlah: (jenis, timId) => {
+      const p = new URLSearchParams({ jenis });
+      if (timId) p.set("tim", timId);
+      return aFetch(`/api/komentar/jumlah?${p}`, { cache: "no-store" });
+    },
+    tambah: (data) =>
+      aFetch("/api/komentar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    ubah: (id, isi) =>
+      aFetch(`/api/komentar/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isi }),
+      }),
+    hapus: (id) => aFetch(`/api/komentar/${id}`, { method: "DELETE" }),
+    selesai: (id, selesai = true) =>
+      aFetch(`/api/komentar/${id}/selesai`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selesai }),
+      }),
+    belumDibaca: () => aFetch("/api/komentar/belum-dibaca", { cache: "no-store" }),
+    tandaiDibaca: (ids) =>
+      aFetch("/api/komentar/tandai-dibaca", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      }),
   },
 };
 

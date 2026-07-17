@@ -15,12 +15,15 @@ import { usePathname } from "next/navigation";
 import {
   BookOpenText, LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
   FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, PanelLeftClose, PanelLeftOpen,
-  Target, Flame, Banknote,
+  Target, Flame, Banknote, Users,
   Link as LinkIcon, Copy, Check,
 } from "lucide-react";
 import Prefetch from "./Prefetch";
 import ToastHost from "./Toast";
-import { api, clearAuth, getToken, getUser, fmtRupiah, useApi } from "@/lib/api";
+import {
+  api, clearAuth, getToken, getUser, fmtRupiah, useApi,
+  setUser as simpanProfil, getTimAktif, setTimAktif,
+} from "@/lib/api";
 
 const MENU = [
   { href: "/", label: "Dashboard", Ic: LayoutDashboard },
@@ -29,6 +32,14 @@ const MENU = [
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
   { href: "/galeri", label: "Galeri", Ic: Images },
   { href: "/ekspor", label: "Ekspor", Ic: FileOutput },
+];
+
+/* Menu fasilitator: hanya lihat & komentar — tanpa Galeri/Ekspor. */
+const MENU_FAS = [
+  { href: "/", label: "Dashboard Tim", pendek: "Dashboard", Ic: LayoutDashboard },
+  { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
+  { href: "/keuangan", label: "Keuangan", Ic: Wallet },
+  { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
 ];
 
 const JUDUL = {
@@ -116,6 +127,65 @@ function TopChips() {
   );
 }
 
+/* ---------- Badge komentar belum dibaca (menu, kedua role) ---------- */
+function useBelumDibaca(path, aktif = true) {
+  const [n, setN] = useState(null);
+  useEffect(() => {
+    if (!aktif || !getToken()) return;
+    let hidup = true;
+    api.komentar.belumDibaca()
+      .then((r) => { if (hidup) setN(r); })
+      .catch(() => {});
+    return () => { hidup = false; };
+  }, [path, aktif]); // segarkan tiap pindah halaman
+  return n || { kegiatan: 0, keuangan: 0, laporan: 0, total: 0 };
+}
+
+const badgeUntuk = (badges, href) =>
+  href === "/kegiatan" ? badges.kegiatan :
+  href === "/keuangan" ? badges.keuangan :
+  href === "/laporan" ? badges.laporan : 0;
+
+/* ---------- Pemilih tim aktif (topbar fasilitator, dukung multi-tim) ---------- */
+function TimSwitcher() {
+  const { data: tim } = useApi("/api/fasilitator/tim");
+  const [aktif, setAktif] = useState("");
+  useEffect(() => { setAktif(getTimAktif()); }, []);
+  useEffect(() => {
+    // Pastikan pilihan valid: default ke tim pertama bila belum/tidak valid
+    if (!Array.isArray(tim) || tim.length === 0) return;
+    if (!tim.some((t) => t.id === aktif)) {
+      setAktif(tim[0].id);
+      setTimAktif(tim[0].id);
+    }
+  }, [tim, aktif]);
+  if (!Array.isArray(tim) || tim.length === 0) return null;
+  return (
+    <div className="top-chips">
+      <span className="chip" title="Tim yang sedang dilihat">
+        <Users className="lucide" />
+        {tim.length === 1 ? (
+          <b>{tim[0].username}</b>
+        ) : (
+          <select
+            value={aktif}
+            onChange={(e) => { setAktif(e.target.value); setTimAktif(e.target.value); }}
+            style={{
+              background: "transparent", border: "none", color: "inherit",
+              font: "inherit", fontWeight: 700, cursor: "pointer", outline: "none",
+            }}
+          >
+            {tim.map((t) => (
+              <option key={t.id} value={t.id}>{t.username}</option>
+            ))}
+          </select>
+        )}
+      </span>
+      <span className="chip" title="Peran akun">🎓 Fasilitator</span>
+    </div>
+  );
+}
+
 /* ---------- Menu akun (dipakai sidebar & mobile) ---------- */
 function UserMenu({ onClose }) {
   const keluar = async () => {
@@ -170,7 +240,10 @@ export default function Shell({ children }) {
     }
     setSiap(true);
     setUser(getUser());
-    api.me().then((r) => setUser(r.user)).catch(() => {});
+    api.me().then((r) => {
+      setUser(r.user);
+      simpanProfil(r.user); // role tersimpan → isFasilitator() akurat di semua halaman
+    }).catch(() => {});
   }, [isLogin, path]);
 
   useEffect(() => {
@@ -190,6 +263,10 @@ export default function Shell({ children }) {
     setMenuMob(false);
   }, [path]);
 
+  // Hook dipanggil TANPA syarat (Rules of Hooks) — fetch di dalamnya
+  // dilewati bila belum login / masih di halaman login.
+  const badges = useBelumDibaca(path, !isLogin && siap);
+
   if (isLogin) {
     return (
       <>
@@ -208,8 +285,13 @@ export default function Shell({ children }) {
     );
   }
 
-  const judul = JUDUL[(path || "/").replace(/\/$/, "") || "/"] || "Logbook";
-  const fabAda = path === "/kegiatan" || path === "/keuangan";
+  const fasilitator = user?.role === "fasilitator";
+  const menuAktif = fasilitator ? MENU_FAS : MENU;
+  const judul =
+    fasilitator && ((path || "/").replace(/\/$/, "") || "/") === "/"
+      ? "Dashboard Tim"
+      : JUDUL[(path || "/").replace(/\/$/, "") || "/"] || "Logbook";
+  const fabAda = !fasilitator && (path === "/kegiatan" || path === "/keuangan");
   const inisial = (user?.username || "?").charAt(0).toUpperCase();
 
   return (
@@ -220,7 +302,7 @@ export default function Shell({ children }) {
           <div className="sb-logo"><BookOpenText className="lucide" /></div>
           <div className="sb-txt">
             <b>Logbook</b>
-            <small>Kegiatan &amp; Keuangan</small>
+            <small>{fasilitator ? "Mode Fasilitator" : "Kegiatan & Keuangan"}</small>
           </div>
           <button
             type="button"
@@ -233,12 +315,22 @@ export default function Shell({ children }) {
           </button>
         </div>
         <nav className="sb-menu">
-          {MENU.map(({ href, label, Ic }) => (
-            <Link key={href} href={href} className={path === href ? "active" : ""}
-                  title={sbMini ? label : undefined}>
-              <Ic className="lucide" /> <span className="sb-txt">{label}</span>
-            </Link>
-          ))}
+          {menuAktif.map(({ href, label, Ic }) => {
+            const nBadge = badgeUntuk(badges, href);
+            return (
+              <Link key={href} href={href} className={path === href ? "active" : ""}
+                    title={sbMini ? label : undefined}>
+                <Ic className="lucide" /> <span className="sb-txt">{label}</span>
+                {nBadge > 0 && (
+                  <span style={{
+                    marginLeft: "auto", background: "#ef4444", color: "#fff",
+                    borderRadius: 99, fontSize: ".62rem", fontWeight: 800,
+                    padding: "1px 7px", lineHeight: 1.5,
+                  }}>{nBadge}</span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
         <div className="sb-foot" ref={menuRef} style={{ position: "relative" }}>
           {menuBuka && <UserMenu onClose={() => setMenuBuka(false)} />}
@@ -271,7 +363,7 @@ export default function Shell({ children }) {
               <b>{judul}</b>
             </div>
             <h1 className="pg-title">{judul}</h1>
-            <TopChips />
+            {fasilitator ? <TimSwitcher /> : <TopChips />}
             <div className="mob-actions" ref={menuMobRef}>
               <button type="button" className="icon-btn" onClick={toggleTheme}
                       aria-label="Ganti tema">
@@ -293,11 +385,22 @@ export default function Shell({ children }) {
 
       {/* ===== Bottom-nav (mobile) ===== */}
       <nav className="bottom-nav">
-        {MENU.map(({ href, label, pendek, Ic }) => (
-          <Link key={href} href={href} className={path === href ? "active" : ""}>
-            <Ic className="lucide" /> {pendek || label}
-          </Link>
-        ))}
+        {menuAktif.map(({ href, label, pendek, Ic }) => {
+          const nBadge = badgeUntuk(badges, href);
+          return (
+            <Link key={href} href={href} className={path === href ? "active" : ""}
+                  style={{ position: "relative" }}>
+              <Ic className="lucide" /> {pendek || label}
+              {nBadge > 0 && (
+                <span style={{
+                  position: "absolute", top: 2, right: "18%",
+                  background: "#ef4444", color: "#fff", borderRadius: 99,
+                  fontSize: ".56rem", fontWeight: 800, padding: "0 5px", lineHeight: 1.6,
+                }}>{nBadge}</span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* ===== FAB tambah entri (mobile) ===== */}

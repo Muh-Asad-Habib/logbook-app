@@ -26,6 +26,9 @@ export const swaggerSpec = swaggerJsdoc({
       { name: "Files", description: "Akses gambar di server" },
       { name: "Export", description: "Unduh DOCX, PDF, dan Excel" },
       { name: "Import", description: "Impor entri + foto dari dokumen Word" },
+      { name: "Laporan", description: "Laporan kemajuan .docx (satu per tim, tersimpan di ImageKit)" },
+      { name: "Fasilitator", description: "Akses baca tim yang diampu (assignment oleh pusat kendali)" },
+      { name: "Komentar", description: "Komentar 2 arah fasilitator ↔ tim pada kegiatan/keuangan/laporan" },
     ],
     security: [{ bearerAuth: [] }],
     components: {
