@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  BookOpenText, User, Lock, Eye, EyeOff, KeyRound, Sparkles, Rocket, LogIn,
+  User, Lock, Eye, EyeOff, KeyRound, Sparkles, Rocket, LogIn,
   ChartColumn, Images, FileOutput,
 } from "lucide-react";
+import LogoMark from "@/components/Logo";
 import { api, getToken, setAuth } from "@/lib/api";
 
 export default function LoginPage() {
@@ -77,7 +78,7 @@ export default function LoginPage() {
 
       <div className="login-card">
         <div className="login-head">
-          <div className="login-ic"><BookOpenText className="lucide" /></div>
+          <div className="login-ic"><LogoMark /></div>
           <h1>
             Logbook <span className="grad-text">Kegiatan &amp; Keuangan</span>
           </h1>
