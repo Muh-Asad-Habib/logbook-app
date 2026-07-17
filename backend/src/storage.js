@@ -303,6 +303,29 @@ export async function deleteSession(token) {
   await q("DELETE FROM sessions WHERE token = $1", [String(token || "")]);
 }
 
+/* ---------- Kepemilikan berkas (cegah IDOR di /api/files/:key) ----------
+ * Sebelumnya endpoint gambar hanya memeriksa "sudah login?" — TIDAK memeriksa
+ * apakah key yang diminta benar-benar milik pemanggil. Siapa pun yang login
+ * (termasuk akun baru daftar sendiri) bisa melihat foto akun lain bila
+ * berhasil menebak/mendapatkan key-nya dari mana pun.
+ * Fungsi ini memastikan key hanya disajikan bila tercatat milik salah satu
+ * userId dalam scope pemanggil (dirinya sendiri; atau — untuk fasilitator —
+ * salah satu tim yang benar-benar ia ampu). */
+export async function fileDimilikiOleh(key, userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean).map(String))];
+  if (!key || !ids.length) return false;
+  const rows = await q(
+    `SELECT 1 FROM kegiatan WHERE user_id = ANY($1::text[]) AND foto_keys ? $2::text
+     UNION ALL
+     SELECT 1 FROM keuangan WHERE user_id = ANY($1::text[]) AND bukti_key = $2::text
+     UNION ALL
+     SELECT 1 FROM laporan_docx WHERE user_id = ANY($1::text[]) AND file_key = $2::text
+     LIMIT 1`,
+    [ids, key]
+  );
+  return rows.length > 0;
+}
+
 /* ---------- Kegiatan ---------- */
 
 export async function listKegiatan(userId) {

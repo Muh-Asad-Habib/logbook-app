@@ -2,6 +2,7 @@ import { Router } from "express";
 import fs from "node:fs";
 import { safePath, contentType, signedUrl, pakaiCloud } from "../files.js";
 import { authRequired } from "../auth.js";
+import * as store from "../storage.js";
 
 const router = Router();
 router.use(authRequired); // gambar hanya untuk yang login (token via header/query)
@@ -26,17 +27,27 @@ router.use(authRequired); // gambar hanya untuk yang login (token via header/que
  *             schema: { type: string, format: binary }
  *       404: { description: Tidak ditemukan }
  */
-router.get(/^\/(.+)/, (req, res) => {
+router.get(/^\/(.+)/, async (req, res) => {
   try {
     const key = decodeURIComponent(req.params[0]);
+    if (key.includes("..") || key.includes("/")) {
+      return res.status(400).json({ error: "key tidak valid" });
+    }
+
+    // Cegah IDOR: key hanya boleh disajikan bila memang tercatat milik
+    // akun yang login — atau, bila fasilitator, milik salah satu tim yang
+    // benar-benar ia ampu (bukan sekadar "sudah login pakai akun apa pun").
+    const scope = req.user.role === "fasilitator"
+      ? (await store.listTimUntukFasilitator(req.userId)).map((t) => t.id)
+      : [req.userId];
+    if (!(await store.fileDimilikiOleh(key, scope))) {
+      return res.status(404).json({ error: "berkas tidak ditemukan" });
+    }
 
     if (pakaiCloud()) {
-      // Backend hanya jadi "satpam": cek token (middleware di atas) lalu
-      // alihkan browser ke signed URL — byte gambar mengalir langsung dari
-      // CDN ImageKit, tidak melewati server ini sama sekali.
-      if (key.includes("..") || key.includes("/")) {
-        return res.status(400).json({ error: "key tidak valid" });
-      }
+      // Backend hanya jadi "satpam": cek token + kepemilikan, lalu alihkan
+      // browser ke signed URL — byte gambar mengalir langsung dari CDN
+      // ImageKit, tidak melewati server ini sama sekali.
       res.setHeader("Cache-Control", "private, max-age=300"); // redirect boleh di-cache sebentar
       return res.redirect(302, signedUrl(key));
     }

@@ -219,7 +219,7 @@ router.put("/data/pengguna/:id/username", async (req, res, next) => {
 router.put("/data/pengguna/:id/password", async (req, res, next) => {
   try {
     const baru = String(req.body?.password || "");
-    if (baru.length < 6) return res.status(400).json({ error: "Password minimal 6 karakter" });
+    if (baru.length < 8) return res.status(400).json({ error: "Password minimal 8 karakter" });
     const user = await store.getUserById(req.params.id);
     if (!user) return res.status(404).json({ error: "Akun tidak ditemukan" });
     await store.updateUserPassword(user.id, baru); // hanya hash yang disimpan
