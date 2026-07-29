@@ -13,8 +13,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [konfirmasi, setKonfirmasi] = useState("");
-  const [sebagaiFas, setSebagaiFas] = useState(false);
-  const [kodeFas, setKodeFas] = useState("");
+  const [peran, setPeran] = useState("tim"); // "tim" | "fasilitator" | "dosen"
+  const [kode, setKode] = useState("");
   const [lihatPass, setLihatPass] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,8 +36,8 @@ export default function LoginPage() {
         setErr("Konfirmasi password tidak cocok");
         return;
       }
-      if (sebagaiFas && !kodeFas.trim()) {
-        setErr("Masukkan kode fasilitator dari admin");
+      if (peran !== "tim" && !kode.trim()) {
+        setErr(`Masukkan kode ${peran === "dosen" ? "dosen pendamping" : "fasilitator"} dari admin`);
         return;
       }
     }
@@ -49,9 +49,15 @@ export default function LoginPage() {
           : await api.register(
               username.trim(),
               password,
-              sebagaiFas
-                ? { sebagai_fasilitator: true, kode_fasilitator: kodeFas.trim() }
-                : {}
+              peran === "tim"
+                ? {}
+                : {
+                    peran,
+                    // field lama tetap dikirim agar kompatibel dengan server lama
+                    ...(peran === "fasilitator"
+                      ? { sebagai_fasilitator: true, kode_fasilitator: kode.trim() }
+                      : { kode_dosen: kode.trim() }),
+                  }
             );
       setAuth(r.token, r.user);
       location.replace("/"); // muat ulang bersih dengan sesi baru
@@ -65,9 +71,15 @@ export default function LoginPage() {
     setMode(m);
     setErr("");
     setKonfirmasi("");
-    setSebagaiFas(false);
-    setKodeFas("");
+    setPeran("tim");
+    setKode("");
   };
+
+  const PERAN = [
+    { id: "tim", label: "Tim", ket: "Mencatat kegiatan & keuangan logbook" },
+    { id: "fasilitator", label: "Fasilitator", ket: "Melihat & mengomentari logbook tim" },
+    { id: "dosen", label: "Dosen Pendamping", ket: "Melihat, mengomentari, & memberi ACC" },
+  ];
 
   return (
     <div className="login-wrap">
@@ -160,36 +172,46 @@ export default function LoginPage() {
                 </div>
               </label>
 
-              <label
-                className="field"
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  cursor: "pointer", userSelect: "none",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={sebagaiFas}
-                  onChange={(e) => setSebagaiFas(e.target.checked)}
-                  style={{ width: "auto", margin: 0 }}
-                />
-                <span>
-                  Daftar sebagai <b>Fasilitator</b>
-                  <small style={{ display: "block", opacity: 0.7 }}>
-                    Hanya melihat &amp; mengomentari logbook tim yang ditugaskan admin
-                  </small>
-                </span>
-              </label>
+              <div className="field">
+                Daftar sebagai
+                <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
+                  {PERAN.map((p) => (
+                    <label
+                      key={p.id}
+                      style={{
+                        display: "flex", alignItems: "flex-start", gap: 10,
+                        cursor: "pointer", userSelect: "none", padding: "9px 12px",
+                        borderRadius: 12, fontWeight: 500,
+                        border: `1px solid ${peran === p.id ? "var(--pri, #4f46e5)" : "rgba(120,130,180,.28)"}`,
+                        background: peran === p.id ? "rgba(79,70,229,.07)" : "transparent",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="peran"
+                        value={p.id}
+                        checked={peran === p.id}
+                        onChange={() => { setPeran(p.id); setKode(""); }}
+                        style={{ width: "auto", margin: "3px 0 0" }}
+                      />
+                      <span>
+                        <b>{p.label}</b>
+                        <small style={{ display: "block", opacity: 0.7 }}>{p.ket}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-              {sebagaiFas && (
+              {peran !== "tim" && (
                 <label className="field">
-                  Kode fasilitator
+                  Kode {peran === "dosen" ? "dosen pendamping" : "fasilitator"}
                   <div className="input-wrap">
                     <span className="in-ic" aria-hidden="true"><KeyRound className="lucide" /></span>
                     <input
                       type="text"
-                      value={kodeFas}
-                      onChange={(e) => setKodeFas(e.target.value)}
+                      value={kode}
+                      onChange={(e) => setKode(e.target.value)}
                       placeholder="kode dari admin"
                       autoComplete="off"
                     />

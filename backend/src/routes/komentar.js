@@ -1,18 +1,18 @@
 /**
- * API komentar 2 arah antara FASILITATOR dan TIM.
+ * API komentar 2 arah antara PENDAMPING (fasilitator / dosen) dan TIM.
  *
  * Aturan:
- * - Fasilitator memulai thread (komentar induk) pada entri kegiatan/keuangan/
+ * - Pendamping memulai thread (komentar induk) pada entri kegiatan/keuangan/
  *   laporan milik tim yang ia ampu; tim MEMBALAS lewat parent_id.
  * - Edit hanya milik sendiri → diberi tanda edited_at (label "(diedit)").
  * - Hapus hanya milik sendiri (balasan ikut terhapus).
  * - "Tandai selesai" hanya oleh pemilik tim (komentar induk).
  * - Tanda "sudah dibaca" per pengguna (tabel komentar_baca) — akurat untuk
- *   banyak fasilitator per tim maupun banyak tim per fasilitator.
+ *   banyak pendamping per tim maupun banyak tim per pendamping.
  */
 import { Router } from "express";
 import * as store from "../storage.js";
-import { authRequired } from "../auth.js";
+import { authRequired, PERAN_PENDAMPING } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { rateLimit } from "../ratelimit.js";
 
@@ -27,16 +27,16 @@ const komentarLimiter = rateLimit({
   pesan: "Terlalu banyak komentar — tunggu sebentar",
 });
 
-/** Tentukan tim yang sah untuk request ini (tim = dirinya; fasilitator = ?tim= yang di-assign). */
+/** Tentukan tim yang sah untuk request ini (tim = dirinya; pendamping = ?tim= yang di-assign). */
 async function timUntukRequest(req, res) {
-  if (req.user.role === "fasilitator") {
+  if (PERAN_PENDAMPING.has(req.user.role)) {
     const timId = String(req.query.tim || req.body?.tim || "");
     if (!timId) {
-      res.status(400).json({ error: "Parameter tim wajib untuk fasilitator" });
+      res.status(400).json({ error: "Parameter tim wajib untuk fasilitator/dosen" });
       return null;
     }
     if (!(await store.bolehAksesTim(req.user.id, timId))) {
-      res.status(403).json({ error: "Kamu bukan fasilitator tim ini" });
+      res.status(403).json({ error: "Kamu bukan pendamping tim ini" });
       return null;
     }
     return timId;
@@ -197,10 +197,10 @@ router.post("/", komentarLimiter, async (req, res, next) => {
       }
       targetId = induk.target_id;
     } else {
-      // Komentar induk: hanya fasilitator yang memulai thread
-      if (req.user.role !== "fasilitator") {
+      // Komentar induk: hanya pendamping (fasilitator/dosen) yang memulai thread
+      if (!PERAN_PENDAMPING.has(req.user.role)) {
         return res.status(403).json({
-          error: "Tim membalas komentar fasilitator — tidak memulai thread baru",
+          error: "Tim membalas komentar pendamping — tidak memulai thread baru",
         });
       }
       // Validasi target benar-benar milik tim itu
@@ -331,7 +331,7 @@ router.put("/:id/selesai", async (req, res, next) => {
   try {
     const k = await store.getKomentarById(req.params.id);
     if (!k) return res.status(404).json({ error: "Komentar tidak ditemukan" });
-    if (req.user.role === "fasilitator" || k.tim_user_id !== req.user.id) {
+    if (PERAN_PENDAMPING.has(req.user.role) || k.tim_user_id !== req.user.id) {
       return res.status(403).json({ error: "Hanya tim pemilik logbook yang menandai selesai" });
     }
     const selesai = req.body?.selesai !== false;

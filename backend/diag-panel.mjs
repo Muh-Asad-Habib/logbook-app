@@ -25,14 +25,17 @@ blok.forEach((src, i) => {
   }
 });
 
-// Pastikan penanda fitur fasilitator benar-benar ada di panel
+// Pastikan penanda fitur pendamping (fasilitator & dosen) ada di panel
 const wajib = [
   "VIEW_ROLE",
   'data-role-tab="fasilitator"',
+  'data-role-tab="dosen"',
   'id="d-tim"',
   "/data/kode-fasilitator",
+  "/data/kode-dosen",
   "/laporan-file",
   "AKSI_INFO",
+  "acc.setuju",
 ];
 const hilang = wajib.filter((k) => !PANEL_HTML.includes(k));
 if (hilang.length) {

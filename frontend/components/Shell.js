@@ -35,13 +35,19 @@ const MENU = [
   { href: "/ekspor", label: "Ekspor", Ic: FileOutput },
 ];
 
-/* Menu fasilitator: hanya lihat & komentar — tanpa Galeri/Ekspor. */
+/* Menu pendamping (fasilitator & dosen): hanya lihat, komentar, ACC — tanpa Galeri/Ekspor. */
 const MENU_FAS = [
   { href: "/", label: "Dashboard Tim", pendek: "Dashboard", Ic: LayoutDashboard },
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
 ];
+
+/** Label & ikon peran — dipakai di sidebar dan chip topbar. */
+const INFO_PERAN = {
+  fasilitator: { emoji: "🎓", nama: "Fasilitator", mode: "Mode Fasilitator" },
+  dosen: { emoji: "👨‍🏫", nama: "Dosen Pendamping", mode: "Mode Dosen Pendamping" },
+};
 
 const JUDUL = {
   "/": "Dashboard",
@@ -147,8 +153,8 @@ const badgeUntuk = (badges, href) =>
   href === "/keuangan" ? badges.keuangan :
   href === "/laporan" ? badges.laporan : 0;
 
-/* ---------- Pemilih tim aktif (topbar fasilitator, dukung multi-tim) ---------- */
-function TimSwitcher() {
+/* ---------- Pemilih tim aktif (topbar pendamping, dukung multi-tim) ---------- */
+function TimSwitcher({ role }) {
   const { data: tim } = useApi("/api/fasilitator/tim");
   const [aktif, setAktif] = useState("");
   useEffect(() => { setAktif(getTimAktif()); }, []);
@@ -160,6 +166,7 @@ function TimSwitcher() {
       setTimAktif(tim[0].id);
     }
   }, [tim, aktif]);
+  const info = INFO_PERAN[role] || INFO_PERAN.fasilitator;
   if (!Array.isArray(tim) || tim.length === 0) return null;
   return (
     <div className="top-chips tim-chips">
@@ -180,7 +187,7 @@ function TimSwitcher() {
           </select>
         )}
       </span>
-      <span className="chip chip-role" title="Peran akun">🎓 Fasilitator</span>
+      <span className="chip chip-role" title="Peran akun">{info.emoji} {info.nama}</span>
     </div>
   );
 }
@@ -284,7 +291,8 @@ export default function Shell({ children }) {
     );
   }
 
-  const fasilitator = user?.role === "fasilitator";
+  const role = user?.role || "tim";
+  const fasilitator = role === "fasilitator" || role === "dosen"; // pendamping
   const menuAktif = fasilitator ? MENU_FAS : MENU;
   const judul =
     fasilitator && ((path || "/").replace(/\/$/, "") || "/") === "/"
@@ -301,7 +309,7 @@ export default function Shell({ children }) {
           <div className="sb-logo"><LogoMark /></div>
           <div className="sb-txt">
             <b>Logbook</b>
-            <small>{fasilitator ? "Mode Fasilitator" : "Kegiatan & Keuangan"}</small>
+            <small>{fasilitator ? (INFO_PERAN[role]?.mode || "Mode Pendamping") : "Kegiatan & Keuangan"}</small>
           </div>
           <button
             type="button"
@@ -362,7 +370,7 @@ export default function Shell({ children }) {
               <b>{judul}</b>
             </div>
             <h1 className="pg-title">{judul}</h1>
-            {fasilitator ? <TimSwitcher /> : <TopChips />}
+            {fasilitator ? <TimSwitcher role={role} /> : <TopChips />}
             <div className="mob-actions" ref={menuMobRef}>
               <button type="button" className="icon-btn" onClick={toggleTheme}
                       aria-label="Ganti tema">

@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Dashboard untuk akun FASILITATOR — ringkasan tim yang diampu.
+ * Dashboard untuk akun PENDAMPING (fasilitator & dosen) — ringkasan tim.
  *
  * - Belum di-assign admin → layar "hubungi admin".
  * - Sudah → kartu metrik tim aktif (capaian, kegiatan, waktu, dana),
- *   5 kegiatan terakhir, info laporan, pintasan ke halaman lain.
+ *   5 kegiatan terakhir, info laporan, rekap ACC, pintasan ke halaman lain.
  * - Multi-tim: pilih lewat switcher di topbar (Shell) — komponen ini
  *   membaca tim aktif dari localStorage & ikut event perubahannya.
  */
@@ -16,10 +16,11 @@ import {
   History, NotebookPen, FileText, Wallet, MessageCircle,
 } from "lucide-react";
 import {
-  api, useApi, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, getTimAktif,
+  api, useApi, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, getTimAktif, isDosen,
 } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
+import KartuAcc from "@/components/KartuAcc";
 
 export default function DashboardFasilitator() {
   const { data: timList, error: timErr } = useApi("/api/fasilitator/tim");
@@ -69,9 +70,9 @@ export default function DashboardFasilitator() {
         <div className="big"><Phone className="lucide" /></div>
         <h3>Belum ditugaskan ke tim mana pun</h3>
         <p className="mts" style={{ maxWidth: 440, margin: "8px auto 0" }}>
-          Akun fasilitatormu sudah aktif, tetapi admin belum menugaskanmu
-          ke tim mana pun. <b>Hubungi admin untuk menjadikan kamu fasilitator di
-          tim kamu</b> — setelah ditugaskan, ringkasan tim langsung tampil di sini.
+          Akunmu sudah aktif, tetapi admin belum menugaskanmu ke tim mana pun.{" "}
+          <b>Hubungi admin untuk menugaskanmu sebagai pendamping di tim kamu</b> —
+          setelah ditugaskan, ringkasan tim langsung tampil di sini.
         </p>
       </div>
     );
@@ -93,8 +94,9 @@ export default function DashboardFasilitator() {
   return (
     <>
       <p className="muted mt">
-        Melihat logbook tim <b>{ringkas.tim?.username}</b> — kamu hanya dapat
-        melihat &amp; mengomentari (tidak bisa mengubah data).
+        Melihat logbook tim <b>{ringkas.tim?.username}</b> — kamu dapat melihat
+        &amp; mengomentari{isDosen() ? " serta memberi ACC / meminta revisi" : ""}{" "}
+        (data tim tidak bisa diubah).
         {badge.total > 0 && <> · <b style={{ color: "#ef4444" }}>{badge.total} komentar belum dibaca</b></>}
       </p>
 
@@ -194,6 +196,10 @@ export default function DashboardFasilitator() {
           </div>
         </div>
       </div>
+
+      {/* Rekap ACC tim ini (data ikut dari /ringkasan supaya tanpa request tambahan) */}
+      <div className="mt"><KartuAcc timId={timId} data={ringkas.persetujuan} /></div>
+
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
   );

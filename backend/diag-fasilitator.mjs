@@ -1,10 +1,12 @@
 /**
- * Diagnosa fitur FASILITATOR end-to-end terhadap server lokal + Neon.
- * Jalankan: node diag-fasilitator.mjs   (server harus hidup di :4000)
+ * Diagnosa fitur PENDAMPING (fasilitator & dosen) end-to-end terhadap
+ * server lokal + Neon. Jalankan: node diag-fasilitator.mjs
+ * (server harus hidup di :4000)
  *
  * Alur: set kode → daftar tim & fasilitator → pagar tulis → assignment →
  * baca data tim → komentar induk → balasan tim → edit → selesai →
- * belum-dibaca → hapus → bersih-bersih akun uji.
+ * belum-dibaca → hapus → ACC dosen (revisi → batal otomatis saat entri
+ * diubah → disetujui → rekap) → bersih-bersih akun uji.
  */
 import { hashPassword } from "./src/passwords.js";
 import * as store from "./src/storage.js";
@@ -14,7 +16,9 @@ const BASE = process.env.DIAG_BASE || "http://localhost:4000";
 const suf = Date.now().toString(36);
 const TIM = `uji-tim-${suf}`;
 const FAS = `uji-fas-${suf}`;
+const DOS = `uji-dos-${suf}`;
 const KODE = "kode-uji-123";
+const KODE_DOSEN = "kode-dosen-uji-123";
 
 const jfetch = async (path, opt = {}) => {
   const res = await fetch(`${BASE}${path}`, opt);
@@ -29,11 +33,13 @@ const cek = (nama, kondisi, info = "") => {
   else { gagal++; console.log(`  ❌ ${nama} ${info}`); }
 };
 
-let timId = "", fasId = "";
+let timId = "", fasId = "", dosId = "";
 try {
   console.log("== Persiapan ==");
   const adaKode = await store.getMeta("kodeFasilitator");
+  const adaKodeDosen = await store.getMeta("kodeDosen");
   await store.setMeta("kodeFasilitator", hashPassword(KODE));
+  await store.setMeta("kodeDosen", hashPassword(KODE_DOSEN));
 
   // 1. Daftar akun
   const rTim = await jfetch("/api/auth/register", {
@@ -150,15 +156,94 @@ try {
   const rHapus = await jfetch(`/api/komentar/${komId}`, { method: "DELETE", headers: H(tokFas) });
   cek("hapus induk → balasan ikut (2 terhapus)", rHapus.status === 200 && rHapus.body.terhapus === 2);
 
+  console.log("== ACC dosen pendamping ==");
+  const rDosSalah = await jfetch("/api/auth/register", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: DOS, password: "rahasia123", peran: "dosen", kode_dosen: "salah" }),
+  });
+  cek("daftar dosen kode salah → 401", rDosSalah.status === 401);
+
+  const rDos = await jfetch("/api/auth/register", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: DOS, password: "rahasia123", peran: "dosen", kode_dosen: KODE_DOSEN }),
+  });
+  cek("daftar dosen kode benar → 201 + role dosen",
+    rDos.status === 201 && rDos.body.user.role === "dosen");
+  dosId = rDos.body.user.id;
+  const tokDos = rDos.body.token;
+
+  cek("dosen GET /api/kegiatan → 403 (pagar tulis sama)",
+    (await jfetch("/api/kegiatan", { headers: H(tokDos) })).status === 403);
+
+  await store.gantiTimFasilitator(dosId, [timId]);
+  const accBody = (isi) => JSON.stringify({ jenis: "kegiatan", target_id: keg.id, tim: timId, ...isi });
+
+  cek("fasilitator PUT /api/persetujuan → 403 (hanya dosen)",
+    (await jfetch("/api/persetujuan", {
+      method: "PUT", headers: H(tokFas), body: accBody({ status: "disetujui" }),
+    })).status === 403);
+
+  cek("tim PUT /api/persetujuan → 403",
+    (await jfetch("/api/persetujuan", {
+      method: "PUT", headers: H(tokTim),
+      body: JSON.stringify({ jenis: "kegiatan", target_id: keg.id, status: "disetujui" }),
+    })).status === 403);
+
+  cek("revisi tanpa catatan → 400",
+    (await jfetch("/api/persetujuan", {
+      method: "PUT", headers: H(tokDos), body: accBody({ status: "revisi" }),
+    })).status === 400);
+
+  const rRevisi = await jfetch("/api/persetujuan", {
+    method: "PUT", headers: H(tokDos),
+    body: accBody({ status: "revisi", catatan: "Lampirkan foto dokumentasi" }),
+  });
+  cek("dosen minta revisi + catatan → 200", rRevisi.status === 200 && rRevisi.body.status === "revisi");
+
+  const rLihatTim = await jfetch("/api/persetujuan?jenis=kegiatan", { headers: H(tokTim) });
+  cek("tim melihat status revisi + catatan",
+    rLihatTim.body[keg.id]?.status === "revisi" &&
+    rLihatTim.body[keg.id]?.catatan === "Lampirkan foto dokumentasi" &&
+    rLihatTim.body[keg.id]?.dosen_username === DOS);
+
+  await store.updateKegiatan(timId, keg.id, { kegiatan: "Uji coba fitur pendamping (revisi)" });
+  const rSetelahEdit = await jfetch("/api/persetujuan?jenis=kegiatan", { headers: H(tokTim) });
+  cek("tim mengubah entri → status kembali menunggu", !rSetelahEdit.body[keg.id]);
+
+  const rSetuju = await jfetch("/api/persetujuan", {
+    method: "PUT", headers: H(tokDos), body: accBody({ status: "disetujui" }),
+  });
+  cek("dosen ACC → disetujui", rSetuju.status === 200 && rSetuju.body.status === "disetujui");
+
+  const rRekap = await jfetch(`/api/persetujuan/ringkas?tim=${timId}`, { headers: H(tokDos) });
+  cek("rekap ACC: 1 disetujui, 0 revisi",
+    rRekap.body.total_disetujui === 1 && rRekap.body.total_revisi === 0 &&
+    rRekap.body.kegiatan.disetujui === 1);
+
+  const rBatal = await jfetch("/api/persetujuan", {
+    method: "PUT", headers: H(tokDos), body: accBody({ status: "menunggu" }),
+  });
+  cek("dosen batalkan ACC → menunggu", rBatal.status === 200 && rBatal.body.status === "menunggu");
+
+  cek("dosen ACC tim yang tidak diampu → 403",
+    (await jfetch("/api/persetujuan", {
+      method: "PUT", headers: H(tokDos),
+      body: JSON.stringify({ jenis: "kegiatan", target_id: keg.id, tim: dosId, status: "disetujui" }),
+    })).status === 403);
+
   console.log(`\n== HASIL: ${lulus} lulus, ${gagal} gagal ==`);
   if (!adaKode) {
     // kode belum pernah diset sebelum uji — kembalikan ke keadaan semula
     await q("DELETE FROM meta WHERE kunci IN ('kodeFasilitator','kodeFasilitatorUpdatedAt')");
   }
+  if (!adaKodeDosen) {
+    await q("DELETE FROM meta WHERE kunci IN ('kodeDosen','kodeDosenUpdatedAt')");
+  }
 } finally {
   // Bersih-bersih akun uji beserta seluruh datanya
   if (timId) await store.deleteUser(timId).catch(() => {});
   if (fasId) await store.deleteUser(fasId).catch(() => {});
+  if (dosId) await store.deleteUser(dosId).catch(() => {});
   console.log("Akun uji dibersihkan.");
   process.exit(gagal ? 1 : 0);
 }

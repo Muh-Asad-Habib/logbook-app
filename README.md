@@ -31,8 +31,8 @@ Komputermu (host)                          Teman-temanmu (di mana saja)
 │  ├─ Server (Express :4000) │   tunnel    https://xxxx.trycloudflare.com
 │  │   ├─ Web (Next.js)      │ ◀────────── (internet, beda jaringan OK)
 │  │   ├─ REST API + Swagger │  Cloudflare
-│  │   └─ Gambar (uploads/)  │   (gratis)
-│  └─ Data: data/db.json     │
+│  │   └─ Gambar (ImageKit)  │   (gratis)
+│  └─ Data: Neon (Postgres)  │
 └────────────────────────────┘
 ```
 
@@ -83,28 +83,53 @@ dan impornya tidak saling terlihat antar akun.
 >   (tanpa bisa melihat password lama), lalu segera ganti sendiri lewat
 >   menu Pengaturan akun.
 
-### 🎓 Peran Fasilitator
+### 🎓 Peran Fasilitator & 👨‍🏫 Dosen Pendamping
 
-Selain akun **tim** (default), ada peran **fasilitator** — pembimbing yang
-memantau logbook tim:
+Selain akun **tim** (default), ada dua peran **pendamping** yang memantau
+logbook tim:
 
-- **Daftar**: di tab Daftar, isi konfirmasi password lalu centang
-  **"Daftar sebagai Fasilitator"** → masukkan **kode fasilitator** yang
-  ditetapkan admin di pusat kendali (tanpa kode yang benar, pendaftaran ditolak).
-- **Akses**: fasilitator hanya bisa **melihat & mengomentari** kegiatan,
+| Peran | Lihat data tim | Komentar | ACC / minta revisi |
+|---|:--:|:--:|:--:|
+| 👥 Tim | logbook sendiri | ✅ (membalas) | — |
+| 🎓 Fasilitator | ✅ | ✅ | — |
+| 👨‍🏫 Dosen Pendamping | ✅ | ✅ | ✅ |
+
+- **Daftar**: di tab Daftar pilih **peran** (Tim / Fasilitator / Dosen
+  Pendamping). Untuk pendamping, masukkan **kode** yang ditetapkan admin di
+  pusat kendali — kode fasilitator dan kode dosen **berbeda**; tanpa kode yang
+  benar pendaftaran ditolak.
+- **Akses**: pendamping hanya bisa **melihat & mengomentari** kegiatan,
   keuangan, dan laporan kemajuan tim yang **ditugaskan pusat kendali** —
-  tidak bisa menambah/mengubah/menghapus data apa pun (dipagari di server).
-- **Many-to-many**: satu tim boleh punya banyak fasilitator, dan satu
-  fasilitator boleh mengampu banyak tim (ada pemilih tim di bilah atas).
-- **Komentar 2 arah**: fasilitator memulai komentar pada entri; tim membalas,
+  tidak bisa menambah/mengubah/menghapus data tim (dipagari di server).
+- **Many-to-many**: satu tim boleh punya banyak pendamping, dan satu
+  pendamping boleh mengampu banyak tim (ada pemilih tim di bilah atas).
+- **Komentar 2 arah**: pendamping memulai komentar pada entri; tim membalas,
   menandai selesai, dan keduanya bisa mengedit (berlabel *"(diedit)"*) atau
   menghapus komentar miliknya. Ada badge jumlah komentar belum dibaca di menu.
-- **Belum ditugaskan?** Setelah login, fasilitator melihat pesan
-  *"Hubungi admin untuk menjadikan kamu fasilitator di tim kamu"* sampai
+- **Belum ditugaskan?** Setelah login, pendamping melihat pesan
+  *"Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu"* sampai
   pusat kendali menetapkan timnya.
-- **Pusat kendali**: tabel akun kini bertab **👥 Tim / 🎓 Fasilitator** —
-  kelola kode pendaftaran, tetapkan tim per fasilitator (multi-pilih),
-  dan lihat laporan kemajuan tiap tim di tab **📄 Laporan**.
+- **Pusat kendali**: tabel akun bertab **👥 Tim / 🎓 Fasilitator /
+  👨‍🏫 Dosen Pendamping** — kelola kode pendaftaran tiap peran, tetapkan tim
+  per pendamping (multi-pilih), dan lihat laporan kemajuan tiap tim.
+
+#### ✅ ACC (pengesahan) oleh dosen pendamping
+
+Tiap entri kegiatan, entri belanja, dan laporan kemajuan punya satu status:
+
+| Status | Arti |
+|---|---|
+| ⏳ **Menunggu ACC** | belum ditinjau dosen |
+| ✔ **Disetujui** | sudah di-ACC dosen pendamping |
+| ↺ **Revisi** | dosen minta perbaikan — **wajib disertai catatan** |
+
+- Tombol **ACC / Minta revisi / Batalkan** hanya muncul untuk akun dosen, dan
+  server juga menolak permintaan dari peran lain (`PUT /api/persetujuan`).
+- Tim melihat lencana status + catatan revisi langsung di entrinya, serta
+  rekap **Pengesahan dosen (ACC)** di Dashboard.
+- **Otomatis batal saat data berubah**: kalau tim mengedit entri (atau
+  mengganti berkas laporan), status kembali ke *menunggu* supaya ACC selalu
+  merujuk versi yang benar-benar ditinjau.
 
 ### Opsi
 
@@ -122,15 +147,22 @@ memantau logbook tim:
 
 ## 💾 Di mana data tersimpan?
 
-Semua **lokal di folder proyek** — mudah di-backup (tinggal salin folder):
+Sejak v3.0 seluruh data ada di **cloud** (lihat [DEPLOY.md](DEPLOY.md)) — laptop
+boleh dimatikan tanpa kehilangan apa pun:
 
 | Apa | Lokasi |
 |---|---|
-| Data kegiatan, keuangan, pengaturan | `data/db.json` |
-| Semua foto & bukti/nota | `uploads/` |
+| Akun, peran, kegiatan, keuangan, pengaturan, komentar, status ACC | **Neon** (Postgres) |
+| Foto kegiatan & bukti/nota | **ImageKit** (CDN, signed URL) |
+| Laporan kemajuan `.docx` | **ImageKit** (bukan Neon — kuota Neon 0,5 GB tetap lega) |
+| Kredensial pusat kendali | tabel `meta` di Neon (hash scrypt) |
 
-Data lama dari aplikasi Streamlit (SQLite `data/logbook.db`) **otomatis dimigrasikan**
-saat pertama kali server jalan — sudah teruji: 14 kegiatan, 3 belanja, dan dana awal terbawa semua.
+> Konfigurasi lewat `.env` (`DATABASE_URL`, `IMAGEKIT_*`) — salin dari `.env.example`.
+> Tabel dibuat otomatis (`CREATE TABLE IF NOT EXISTS`) saat server pertama tersambung.
+
+**Data lama** ikut terbawa: berkas Streamlit (SQLite `data/logbook.db`) → `data/db.json`
+→ Neon + ImageKit lewat `npm run migrate` (sekali jalan). Baris laporan lama yang masih
+base64 di Neon otomatis dipindah ke ImageKit saat pertama kali dibuka.
 
 ## 📤 Ekspor DOCX, PDF & Excel
 
@@ -201,23 +233,66 @@ curl -X POST https://xxxx.trycloudflare.com/api/kegiatan \
 | POST | `/api/import/docx` | Impor entri + foto dari dokumen Word |
 | GET | `/health` | Health check (tanpa login) |
 
+**📄 Laporan kemajuan (akun tim)**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/api/laporan/info` | Info berkas laporan (nama, ukuran, waktu unggah) |
+| GET | `/api/laporan/file` | Unduh/tampilkan `.docx` milik sendiri |
+| POST / DELETE | `/api/laporan` | Unggah / hapus laporan (potongan: `/chunk` + `/selesai`) |
+| POST | `/api/laporan/tautan` | Buat tautan publik sementara (penampil Office) |
+| GET | `/api/laporan/publik/{kunci}` | Akses berkas lewat tautan publik (tanpa login) |
+
+**🎓 Pendamping (fasilitator & dosen) — hanya baca**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/api/fasilitator/tim` | Daftar tim yang diampu (bisa lebih dari satu) |
+| GET | `/api/fasilitator/tim/{id}/kegiatan` | Kegiatan tim tersebut |
+| GET | `/api/fasilitator/tim/{id}/keuangan` | Belanja tim tersebut |
+| GET | `/api/fasilitator/tim/{id}/statistik` | Ringkasan angka tim |
+| GET | `/api/fasilitator/tim/{id}/ringkasan` | Dashboard: statistik + entri & aktivitas terakhir |
+| GET | `/api/fasilitator/tim/{id}/laporan-info` \| `/laporan-file` | Info / isi laporan kemajuan |
+| POST | `/api/fasilitator/tim/{id}/laporan-tautan` | Tautan penampil Office (tidak mengubah data) |
+
+**💬 Komentar & ✅ ACC**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET / POST | `/api/komentar` | Daftar / tambah komentar (`?jenis=&target_id=&tim=`) |
+| PUT / DELETE | `/api/komentar/{id}` | Edit (berlabel *"(diedit)"*) / hapus milik sendiri |
+| PUT | `/api/komentar/{id}/selesai` | Tandai selesai (khusus pemilik tim) |
+| GET | `/api/komentar/jumlah` | Jumlah komentar per entri (badge) |
+| GET | `/api/komentar/belum-dibaca` | Hitungan belum dibaca per pengguna |
+| POST | `/api/komentar/tandai-dibaca` | Tandai sejumlah komentar sudah dibaca |
+| GET | `/api/persetujuan` | Peta status ACC entri (`menunggu`/`disetujui`/`revisi`) |
+| GET | `/api/persetujuan/ringkas` | Rekap ACC satu tim |
+| PUT | `/api/persetujuan` | ACC / minta revisi / batalkan — **khusus dosen** |
+
+> Endpoint tulis milik tim (kegiatan, keuangan, pengaturan, ekspor, impor, laporan)
+> menolak akun pendamping dengan **403** — pagar ada di server, bukan sekadar UI.
+
 ## 🗂️ Struktur proyek
 
 ```
 logbook-app/
-├── start.ps1            ← JALANKAN INI
+├── start.ps1            ← JALANKAN INI (mode lokal)
 ├── stop.ps1             ← hentikan paksa
-├── data/db.json         ← seluruh data (lokal)
-├── uploads/             ← seluruh gambar (lokal)
-├── tools/cloudflared.exe← tunnel (terunduh otomatis)
+├── .env                 ← DATABASE_URL + kunci ImageKit (dari .env.example)
+├── api/index.js         ← entry point serverless (Vercel)
+├── tools/               ← cloudflared.exe, migrate-to-cloud.mjs, superuser.mjs
 ├── backend/             ← Express: API + Swagger + penyaji frontend (port 4000)
 │   └── src/
-│       ├── server.js    ← entry point
-│       ├── storage.js   ← penyimpanan JSON + migrasi otomatis dari SQLite lama
-│       ├── files.js     ← simpan/hapus gambar di uploads/
-│       └── routes/      ← kegiatan, keuangan, pengaturan, files
+│       ├── server.js    ← entry point + pemasangan seluruh route
+│       ├── db.js        ← koneksi Neon + skema (CREATE/ALTER IF NOT EXISTS)
+│       ├── storage.js   ← seluruh akses data (akun, entri, komentar, ACC)
+│       ├── files.js     ← unggah foto & .docx ke ImageKit (+ signed URL)
+│       ├── auth.js      ← sesi + pagar peran (hanyaTim / hanyaFasilitator / hanyaDosen)
+│       ├── admin/       ← pusat kendali (panel.js + routes.js)
+│       └── routes/      ← kegiatan, keuangan, laporan, fasilitator, komentar, persetujuan, …
 └── frontend/            ← Next.js → di-build jadi statis (frontend/out)
-    └── app/             ← Dashboard, Kegiatan, Keuangan, Galeri
+    ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Galeri, Ekspor, Profil
+    └── components/      ← Shell, Komentar, Acc, KartuAcc, DashboardFasilitator, …
 ```
 
 ## 🧑‍💻 Mode pengembangan (opsional)
@@ -226,6 +301,13 @@ logbook-app/
 cd backend;  npm run dev     # API di :4000 (auto-reload)
 cd frontend; npm run dev     # UI di :3000 (hot-reload, API → localhost:4000)
 ```
+
+Uji otomatis (server harus hidup di `:4000`, butuh `.env`):
+
+| Perintah | Isi uji |
+|---|---|
+| `npm run diag --workspace backend` | Semua rute terdaftar + pagar peran + panel pusat kendali |
+| `npm run diag:peran --workspace backend` | End-to-end peran: daftar pakai kode, pagar tulis 403, assignment, komentar 2 arah, badge belum-dibaca, ACC dosen (revisi → batal otomatis saat entri diubah → disetujui). Akun uji dibuat & dihapus otomatis |
 
 Setelah selesai mengubah frontend: `.\start.ps1 -Rebuild`.
 
@@ -246,6 +328,7 @@ URL tunnel cuma melihat halaman login; tanpa username & password mereka tidak bi
 melihat atau mengubah apa pun. Password disimpan sebagai hash scrypt.
 
 **T: Data hilang kalau komputer mati?**
-J: Tidak — data ada di `data/db.json` + `uploads/` di diskmu. Mati-nyalakan bebas;
-yang berhenti hanya akses orang lain selama server mati.
+J: Tidak — data ada di **Neon** (Postgres) + **ImageKit**, bukan di laptopmu.
+Mati-nyalakan bebas; kalau di-deploy ke Vercel, aplikasi bahkan tetap online 24 jam.
+Yang berhenti hanya URL tunnel lokal selama `start.ps1` tidak berjalan.
 

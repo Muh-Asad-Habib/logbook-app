@@ -680,6 +680,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
         <div class="tabs" style="margin-top:12px">
           <button class="on" data-role-tab="tim">👥 Tim</button>
           <button data-role-tab="fasilitator">🎓 Fasilitator</button>
+          <button data-role-tab="dosen">👨‍🏫 Dosen Pendamping</button>
         </div>
         <div class="tbl">
           <table>
@@ -707,6 +708,19 @@ export const PANEL_HTML = /* html */ `<!doctype html>
               <label>Kode baru (min. 6 karakter)
                 <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
                 <input id="k-val" autocomplete="off" placeholder="kode rahasia fasilitator"></span>
+              </label>
+              <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
+            </form>
+          </div>
+          <div class="card">
+            <h2>👨‍🏫 Kode pendaftaran dosen pendamping <span class="tag" id="kode-status-dosen">—</span></h2>
+            <p class="mut" style="margin-top:8px">Dosen pendamping bisa melihat &amp; mengomentari seperti
+            fasilitator, <b>plus memberi ACC / meminta revisi</b> pada kegiatan, belanja, dan laporan tim
+            yang ditugaskan. Kode disimpan sebagai hash — hanya bisa diganti.</p>
+            <form id="f-kode-dosen">
+              <label>Kode baru (min. 6 karakter)
+                <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+                <input id="k-val-dosen" autocomplete="off" placeholder="kode rahasia dosen"></span>
               </label>
               <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
             </form>
@@ -776,9 +790,9 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   </div>
 </dialog>
 
-<!-- ===== DIALOG ASSIGN FASILITATOR KE TIM ===== -->
+<!-- ===== DIALOG ASSIGN PENDAMPING KE TIM ===== -->
 <dialog id="d-fas" class="mini">
-  <div class="dlg-h"><h3>🎓 Fasilitator pengampu</h3></div>
+  <div class="dlg-h"><h3>🎓 Pendamping tim</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-fas-sub"></p>
     <form method="dialog" id="f-fas">
@@ -985,23 +999,30 @@ function muat(){
   var rb = $("#btn-muat"); if (rb) rb.classList.add("memuat");
   Promise.all([
     call("/data/ringkas"), call("/data/pengguna"), call("/data/audit"),
-    call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; })
+    call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; }),
+    call("/data/kode-dosen").catch(function(){ return { ada:false, updatedAt:"" }; })
   ])
     .then(function(rs){
       var ov = rs[0]; USERS = rs[1].users;
+      var nPendamping = (ov.fasilitator || 0) + (ov.dosen || 0);
       $("#statistik").innerHTML =
-        stat("users","Akun tim",(ov.users - (ov.fasilitator||0)),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
+        stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
         stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
-        stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("folder","Laporan tim",(ov.laporan||0),"s6");
+        stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("user","Dosen pendamping",(ov.dosen||0),"s2") +
+        stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6");
       document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
         hitungNaik(b, Number(b.dataset.n));
       });
       $("#jml-user").textContent = ov.users + " akun";
       renderUsers();
-      var ks = $("#kode-status");
-      if (ks) ks.textContent = rs[3].ada
-        ? "diset" + (rs[3].updatedAt ? " · " + tgl(rs[3].updatedAt) : "")
-        : "belum diset";
+      function statusKode(el, j){
+        if (!el) return;
+        el.textContent = j.ada
+          ? "diset" + (j.updatedAt ? " · " + tgl(j.updatedAt) : "")
+          : "belum diset";
+      }
+      statusKode($("#kode-status"), rs[3]);
+      statusKode($("#kode-status-dosen"), rs[4]);
       $("#audit").innerHTML = rs[2].rows.map(function(r){
         var aksi = r.aksi || r.raw || "";
         return '<div class="row-a"><span class="t">' + esc(tglJam(r.ts)) + '</span>' +
@@ -1046,26 +1067,34 @@ function namaTarget(r){
   return u ? u.username : t;
 }
 
+/* Peran pendamping (punya tabel & aksi yang sama, beda wewenang ACC). */
+function isPendamping(role){ return role === "fasilitator" || role === "dosen"; }
+function labelPeran(role){
+  return role === "dosen" ? "👨‍🏫 dosen" : role === "fasilitator" ? "🎓 fasilitator" : "tim";
+}
+
 function renderUsers(){
   var q = ($("#cari").value || "").toLowerCase();
+  var lihatPendamping = isPendamping(VIEW_ROLE);
   var rows = USERS.filter(function(u){
     var role = u.role || "tim";
-    if (VIEW_ROLE === "fasilitator" ? role !== "fasilitator" : role === "fasilitator") return false;
+    if (lihatPendamping ? role !== VIEW_ROLE : isPendamping(role)) return false;
     return u.username.toLowerCase().indexOf(q) >= 0;
   });
   var head = $("#t-users-head");
   if (head) {
-    head.innerHTML = VIEW_ROLE === "fasilitator"
+    head.innerHTML = lihatPendamping
       ? "<th>Akun</th><th>Tim diampu</th><th>Sesi</th><th>Dibuat</th><th style='text-align:right'>Aksi</th>"
       : '<th>Akun</th><th class="num">Kegiatan</th><th class="num">Belanja</th>' +
         '<th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th><th style="text-align:right">Aksi</th>';
   }
-  var kolom = VIEW_ROLE === "fasilitator" ? 5 : 7;
-  $("#t-users").innerHTML = rows.map(VIEW_ROLE === "fasilitator" ? barisFasilitator : barisUser).join("") ||
+  var kolom = lihatPendamping ? 5 : 7;
+  $("#t-users").innerHTML = rows.map(lihatPendamping ? barisPendamping : barisUser).join("") ||
     '<tr><td colspan="' + kolom + '"><div class="kosong"><div class="big">' +
-    (VIEW_ROLE === "fasilitator" ? "🎓" : "🔍") + '</div>' +
-    (VIEW_ROLE === "fasilitator" && !q
-      ? "Belum ada akun fasilitator.<div class='mut' style='margin-top:6px'>Set kode pendaftaran di kartu bawah, lalu bagikan ke fasilitator.</div>"
+    (VIEW_ROLE === "dosen" ? "👨‍🏫" : VIEW_ROLE === "fasilitator" ? "🎓" : "🔍") + '</div>' +
+    (lihatPendamping && !q
+      ? "Belum ada akun " + (VIEW_ROLE === "dosen" ? "dosen pendamping" : "fasilitator") +
+        ".<div class='mut' style='margin-top:6px'>Set kode pendaftaran di kartu bawah, lalu bagikan kodenya.</div>"
       : "Tidak ada akun yang cocok.") + "</div></td></tr>";
 }
 function barisUser(u){
@@ -1076,6 +1105,9 @@ function barisUser(u){
       (u.pemilikTemplate ? ' <span class="badge b">arsip</span>' : "") +
       (u.punya_laporan ? ' <span class="badge c">📄 laporan</span>' : "") +
       (u.n_fasilitator ? ' <span class="badge y">🎓 ' + u.n_fasilitator + '</span>' : "") +
+      (u.n_dosen ? ' <span class="badge c">👨‍🏫 ' + u.n_dosen + '</span>' : "") +
+      (u.n_acc ? ' <span class="badge g">✔ ' + u.n_acc + ' ACC</span>' : "") +
+      (u.n_revisi ? ' <span class="badge r">↺ ' + u.n_revisi + ' revisi</span>' : "") +
       '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
     "</div></div></td>" +
     '<td class="num">' + u.kegiatan + "</td>" +
@@ -1085,7 +1117,7 @@ function barisUser(u){
     "<td style='white-space:nowrap'>" + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
-      '<button class="btn sm ic" title="Fasilitator pengampu tim ini" data-act="fas" data-id="' + u.id + '">🎓</button>' +
+      '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '">🎓</button>' +
       '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
@@ -1093,11 +1125,14 @@ function barisUser(u){
       '<button class="btn sm ic d" title="Hapus akun" data-act="hapus" data-id="' + u.id + '">' + sv("trash") + '</button>' +
     "</div></td></tr>";
 }
-function barisFasilitator(u){
+function barisPendamping(u){
   var ini = (u.username || "?").charAt(0).toUpperCase();
+  var role = u.role || "fasilitator";
   return "<tr>" +
     '<td><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
-      "<b>" + esc(u.username) + "</b> <span class='badge y'>🎓 fasilitator</span>" +
+      "<b>" + esc(u.username) + "</b> <span class='badge " + (role === "dosen" ? "c" : "y") + "'>" +
+      labelPeran(role) + "</span>" +
+      (role === "dosen" ? ' <span class="badge g" title="Boleh memberi ACC / minta revisi">✔ ACC</span>' : "") +
       '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
     "</div></div></td>" +
     "<td>" + (u.n_tim_diampu
@@ -1207,7 +1242,12 @@ var AKSI_INFO = {
   "user.laporan.lihat":   ["folder","c","Laporan dilihat lewat panel"],
   "fasilitator.kode.ubah":["key","y","Kode fasilitator diganti"],
   "fasilitator.tim.ubah": ["users","y","Assignment tim fasilitator diubah"],
-  "tim.fasilitator.ubah": ["users","y","Fasilitator pengampu tim diubah"]
+  "dosen.kode.ubah":      ["key","y","Kode dosen pendamping diganti"],
+  "dosen.tim.ubah":       ["users","y","Assignment tim dosen pendamping diubah"],
+  "tim.fasilitator.ubah": ["users","y","Pendamping tim diubah"],
+  "acc.setuju":           ["save","g","Entri di-ACC dosen pendamping"],
+  "acc.revisi":           ["edit","r","Dosen pendamping minta revisi"],
+  "acc.batal":            ["power","y","Status ACC dikembalikan ke menunggu"]
 };
 function tabelAktivitas(list){
   if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
@@ -1224,6 +1264,8 @@ function tabelAktivitas(list){
     if (r.sesiLainDicabut != null) meta.push(r.sesiLainDicabut + " sesi lain keluar");
     if (r.oleh) meta.push("oleh " + r.oleh);
     if (r.jenis && String(r.aksi || "").indexOf("komentar.") === 0) meta.push("di " + r.jenis);
+    if (r.jenis && String(r.aksi || "").indexOf("acc.") === 0) meta.push("di " + r.jenis);
+    if (r.catatan && String(r.aksi || "").indexOf("acc.") === 0) meta.push("“" + r.catatan + "”");
     if (r.balasan) meta.push("balasan");
     if (r.nama && String(r.aksi || "").indexOf("laporan.") === 0) meta.push(r.nama);
     out += '<div class="tl-item">' +
@@ -1339,8 +1381,8 @@ function assignTim(id){
   call("/data/fasilitator/" + id + "/tim").then(function(j){
     var terpilih = {};
     (j.tim || []).forEach(function(t){ terpilih[t.id] = true; });
-    var timSemua = USERS.filter(function(x){ return (x.role || "tim") !== "fasilitator"; });
-    $("#d-tim-sub").textContent = "Fasilitator: " + u.username +
+    var timSemua = USERS.filter(function(x){ return !isPendamping(x.role || "tim"); });
+    $("#d-tim-sub").textContent = (u.role === "dosen" ? "Dosen pendamping: " : "Fasilitator: ") + u.username +
       " — centang tim yang diampu (boleh lebih dari satu).";
     $("#d-tim-list").innerHTML = timSemua.length ? timSemua.map(function(t){
       return '<label class="row" style="margin-top:8px;gap:9px;cursor:pointer;font-size:.84rem;color:var(--ink)">' +
@@ -1366,22 +1408,24 @@ function assignTim(id){
   }).catch(function(e){ toast(e.message, true); });
 }
 
-/* Kebalikan assignTim: dari baris TIM, pilih fasilitator yang mengampunya. */
+/* Kebalikan assignTim: dari baris TIM, pilih pendamping (fasilitator & dosen). */
 function assignFasilitator(id){
   var u = findU(id); if (!u) return;
   call("/data/tim/" + id + "/fasilitator").then(function(j){
     var terpilih = {};
     (j.fasilitator || []).forEach(function(f){ terpilih[f.id] = true; });
-    var fasSemua = USERS.filter(function(x){ return (x.role || "tim") === "fasilitator"; });
+    var fasSemua = USERS.filter(function(x){ return isPendamping(x.role || "tim"); });
     $("#d-fas-sub").textContent = "Tim: " + u.username +
-      " — centang fasilitator yang mengampu (boleh lebih dari satu).";
+      " — centang pendamping tim ini (fasilitator dan/atau dosen, boleh lebih dari satu).";
     $("#d-fas-list").innerHTML = fasSemua.length ? fasSemua.map(function(f){
+      var role = f.role || "fasilitator";
       return '<label class="row" style="margin-top:8px;gap:9px;cursor:pointer;font-size:.84rem;color:var(--ink)">' +
         '<input type="checkbox" style="width:auto;margin:0" value="' + f.id + '"' +
         (terpilih[f.id] ? " checked" : "") + '> ' +
         '<span class="ava" style="width:26px;height:26px;flex:0 0 26px;font-size:.7rem;' + avaStyle(f.username) + '">' +
-        esc((f.username || "?").charAt(0).toUpperCase()) + '</span> ' + esc(f.username) + '</label>';
-    }).join("") : '<div class="mut">Belum ada akun fasilitator. Set kode pendaftaran fasilitator lalu bagikan.</div>';
+        esc((f.username || "?").charAt(0).toUpperCase()) + '</span> ' + esc(f.username) +
+        ' <span class="badge ' + (role === "dosen" ? "c" : "y") + '">' + labelPeran(role) + '</span></label>';
+    }).join("") : '<div class="mut">Belum ada akun pendamping. Set kode pendaftaran fasilitator/dosen lalu bagikan.</div>';
     var dlg = $("#d-fas");
     dlg.showModal();
     dlg.addEventListener("close", function h(){
@@ -1393,7 +1437,7 @@ function assignFasilitator(id){
       call("/data/tim/" + id + "/fasilitator", {
         method: "PUT", body: JSON.stringify({ fasilitator_ids: ids })
       }).then(function(r){
-        toast("Fasilitator tim disimpan (" + r.total + ")"); muat();
+        toast("Pendamping tim disimpan (" + r.total + ")"); muat();
       }).catch(function(e){ toast(e.message, true); });
     });
   }).catch(function(e){ toast(e.message, true); });
@@ -1471,6 +1515,18 @@ $("#f-kode").addEventListener("submit", function(e){
     .then(function(){
       toast("Kode fasilitator tersimpan");
       $("#k-val").value = "";
+      muat();
+    }).catch(function(ex){ toast(ex.message, true); });
+});
+
+$("#f-kode-dosen").addEventListener("submit", function(e){
+  e.preventDefault();
+  var v = $("#k-val-dosen").value;
+  if (v.length < 6) { toast("Kode minimal 6 karakter", true); return; }
+  call("/data/kode-dosen", { method: "PUT", body: JSON.stringify({ kode: v }) })
+    .then(function(){
+      toast("Kode dosen pendamping tersimpan");
+      $("#k-val-dosen").value = "";
       muat();
     }).catch(function(ex){ toast(ex.message, true); });
 });

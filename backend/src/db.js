@@ -133,9 +133,11 @@ const SKEMA = [
      exp     BIGINT NOT NULL
    )`,
   // ---- Fitur Fasilitator (aditif — data lama tidak tersentuh) ----
-  // Peran akun: 'tim' (default, perilaku lama) atau 'fasilitator'.
+  // Peran akun: 'tim' (default, perilaku lama), 'fasilitator', atau 'dosen'
+  // (Dosen Pendamping = fasilitator + wewenang ACC/pengesahan).
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'tim'`,
-  // Assignment many-to-many: 1 tim ↔ banyak fasilitator, 1 fasilitator ↔ banyak tim.
+  // Assignment many-to-many: 1 tim ↔ banyak pendamping (fasilitator/dosen),
+  // 1 pendamping ↔ banyak tim. Nama tabel dipertahankan agar data lama utuh.
   `CREATE TABLE IF NOT EXISTS fasilitator_tim (
      fasilitator_id TEXT NOT NULL,
      tim_user_id    TEXT NOT NULL,
@@ -167,6 +169,22 @@ const SKEMA = [
   // Laporan .docx kini disimpan di ImageKit — kolom data lama dibiarkan
   // (baris lama tetap terbaca, dimigrasi malas saat pertama diakses).
   `ALTER TABLE laporan_docx ADD COLUMN IF NOT EXISTS file_key TEXT NOT NULL DEFAULT ''`,
+  // ---- Fitur ACC / pengesahan oleh DOSEN PENDAMPING ----
+  // Satu status per entri (PK jenis+target_id): baris ADA = sudah ditinjau
+  // ('disetujui' atau 'revisi'); baris TIDAK ADA = masih 'menunggu'.
+  // target_id: id entri kegiatan/keuangan; untuk laporan = tim_user_id.
+  `CREATE TABLE IF NOT EXISTS persetujuan (
+     jenis       TEXT NOT NULL,
+     target_id   TEXT NOT NULL,
+     tim_user_id TEXT NOT NULL,
+     dosen_id    TEXT NOT NULL,
+     status      TEXT NOT NULL,
+     catatan     TEXT NOT NULL DEFAULT '',
+     created_at  TEXT NOT NULL,
+     updated_at  TEXT NOT NULL,
+     PRIMARY KEY (jenis, target_id)
+   )`,
+  `CREATE INDEX IF NOT EXISTS persetujuan_tim_idx ON persetujuan (tim_user_id, jenis)`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */

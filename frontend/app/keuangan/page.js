@@ -4,11 +4,12 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
 import {
   api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData,
-  isFasilitator, getTimAktif,
+  isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
+import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -40,12 +41,12 @@ function useJumlahKomentar(jenis, timId, aktif = true) {
 
 export default function KeuanganPage() {
   const [fas, setFas] = useState(null);
-  useEffect(() => { setFas(isFasilitator()); }, []);
+  useEffect(() => { setFas(isPendamping()); }, []);
   if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
   return fas ? <KeuanganFasilitator /> : <KeuanganTim />;
 }
 
-/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+/* ===================== MODE PENDAMPING (lihat + komentar + ACC) ===================== */
 function KeuanganFasilitator() {
   const [timId, setTimId] = useState("");
   const [items, setItems] = useState(null);
@@ -54,6 +55,7 @@ function KeuanganFasilitator() {
   const [mode, setMode] = useState("Tabel");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("keuangan", timId, !!timId);
+  const [acc, muatAcc] = useAcc("keuangan", timId, !!timId);
 
   useEffect(() => {
     const muatTim = async () => {
@@ -140,7 +142,7 @@ function KeuanganFasilitator() {
               <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
             ))}
           </div>
-          <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
+          <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
         </div>
       </div>
 
@@ -188,6 +190,8 @@ function KeuanganFasilitator() {
                       ) : "—"}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
+                      <AccPanel jenis="keuangan" targetId={r.e.id} timId={timId}
+                                acc={acc[r.e.id]} onChange={muatAcc} />
                       <KomentarPanel jenis="keuangan" targetId={r.e.id} timId={timId}
                                      n={peta[r.e.id] || 0} />
                     </td>
@@ -216,6 +220,8 @@ function KeuanganFasilitator() {
                            onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}
+                  <AccPanel jenis="keuangan" targetId={e.id} timId={timId}
+                            acc={acc[e.id]} onChange={muatAcc} />
                   <KomentarPanel jenis="keuangan" targetId={e.id} timId={timId}
                                  n={peta[e.id] || 0} />
                 </div>
@@ -229,7 +235,7 @@ function KeuanganFasilitator() {
   );
 }
 
-/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+/* ===================== MODE TIM (halaman lama + komentar + status ACC) ===================== */
 function KeuanganTim() {
   const { data: items, error: loadErr } = useApi("/api/keuangan");
   const [cari, setCari] = useState("");
@@ -238,6 +244,7 @@ function KeuanganTim() {
   const [lb, setLb] = useState(null);
   const dlgRef = useRef(null);
   const petaKomentar = useJumlahKomentar("keuangan", "");
+  const [acc, muatAcc] = useAcc("keuangan", "");
 
   useEffect(() => { if (edit && dlgRef.current) dlgRef.current.showModal(); }, [edit]);
   // Di layar sempit tabel 7 kolom sesak — mulai dengan tampilan kartu
@@ -262,6 +269,7 @@ function KeuanganTim() {
       await api.deleteKeuangan(e.id);
       toast.ok("Entri belanja dihapus");
       refreshData();
+      muatAcc();
     } catch (err) {
       toast.err(`Gagal menghapus: ${err.message}`);
     }
@@ -373,6 +381,7 @@ function KeuanganTim() {
                       <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
                         <Trash2 className="lucide" />
                       </button>
+                      <div style={{ marginTop: 6 }}><AccBadge acc={acc[r.e.id]} /></div>
                       <KomentarPanel jenis="keuangan" targetId={r.e.id}
                                      n={petaKomentar[r.e.id] || 0} />
                     </td>
@@ -401,6 +410,7 @@ function KeuanganTim() {
                            onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}
+                  <AccPanel jenis="keuangan" targetId={e.id} acc={acc[e.id]} onChange={muatAcc} />
                   <KomentarPanel jenis="keuangan" targetId={e.id}
                                  n={petaKomentar[e.id] || 0} />
                 </div>
@@ -427,6 +437,8 @@ function KeuanganTim() {
             setEdit(null);
             toast.ok(baru ? "Belanja dicatat" : "Perubahan tersimpan");
             refreshData();
+            // Entri yang diubah kembali berstatus "menunggu ACC"
+            muatAcc();
           }}
         />
       )}

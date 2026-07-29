@@ -59,24 +59,45 @@ export async function authRequired(req, res, next) {
   }
 }
 
+/** Peran pendamping (baca + komentar): fasilitator & dosen pendamping. */
+export const PERAN_PENDAMPING = new Set(["fasilitator", "dosen"]);
+
+/** Label ramah untuk pesan error. */
+const labelPeran = (r) => (r === "dosen" ? "dosen pendamping" : "fasilitator");
+
 /**
  * Pagar tulis: hanya akun TIM yang boleh lewat.
  * Dipasang di seluruh router aksi data (kegiatan/keuangan/laporan/ekspor/impor)
- * supaya fasilitator mustahil mengubah data — bahkan lewat API langsung.
+ * supaya pendamping (fasilitator & dosen) mustahil mengubah data tim —
+ * bahkan lewat API langsung.
  */
 export function hanyaTim(req, res, next) {
-  if (req.user?.role === "fasilitator") {
+  const role = req.user?.role;
+  if (PERAN_PENDAMPING.has(role)) {
     return res.status(403).json({
-      error: "Akun fasilitator hanya dapat melihat & mengomentari",
+      error: `Akun ${labelPeran(role)} hanya dapat melihat & mengomentari`,
     });
   }
   next();
 }
 
-/** Kebalikan hanyaTim — dipakai router /api/fasilitator. */
-export function hanyaFasilitator(req, res, next) {
-  if (req.user?.role !== "fasilitator") {
-    return res.status(403).json({ error: "Khusus akun fasilitator" });
+/** Kebalikan hanyaTim — dipakai router /api/fasilitator (fasilitator & dosen). */
+export function hanyaPendamping(req, res, next) {
+  if (!PERAN_PENDAMPING.has(req.user?.role)) {
+    return res.status(403).json({ error: "Khusus akun fasilitator / dosen pendamping" });
+  }
+  next();
+}
+
+/** Nama lama — dipertahankan agar pemanggil lama tidak rusak. */
+export const hanyaFasilitator = hanyaPendamping;
+
+/** Pagar ACC: hanya DOSEN PENDAMPING yang boleh mengesahkan entri. */
+export function hanyaDosen(req, res, next) {
+  if (req.user?.role !== "dosen") {
+    return res.status(403).json({
+      error: "Hanya dosen pendamping yang dapat memberi ACC / meminta revisi",
+    });
   }
   next();
 }

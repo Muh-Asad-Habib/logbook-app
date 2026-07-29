@@ -28,9 +28,10 @@ const registerLimiter = rateLimit({
  *     tags: [Auth]
  *     summary: Daftar akun baru (langsung login, dapat token)
  *     description: >
- *       Daftar sebagai TIM (default) atau FASILITATOR — centang
- *       `sebagai_fasilitator` dan sertakan `kode_fasilitator` yang
- *       ditetapkan pusat kendali.
+ *       Daftar sebagai TIM (default), FASILITATOR, atau DOSEN PENDAMPING.
+ *       Untuk peran pendamping sertakan `peran` + kode yang ditetapkan pusat
+ *       kendali (`kode_fasilitator` / `kode_dosen`). Field lama
+ *       `sebagai_fasilitator` tetap didukung.
  *     requestBody:
  *       required: true
  *       content:
@@ -41,46 +42,66 @@ const registerLimiter = rateLimit({
  *             properties:
  *               username: { type: string, example: "timku" }
  *               password: { type: string, example: "rahasia123", minLength: 8 }
+ *               peran: { type: string, enum: [tim, fasilitator, dosen], example: "dosen" }
  *               sebagai_fasilitator: { type: boolean, example: false }
  *               kode_fasilitator: { type: string, example: "kode dari admin" }
+ *               kode_dosen: { type: string, example: "kode dari admin" }
  *     responses:
  *       201: { description: Akun dibuat — token & profil dikembalikan }
  *       400: { description: Input tidak valid }
- *       401: { description: Kode fasilitator salah }
- *       403: { description: Pendaftaran fasilitator belum dibuka }
+ *       401: { description: Kode pendaftaran salah }
+ *       403: { description: Pendaftaran peran tersebut belum dibuka }
  *       409: { description: Username sudah dipakai }
  */
+// Konfigurasi tiap peran pendamping: kunci meta, field kode, & label pesan.
+const PENDAFTARAN = {
+  fasilitator: {
+    metaKode: "kodeFasilitator",
+    fieldKode: "kode_fasilitator",
+    label: "fasilitator",
+  },
+  dosen: {
+    metaKode: "kodeDosen",
+    fieldKode: "kode_dosen",
+    label: "dosen pendamping",
+  },
+};
+
 router.post("/register", registerLimiter, async (req, res, next) => {
   try {
     const username = String(req.body?.username || "").trim();
     const password = String(req.body?.password || "");
-    const sebagaiFasilitator = !!req.body?.sebagai_fasilitator;
+    // `peran` (baru) diutamakan; `sebagai_fasilitator` (lama) tetap didukung
+    let peran = String(req.body?.peran || "").trim().toLowerCase();
+    if (!peran) peran = req.body?.sebagai_fasilitator ? "fasilitator" : "tim";
+    if (!["tim", "fasilitator", "dosen"].includes(peran)) {
+      return res.status(400).json({ error: "Peran tidak dikenal" });
+    }
     if (username.length < 3 || username.length > 40) {
       return res.status(400).json({ error: "Username minimal 3 karakter (maks. 40)" });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: "Password minimal 8 karakter" });
     }
-    if (sebagaiFasilitator) {
-      const hash = await store.getMeta("kodeFasilitator");
+    if (peran !== "tim") {
+      const cfg = PENDAFTARAN[peran];
+      const hash = await store.getMeta(cfg.metaKode);
       if (!hash) {
         return res.status(403).json({
-          error: "Pendaftaran fasilitator belum dibuka — hubungi admin",
+          error: `Pendaftaran ${cfg.label} belum dibuka — hubungi admin`,
         });
       }
-      const kode = String(req.body?.kode_fasilitator || "");
+      const kode = String(req.body?.[cfg.fieldKode] || req.body?.kode || "");
       if (!kode || !verifyPassword(kode, hash)) {
-        return res.status(401).json({ error: "Kode fasilitator salah" });
+        return res.status(401).json({ error: `Kode ${cfg.label} salah` });
       }
     }
     if (await store.findUserByUsername(username)) {
       return res.status(409).json({ error: "Username sudah dipakai — silakan pilih yang lain" });
     }
-    const user = await store.createUser(
-      username, password, sebagaiFasilitator ? "fasilitator" : "tim"
-    );
+    const user = await store.createUser(username, password, peran);
     const token = await store.createSession(user.id);
-    catatAktivitas(user.id, "akun.daftar", sebagaiFasilitator ? { role: "fasilitator" } : {});
+    catatAktivitas(user.id, "akun.daftar", peran === "tim" ? {} : { role: peran });
     res.status(201).json({ token, user: publicUser(user) });
   } catch (err) {
     next(err);
@@ -135,7 +156,8 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 router.get("/me", authRequired, async (req, res, next) => {
   try {
     const hasil = { user: req.user };
-    if (req.user.role === "fasilitator") {
+    // Fasilitator & dosen pendamping sama-sama memakai daftar tim ter-assign
+    if (req.user.role && req.user.role !== "tim") {
       hasil.tim = await store.listTimUntukFasilitator(req.user.id);
     }
     res.json(hasil);

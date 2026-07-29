@@ -25,9 +25,10 @@ import {
   ZoomIn, ZoomOut, Maximize, Loader, RefreshCw,
 } from "lucide-react";
 import {
-  api, exportUrl, useApi, revalidate, fmtTgl, isFasilitator, getTimAktif,
+  api, exportUrl, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
 } from "@/lib/api";
 import KomentarPanel from "@/components/Komentar";
+import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
@@ -160,12 +161,12 @@ function OfficeFrame({ url, wrapUkuran, onLoad }) {
 
 export default function LaporanPage() {
   const [fas, setFas] = useState(null);
-  useEffect(() => { setFas(isFasilitator()); }, []);
+  useEffect(() => { setFas(isPendamping()); }, []);
   if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
   return fas ? <LaporanFasilitator /> : <LaporanTim />;
 }
 
-/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+/* ===================== MODE PENDAMPING (lihat + komentar + ACC) ===================== */
 function LaporanFasilitator() {
   const [timId, setTimId] = useState("");
   const [info, setInfo] = useState(null);
@@ -175,6 +176,7 @@ function LaporanFasilitator() {
   const [modeCadangan, setModeCadangan] = useState(false);
   const frameRef = useRef(null);
   const [wrapRef, wrapUkuran] = useUkuranWadah();
+  const [acc, muatAcc] = useAcc("laporan", timId, !!timId);
 
   useEffect(() => {
     const muatTim = async () => {
@@ -274,7 +276,7 @@ function LaporanFasilitator() {
     return (
       <div className="empty mt">
         <div className="big">📞</div>
-        <p>Hubungi admin untuk menjadikan kamu fasilitator di tim kamu.</p>
+        <p>Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu.</p>
       </div>
     );
   if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
@@ -288,7 +290,7 @@ function LaporanFasilitator() {
             <div style={{ minWidth: 0 }}>
               <b className="docx-nama">{info.nama}</b>
               <span className="muted docx-meta">
-                {fmtUkuran(info.ukuran)} · {fmtWaktu(info.updated_at)} · 👁 mode fasilitator
+                {fmtUkuran(info.ukuran)} · {fmtWaktu(info.updated_at)} · 👁 mode pendamping
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -335,7 +337,15 @@ function LaporanFasilitator() {
         </div>
       )}
 
-      {/* Komentar laporan (target = id tim, satu laporan per tim) */}
+      {/* ACC + komentar laporan (target = id tim, satu laporan per tim) */}
+      {info.ada && timId && (
+        <div className="card mt">
+          <h3>✅ Pengesahan laporan</h3>
+          <p className="sub">status ACC dari dosen pendamping</p>
+          <AccPanel jenis="laporan" targetId={timId} timId={timId}
+                    acc={acc[timId]} onChange={muatAcc} />
+        </div>
+      )}
       {info.ada && timId && (
         <div className="card mt">
           <h3>💬 Komentar laporan</h3>
@@ -346,7 +356,7 @@ function LaporanFasilitator() {
   );
 }
 
-/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+/* ===================== MODE TIM (halaman lama + komentar + status ACC) ===================== */
 function LaporanTim() {
   const { data: info, error: infoErr } = useApi("/api/laporan/info");
   const [file, setFile] = useState(null);
@@ -636,19 +646,27 @@ function LaporanTim() {
   );
 }
 
-/** Panel komentar laporan milik tim — target_id = id akun sendiri. */
+/** Panel ACC + komentar laporan milik tim — target_id = id akun sendiri. */
 function KomentarLaporanTim() {
   const [idKu, setIdKu] = useState("");
   useEffect(() => {
     api.me().then((r) => setIdKu(r.user?.id || "")).catch(() => {});
   }, []);
+  const [acc, muatAcc] = useAcc("laporan", "", !!idKu);
   if (!idKu) return null;
   return (
-    <div className="card mt">
-      <h3>💬 Komentar laporan</h3>
-      <p className="sub">diskusi dengan fasilitator tentang laporan kemajuan</p>
-      <KomentarPanel jenis="laporan" targetId={idKu} />
-    </div>
+    <>
+      <div className="card mt">
+        <h3>✅ Pengesahan laporan</h3>
+        <p className="sub">status ACC dari dosen pendamping</p>
+        <AccPanel jenis="laporan" targetId={idKu} acc={acc[idKu]} onChange={muatAcc} />
+      </div>
+      <div className="card mt">
+        <h3>💬 Komentar laporan</h3>
+        <p className="sub">diskusi dengan pendamping tentang laporan kemajuan</p>
+        <KomentarPanel jenis="laporan" targetId={idKu} />
+      </div>
+    </>
   );
 }
 

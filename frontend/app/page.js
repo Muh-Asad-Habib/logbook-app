@@ -6,21 +6,22 @@ import {
   Trophy, CalendarCheck, Hourglass, Receipt, Coins, TrendingDown, Rocket, Flame,
   TrendingUp, ChartColumn, ChartPie, Banknote, History, Save, Check, Plus, NotebookPen,
 } from "lucide-react";
-import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isFasilitator } from "@/lib/api";
+import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isPendamping } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
 import {
   Gauge, Heatmap, AreaChart, BarChart, Breakdown, Sparkline,
 } from "@/components/Charts";
 import Lightbox from "@/components/Lightbox";
 import DashboardFasilitator from "@/components/DashboardFasilitator";
+import KartuAcc from "@/components/KartuAcc";
 import { toast } from "@/components/Toast";
 
 const fmtJt = (v) => (v >= 1_000_000 ? `Rp${(v / 1_000_000).toFixed(1)}jt` : fmtRupiah(v));
 
 export default function Dashboard() {
-  // Fasilitator melihat dashboard ringkasan tim (read-only) — bukan dashboard pribadi
+  // Pendamping (fasilitator & dosen) melihat ringkasan tim — bukan dashboard pribadi
   const [roleFas, setRoleFas] = useState(null);
-  useEffect(() => { setRoleFas(isFasilitator()); }, []);
+  useEffect(() => { setRoleFas(isPendamping()); }, []);
   if (roleFas === null) return <div className="skel mt" style={{ height: 220 }} />;
   if (roleFas) return <DashboardFasilitator />;
   return <DashboardTim />;
@@ -255,6 +256,9 @@ function DashboardTim() {
           </div>
         </div>
       </div>
+
+      {/* Rekap ACC dosen pendamping atas logbook tim ini */}
+      <div className="mt"><KartuAcc /></div>
 
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
