@@ -13,7 +13,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>Pusat Kendali</title>
+<title>Panel Admin</title>
 <style>
   :root{
     --bg:#070a14;--bg2:#0b0f1e;
@@ -604,7 +604,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     <div class="win-dots"><i></i><i></i><i></i><span>akses-terbatas · teraudit</span></div>
     <div class="login-body">
       <div class="logo"><svg class="i"><use href="#i-shield"/></svg></div>
-      <h1>Pusat Kendali</h1>
+      <h1>Panel Admin</h1>
       <div class="mut">Area terbatas — seluruh aktivitas tercatat di jejak audit</div>
       <form id="f-login">
         <label>Username
@@ -636,7 +636,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     </button>
     <div class="side-top">
       <div class="side-logo" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></div>
-      <div class="side-brand"><b>Pusat Kendali</b><span>panel pemeliharaan</span></div>
+      <div class="side-brand"><b>Panel Admin</b><span>panel pemeliharaan</span></div>
     </div>
     <nav class="side-nav">
       <a href="#statistik" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
@@ -660,7 +660,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
             <svg class="i"><use href="#i-clock"/></svg><span id="jam">—</span>
             <i class="sep"></i><span id="upd">memuat data…</span>
           </div>
-          <h1>Pusat Kendali <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
+          <h1>Panel Admin <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
         </div>
         <div class="top-act">
           <button class="btn sm" id="btn-muat" data-act="muat" aria-label="Segarkan data"><svg class="i"><use href="#i-refresh"/></svg><span class="btn-txt"> Segarkan</span></button>
@@ -748,7 +748,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
         </div>
       </div>
 
-      <div class="foot">Pusat Kendali · akses terbatas &amp; teraudit</div>
+      <div class="foot">Panel Admin · akses terbatas &amp; teraudit</div>
     </div>
   </div>
 </div>

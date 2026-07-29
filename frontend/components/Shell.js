@@ -14,13 +14,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
-  FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, PanelLeftClose, PanelLeftOpen,
+  FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, ChevronDown,
+  PanelLeftClose, PanelLeftOpen,
   Trophy, Flame, Banknote, Users,
   Link as LinkIcon, Copy, Check,
 } from "lucide-react";
 import LogoMark from "./Logo";
 import Prefetch from "./Prefetch";
 import ToastHost from "./Toast";
+import GabungTim from "./GabungTim";
 import {
   api, clearAuth, getToken, getUser, fmtRupiah, useApi,
   setUser as simpanProfil, getTimAktif, setTimAktif,
@@ -153,11 +155,23 @@ const badgeUntuk = (badges, href) =>
   href === "/keuangan" ? badges.keuangan :
   href === "/laporan" ? badges.laporan : 0;
 
-/* ---------- Pemilih tim aktif (topbar pendamping, dukung multi-tim) ---------- */
+/* ---------- Pemilih tim aktif (topbar pendamping, dukung multi-tim) ----------
+ * Satu dropdown untuk semua: berganti tim yang dilihat DAN menambah tim baru
+ * memakai kode yang dibagikan tim (fasilitator & dosen pendamping). */
 function TimSwitcher({ role }) {
   const { data: tim } = useApi("/api/fasilitator/tim");
   const [aktif, setAktif] = useState("");
-  useEffect(() => { setAktif(getTimAktif()); }, []);
+  const [buka, setBuka] = useState(false);
+  const [tambah, setTambah] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    setAktif(getTimAktif());
+    // Ikuti perubahan tim aktif dari tempat lain (mis. setelah gabung tim baru)
+    const ganti = (e) => setAktif(String(e.detail || getTimAktif()));
+    window.addEventListener("tim-aktif-berubah", ganti);
+    return () => window.removeEventListener("tim-aktif-berubah", ganti);
+  }, []);
   useEffect(() => {
     // Pastikan pilihan valid: default ke tim pertama bila belum/tidak valid
     if (!Array.isArray(tim) || tim.length === 0) return;
@@ -166,28 +180,94 @@ function TimSwitcher({ role }) {
       setTimAktif(tim[0].id);
     }
   }, [tim, aktif]);
+
+  // Klik di luar → tutup dropdown
+  useEffect(() => {
+    if (!buka) return;
+    const tutup = (e) => {
+      if (!boxRef.current?.contains(e.target)) {
+        setBuka(false);
+        setTambah(false);
+      }
+    };
+    document.addEventListener("pointerdown", tutup);
+    return () => document.removeEventListener("pointerdown", tutup);
+  }, [buka]);
+
   const info = INFO_PERAN[role] || INFO_PERAN.fasilitator;
   if (!Array.isArray(tim) || tim.length === 0) return null;
+  const namaAktif = tim.find((t) => t.id === aktif)?.username || tim[0].username;
+
   return (
-    <div className="top-chips tim-chips">
-      <span className="chip" title="Tim yang sedang dilihat">
+    <div className="top-chips tim-chips" ref={boxRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="chip"
+        onClick={() => setBuka((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={buka}
+        title="Ganti tim yang dilihat / tambah tim"
+        style={{ cursor: "pointer", fontFamily: "inherit" }}
+      >
         <Users className="lucide" />
-        {tim.length === 1 ? (
-          <b>{tim[0].username}</b>
-        ) : (
-          <select
-            className="tim-select"
-            value={aktif}
-            onChange={(e) => { setAktif(e.target.value); setTimAktif(e.target.value); }}
-            aria-label="Pilih tim yang dilihat"
-          >
-            {tim.map((t) => (
-              <option key={t.id} value={t.id}>{t.username}</option>
-            ))}
-          </select>
+        <b>{namaAktif}</b>
+        {tim.length > 1 && (
+          <span className="muted" style={{ fontSize: ".68rem" }}>+{tim.length - 1}</span>
         )}
-      </span>
+        <ChevronDown className="lucide" style={{ width: 14, height: 14, opacity: 0.65 }} />
+      </button>
       <span className="chip chip-role" title="Peran akun">{info.emoji} {info.nama}</span>
+
+      {buka && (
+        <div className="user-menu" role="menu"
+             style={{ top: "calc(100% + 8px)", right: 0, minWidth: 268 }}>
+          <div className="muted" style={{ padding: "6px 12px 2px", fontSize: ".66rem", fontWeight: 800, letterSpacing: ".04em" }}>
+            TIM YANG KAMU DAMPINGI
+          </div>
+          {tim.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="menuitem"
+              className="user-menu-item"
+              onClick={() => { setAktif(t.id); setTimAktif(t.id); setBuka(false); setTambah(false); }}
+            >
+              <Users className="lucide" />
+              <span>
+                {t.username}
+                {t.id === aktif && <small>sedang dilihat</small>}
+              </span>
+              {t.id === aktif && (
+                <Check className="lucide" style={{ marginLeft: "auto", width: 16, height: 16 }} />
+              )}
+            </button>
+          ))}
+
+          {tambah ? (
+            <div style={{ padding: "8px 12px 4px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+              <GabungTim
+                ringkas
+                autoFocus
+                onGabung={() => { setTambah(false); setBuka(false); }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              className="user-menu-item"
+              onClick={() => setTambah(true)}
+              style={{ borderTop: "1px solid var(--line)", borderRadius: 0, marginTop: 4 }}
+            >
+              <Plus className="lucide" />
+              <span>
+                Tambah tim
+                <small>masukkan kode dari tim</small>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

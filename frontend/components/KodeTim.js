@@ -110,7 +110,7 @@ export default function KodeTim() {
       {list !== null && list.length === 0 && (
         <p className="muted mts">
           Belum ada pendamping yang bergabung. Bagikan kode di atas, atau minta
-          admin menugaskannya lewat pusat kendali.
+          bantuan admin.
         </p>
       )}
       {(list || []).map((p) => (
