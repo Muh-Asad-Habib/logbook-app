@@ -22,7 +22,14 @@ const commitLokal = (() => {
 
 const ambil = async (path) => {
   const t0 = Date.now();
-  const res = await fetch(`${URL_DASAR}${path}`, { redirect: "manual" });
+  // Cache-buster + no-store: hasil harus mencerminkan deploy TERKINI,
+  // bukan salinan CDN dari pengecekan sebelumnya.
+  const sep = path.includes("?") ? "&" : "?";
+  const res = await fetch(`${URL_DASAR}${path}${sep}_cek=${Date.now()}`, {
+    redirect: "manual",
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
   return { status: res.status, ms: Date.now() - t0, res };
 };
 

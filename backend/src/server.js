@@ -72,7 +72,10 @@ app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
 // mudah memastikan versi mana yang sedang online, dan `boot` menunjukkan
 // kapan instance serverless ini pertama kali dijalankan.
 const BOOT_TS = new Date().toISOString();
-app.get("/health", (_req, res) =>
+app.get("/health", (_req, res) => {
+  // Jangan pernah di-cache CDN: kalau tidak, hasil pengecekan bisa
+  // menampilkan deploy LAMA dan mengesankan deploy gagal.
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   res.json({
     ok: true,
     ts: new Date().toISOString(),
@@ -80,8 +83,8 @@ app.get("/health", (_req, res) =>
     deploy: process.env.VERCEL_URL || "lokal",
     commit: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7),
     region: process.env.VERCEL_REGION || "",
-  })
-);
+  });
+});
 
 // REST API
 app.use("/api/auth", authRouter);
