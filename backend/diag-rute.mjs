@@ -1,8 +1,8 @@
 /**
  * Peta rute + pagar peran. Memastikan:
- *  - FASE 6: `hanyaTim` terpasang di semua router tulis milik tim.
- *  - FASE 7: /api/fasilitator GET-only (kecuali laporan-tautan) + hanyaFasilitator.
- *  - FASE 8: /api/komentar lengkap.
+ *  - `hanyaTim` terpasang di semua router tulis milik tim.
+ *  - /api/fasilitator GET-only (kecuali laporan-tautan) + hanyaPendamping.
+ *  - /api/komentar & /api/persetujuan lengkap.
  *
  * Jalankan: node backend/diag-rute.mjs
  */
@@ -15,8 +15,9 @@ const target = [
   ["/api/export", "./src/routes/export.js", "hanyaTim"],
   ["/api/import", "./src/routes/import.js", "hanyaTim"],
   ["/api/laporan", "./src/routes/laporan.js", "hanyaTim"],
-  ["/api/fasilitator", "./src/routes/fasilitator.js", "hanyaFasilitator"],
+  ["/api/fasilitator", "./src/routes/fasilitator.js", "hanyaPendamping"],
   ["/api/komentar", "./src/routes/komentar.js", null],
+  ["/api/persetujuan", "./src/routes/persetujuan.js", null],
 ];
 
 let gagal = 0;

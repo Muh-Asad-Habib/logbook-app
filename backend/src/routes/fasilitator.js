@@ -1,30 +1,32 @@
 /**
- * API khusus akun FASILITATOR — read-only terhadap data tim yang di-assign
- * pusat kendali (tabel fasilitator_tim, many-to-many).
+ * API khusus akun PENDAMPING (fasilitator & dosen pendamping) — read-only
+ * terhadap data tim yang di-assign pusat kendali (tabel fasilitator_tim,
+ * many-to-many).
  *
  * - Semua endpoint memvalidasi assignment (bolehAksesTim) per request.
  * - Tidak ada endpoint tulis data tim di sini; satu-satunya POST hanya
  *   membuat tautan penampil Office untuk laporan (tidak mengubah data).
  * - Komentar dilayani router terpisah: /api/komentar.
+ * - ACC/pengesahan (khusus dosen) dilayani router: /api/persetujuan.
  */
 import { Router } from "express";
 import crypto from "node:crypto";
 import * as store from "../storage.js";
-import { authRequired, hanyaFasilitator } from "../auth.js";
+import { authRequired, hanyaPendamping } from "../auth.js";
 import { bacaAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
 
 const router = Router();
 router.use(authRequired);
-router.use(hanyaFasilitator);
+router.use(hanyaPendamping);
 
-/** Pastikan fasilitator ini boleh mengakses tim :timId (403 bila belum di-assign). */
+/** Pastikan pendamping ini boleh mengakses tim :timId (403 bila belum di-assign). */
 async function pastikanAkses(req, res, next) {
   try {
     const timId = String(req.params.timId || "");
     if (!(await store.bolehAksesTim(req.user.id, timId))) {
       return res.status(403).json({
-        error: "Kamu belum ditugaskan sebagai fasilitator tim ini — hubungi admin",
+        error: "Kamu belum ditugaskan sebagai pendamping tim ini — hubungi admin",
       });
     }
     const tim = await store.getUserById(timId);
@@ -156,10 +158,11 @@ router.get("/tim/:timId/statistik", pastikanAkses, async (req, res, next) => {
 router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
   try {
     const { _kegiatan, ...statistik } = await hitungStatistik(req.tim.id);
-    const [aktivitas, laporan, belumDibaca] = await Promise.all([
+    const [aktivitas, laporan, belumDibaca, persetujuan] = await Promise.all([
       bacaAktivitas(req.tim.id, 10),
       store.infoLaporan(req.tim.id),
-      store.hitungBelumDibaca(req.user.id, "fasilitator"),
+      store.hitungBelumDibaca(req.user.id, req.user.role),
+      store.ringkasPersetujuan(req.tim.id),
     ]);
     res.json({
       tim: req.tim,
@@ -168,6 +171,7 @@ router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
       aktivitas,
       laporan,
       komentar_belum_dibaca: belumDibaca,
+      persetujuan,
     });
   } catch (err) {
     next(err);

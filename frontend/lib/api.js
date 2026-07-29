@@ -42,11 +42,26 @@ export function clearAuth() {
   clearCache();
 }
 
-/* ---------- Peran fasilitator ---------- */
+/* ---------- Peran pendamping (fasilitator & dosen pendamping) ---------- */
 const TIM_AKTIF_KEY = "logbook_tim_aktif";
 
-/** Apakah user yang login berperan fasilitator? */
-export const isFasilitator = () => getUser()?.role === "fasilitator";
+/** Peran akun yang login: "tim" | "fasilitator" | "dosen". */
+export const getRole = () => getUser()?.role || "tim";
+
+/**
+ * Apakah user yang login berperan PENDAMPING (fasilitator atau dosen)?
+ * Keduanya memakai tampilan baca-saja + komentar yang sama.
+ */
+export const isPendamping = () => {
+  const r = getRole();
+  return r === "fasilitator" || r === "dosen";
+};
+
+/** Khusus dosen pendamping — satu-satunya peran yang boleh memberi ACC. */
+export const isDosen = () => getRole() === "dosen";
+
+/** Nama lama; kini mencakup dosen juga (mode baca-saja yang identik). */
+export const isFasilitator = isPendamping;
 
 /** Tim yang sedang dipilih fasilitator (id akun tim). */
 export const getTimAktif = () =>
@@ -354,6 +369,30 @@ export const api = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
+      }),
+  },
+
+  // ---- ACC / pengesahan oleh dosen pendamping ----
+  persetujuan: {
+    /** Peta status per entri: { [target_id]: { status, catatan, dosen_username } }. */
+    list: (jenis, timId) => {
+      const p = new URLSearchParams();
+      if (jenis) p.set("jenis", jenis);
+      if (timId) p.set("tim", timId);
+      return aFetch(`/api/persetujuan?${p}`, { cache: "no-store" });
+    },
+    /** Rekap per jenis (disetujui/revisi/menunggu) untuk kartu ringkasan. */
+    ringkas: (timId) => {
+      const p = new URLSearchParams();
+      if (timId) p.set("tim", timId);
+      return aFetch(`/api/persetujuan/ringkas?${p}`, { cache: "no-store" });
+    },
+    /** Set status: "disetujui" | "revisi" | "menunggu" (khusus dosen). */
+    set: (data) =>
+      aFetch("/api/persetujuan", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       }),
   },
 };

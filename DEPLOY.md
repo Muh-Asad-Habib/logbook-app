@@ -233,6 +233,36 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 - [ ] `https://URL-kamu/docs` → dokumentasi API (Swagger) terbuka
 - [ ] Panel pemeliharaan: `https://URL-kamu/pusat-kendali` (atau path custom-mu)
       → login dengan kredensial panel lama
+- [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
+      pendamping** di panel → setel kodenya
+- [ ] Daftar akun pendamping memakai kode itu → di panel, tab **🎓 Fasilitator /
+      👨‍🏫 Dosen Pendamping** → tombol **🔗 Tim** → pilih tim yang diampu
+- [ ] Login sebagai pendamping → data tim tampil (read-only), komentar terkirim;
+      akun dosen bisa **ACC / minta revisi** sebuah entri
+
+---
+
+## Bagian 7b — Peran pendamping setelah deploy
+
+Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
+**👨‍🏫 Dosen Pendamping**. Yang perlu disiapkan admin sekali saja:
+
+1. Buka pusat kendali → setel **kode pendaftaran** untuk fasilitator dan dosen
+   (dua kode berbeda, disimpan sebagai hash scrypt di tabel `meta`).
+   Selama kode belum diset, pendaftaran peran itu ditolak (403).
+2. Bagikan kode ke pendamping → mereka daftar di tab **✨ Daftar** dengan
+   memilih perannya.
+3. Tetapkan **tim yang diampu** lewat tombol **🔗 Tim** (multi-pilih —
+   satu pendamping boleh banyak tim, satu tim boleh banyak pendamping).
+4. Perubahan peran/penugasan terasa maksimal **±30 detik** (cache sesi).
+
+> 🔒 Semua endpoint tulis milik tim dipagari di server (`403` untuk pendamping),
+> dan tiap permintaan pendamping dicek terhadap daftar tim yang ditugaskan —
+> keamanan tidak bergantung pada tampilan frontend.
+>
+> 🗄️ Tabel baru (`fasilitator_tim`, `komentar`, `komentar_baca`, `persetujuan`)
+> dan kolom baru (`users.role`, `laporan_docx.file_key`) dibuat otomatis saat
+> server jalan — **tidak ada langkah migrasi manual**.
 
 ---
 

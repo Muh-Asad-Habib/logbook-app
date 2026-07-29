@@ -75,13 +75,15 @@ router.post("/keluar", async (req, res, next) => {
 
 router.get("/data/ringkas", async (_req, res, next) => {
   try {
-    const [u, k, b, s, f, l] = await Promise.all([
+    const [u, k, b, s, f, l, d, acc] = await Promise.all([
       q("SELECT COUNT(*) AS n FROM users"),
       q("SELECT COUNT(*) AS n FROM kegiatan"),
       q("SELECT COUNT(*) AS n FROM keuangan"),
       q("SELECT COUNT(*) AS n FROM sessions"),
       q("SELECT COUNT(*) AS n FROM users WHERE role = 'fasilitator'"),
       q("SELECT COUNT(*) AS n FROM laporan_docx"),
+      q("SELECT COUNT(*) AS n FROM users WHERE role = 'dosen'"),
+      q("SELECT COUNT(*) AS n FROM persetujuan WHERE status = 'disetujui'"),
     ]);
     res.json({
       users: angka(u[0]?.n),
@@ -89,7 +91,9 @@ router.get("/data/ringkas", async (_req, res, next) => {
       keuangan: angka(b[0]?.n),
       sesi: angka(s[0]?.n),
       fasilitator: angka(f[0]?.n),
+      dosen: angka(d[0]?.n),
       laporan: angka(l[0]?.n),
+      acc: angka(acc[0]?.n),
     });
   } catch (err) {
     next(err);
@@ -259,65 +263,101 @@ router.delete("/data/pengguna/:id", async (req, res, next) => {
   }
 });
 
-/* ---------- fitur fasilitator ---------- */
+/* ---------- fitur pendamping (fasilitator & dosen) ---------- */
 
-/** Status kode pendaftaran fasilitator (kode asli tidak pernah bisa dibaca). */
+const PERAN_PENDAMPING = new Set(["fasilitator", "dosen"]);
+
+// Kode pendaftaran per peran → kunci meta di tabel `meta`.
+const KODE_META = {
+  fasilitator: { hash: "kodeFasilitator", ts: "kodeFasilitatorUpdatedAt" },
+  dosen: { hash: "kodeDosen", ts: "kodeDosenUpdatedAt" },
+};
+
+/** Status kode pendaftaran (kode asli tidak pernah bisa dibaca). */
+async function statusKode(peran) {
+  const m = KODE_META[peran];
+  const [hash, updatedAt] = await Promise.all([
+    store.getMeta(m.hash), store.getMeta(m.ts),
+  ]);
+  return { ada: !!hash, updatedAt: updatedAt || "" };
+}
+
+/** Set/ganti kode pendaftaran (disimpan sebagai hash scrypt). */
+async function simpanKode(req, res, peran) {
+  const kode = String(req.body?.kode || "");
+  if (kode.length < 6) {
+    return res.status(400).json({ error: "Kode minimal 6 karakter" });
+  }
+  const m = KODE_META[peran];
+  await store.setMeta(m.hash, hashPassword(kode));
+  await store.setMeta(m.ts, new Date().toISOString());
+  adminStore.audit(req, `${peran}.kode.ubah`, {});
+  res.json({ ok: true, catatan: "Kode baru langsung berlaku untuk pendaftaran berikutnya" });
+}
+
 router.get("/data/kode-fasilitator", async (_req, res, next) => {
   try {
-    const hash = await store.getMeta("kodeFasilitator");
-    const updatedAt = await store.getMeta("kodeFasilitatorUpdatedAt");
-    res.json({ ada: !!hash, updatedAt: updatedAt || "" });
+    res.json(await statusKode("fasilitator"));
   } catch (err) {
     next(err);
   }
 });
 
-/** Set/ganti kode pendaftaran fasilitator (disimpan sebagai hash scrypt). */
 router.put("/data/kode-fasilitator", async (req, res, next) => {
   try {
-    const kode = String(req.body?.kode || "");
-    if (kode.length < 6) {
-      return res.status(400).json({ error: "Kode minimal 6 karakter" });
-    }
-    await store.setMeta("kodeFasilitator", hashPassword(kode));
-    await store.setMeta("kodeFasilitatorUpdatedAt", new Date().toISOString());
-    adminStore.audit(req, "fasilitator.kode.ubah", {});
-    res.json({ ok: true, catatan: "Kode baru langsung berlaku untuk pendaftaran berikutnya" });
+    await simpanKode(req, res, "fasilitator");
   } catch (err) {
     next(err);
   }
 });
 
-/** Daftar tim yang diampu seorang fasilitator. */
+/** Status & pengaturan kode pendaftaran DOSEN PENDAMPING. */
+router.get("/data/kode-dosen", async (_req, res, next) => {
+  try {
+    res.json(await statusKode("dosen"));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/data/kode-dosen", async (req, res, next) => {
+  try {
+    await simpanKode(req, res, "dosen");
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Daftar tim yang diampu seorang pendamping (fasilitator/dosen). */
 router.get("/data/fasilitator/:id/tim", async (req, res, next) => {
   try {
     const fas = await store.getUserById(req.params.id);
-    if (!fas || fas.role !== "fasilitator") {
-      return res.status(404).json({ error: "Akun fasilitator tidak ditemukan" });
+    if (!fas || !PERAN_PENDAMPING.has(fas.role)) {
+      return res.status(404).json({ error: "Akun pendamping tidak ditemukan" });
     }
-    res.json({ tim: await store.listTimUntukFasilitator(fas.id) });
+    res.json({ tim: await store.listTimUntukFasilitator(fas.id), role: fas.role });
   } catch (err) {
     next(err);
   }
 });
 
-/** Ganti seluruh assignment tim seorang fasilitator (many-to-many). */
+/** Ganti seluruh assignment tim seorang pendamping (many-to-many). */
 router.put("/data/fasilitator/:id/tim", async (req, res, next) => {
   try {
     const fas = await store.getUserById(req.params.id);
-    if (!fas || fas.role !== "fasilitator") {
-      return res.status(404).json({ error: "Akun fasilitator tidak ditemukan" });
+    if (!fas || !PERAN_PENDAMPING.has(fas.role)) {
+      return res.status(404).json({ error: "Akun pendamping tidak ditemukan" });
     }
     const timIds = Array.isArray(req.body?.tim_ids) ? req.body.tim_ids.map(String) : [];
     // Validasi semua target adalah akun TIM yang ada
     for (const id of timIds) {
       const t = await store.getUserById(id);
-      if (!t || t.role === "fasilitator") {
+      if (!t || PERAN_PENDAMPING.has(t.role)) {
         return res.status(400).json({ error: `Akun tim tidak valid: ${id}` });
       }
     }
     const hasil = await store.gantiTimFasilitator(fas.id, timIds);
-    adminStore.audit(req, "fasilitator.tim.ubah", {
+    adminStore.audit(req, `${fas.role}.tim.ubah`, {
       target: fas.id,
       username: fas.username,
       ...hasil,
@@ -328,7 +368,7 @@ router.put("/data/fasilitator/:id/tim", async (req, res, next) => {
   }
 });
 
-/** Daftar fasilitator yang mengampu sebuah tim (info di tab Tim). */
+/** Daftar pendamping yang mengampu sebuah tim (info di tab Tim). */
 router.get("/data/tim/:id/fasilitator", async (req, res, next) => {
   try {
     const tim = await store.getUserById(req.params.id);
@@ -339,20 +379,20 @@ router.get("/data/tim/:id/fasilitator", async (req, res, next) => {
   }
 });
 
-/** Ganti seluruh fasilitator yang mengampu sebuah tim (kebalikan assignment fasilitator). */
+/** Ganti seluruh pendamping yang mengampu sebuah tim (kebalikan assignment pendamping). */
 router.put("/data/tim/:id/fasilitator", async (req, res, next) => {
   try {
     const tim = await store.getUserById(req.params.id);
-    if (!tim || tim.role === "fasilitator") {
+    if (!tim || PERAN_PENDAMPING.has(tim.role)) {
       return res.status(404).json({ error: "Akun tim tidak ditemukan" });
     }
     const fasIds = Array.isArray(req.body?.fasilitator_ids)
       ? req.body.fasilitator_ids.map(String) : [];
-    // Validasi semua target adalah akun FASILITATOR yang ada
+    // Validasi semua target adalah akun PENDAMPING yang ada
     for (const id of fasIds) {
       const f = await store.getUserById(id);
-      if (!f || f.role !== "fasilitator") {
-        return res.status(400).json({ error: `Akun fasilitator tidak valid: ${id}` });
+      if (!f || !PERAN_PENDAMPING.has(f.role)) {
+        return res.status(400).json({ error: `Akun pendamping tidak valid: ${id}` });
       }
     }
     const hasil = await store.gantiFasilitatorTim(tim.id, fasIds);
@@ -362,6 +402,17 @@ router.put("/data/tim/:id/fasilitator", async (req, res, next) => {
       ...hasil,
     });
     res.json({ ok: true, ...hasil });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Rekap ACC dosen untuk sebuah tim (kartu info di panel). */
+router.get("/data/tim/:id/persetujuan", async (req, res, next) => {
+  try {
+    const tim = await store.getUserById(req.params.id);
+    if (!tim) return res.status(404).json({ error: "Akun tidak ditemukan" });
+    res.json(await store.ringkasPersetujuan(tim.id));
   } catch (err) {
     next(err);
   }

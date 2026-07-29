@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import {
   MessageCircle, Send, Pencil, Trash2, Check, CornerDownRight, X,
 } from "lucide-react";
-import { api, getUser, isFasilitator } from "@/lib/api";
+import { api, getUser, isPendamping } from "@/lib/api";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const fmtWaktu = (iso) => {
@@ -28,6 +28,10 @@ const fmtWaktu = (iso) => {
   return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()} · ` +
     `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
+
+/** Penanda peran penulis komentar (tim tidak diberi ikon). */
+const ikonPeran = (role) =>
+  role === "dosen" ? "👨‍🏫 " : role === "fasilitator" ? "🎓 " : "";
 
 /* ---------- satu komentar (dipakai induk & balasan) ---------- */
 function ItemKomentar({ k, milikku, roleTim, onBalas, onUbah, onHapus, onSelesai }) {
@@ -57,7 +61,7 @@ function ItemKomentar({ k, milikku, roleTim, onBalas, onUbah, onHapus, onSelesai
       <div className="row spread" style={{ gap: 6, alignItems: "baseline" }}>
         <span style={{ fontSize: ".78rem", fontWeight: 700 }}>
           {!induk && <CornerDownRight className="lucide" style={{ width: 12, height: 12 }} />}{" "}
-          {k.penulis_role === "fasilitator" ? "🎓 " : ""}{k.penulis_username || "?"}
+          {ikonPeran(k.penulis_role)}{k.penulis_username || "?"}
           <span className="muted" style={{ fontWeight: 500, marginLeft: 6, fontSize: ".68rem" }}>
             {fmtWaktu(k.createdAt)}
             {k.edited_at ? " · (diedit)" : ""}
@@ -114,7 +118,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
   const [isi, setIsi] = useState("");
   const [balasKe, setBalasKe] = useState(null); // komentar induk yang dibalas
   const [busy, setBusy] = useState(false);
-  const fas = isFasilitator();
+  const fas = isPendamping();
   const aku = getUser();
 
   const muat = async () => {
@@ -208,7 +212,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
         type="button"
         className={`btn sm ${buka ? "primary" : ""}`}
         onClick={() => setBuka((v) => !v)}
-        title="Komentar fasilitator & tim"
+        title="Komentar pendamping & tim"
       >
         <MessageCircle className="lucide" /> {jumlah > 0 ? `${jumlah} komentar` : "Komentar"}
       </button>
@@ -220,7 +224,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
             <p className="muted mts">
               {fas
                 ? "Belum ada komentar — tulis komentar pertama untuk tim ini."
-                : "Belum ada komentar dari fasilitator untuk entri ini."}
+                : "Belum ada komentar dari pendamping untuk entri ini."}
             </p>
           )}
           {induk.map((k) => (
@@ -278,7 +282,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
           ) : (
             induk.length > 0 && (
               <p className="muted" style={{ fontSize: ".72rem", marginTop: 6 }}>
-                Pilih <b>Balas</b> pada komentar fasilitator untuk merespons.
+                Pilih <b>Balas</b> pada komentar pendamping untuk merespons.
               </p>
             )
           )}

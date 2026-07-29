@@ -19,6 +19,7 @@ import importRouter from "./routes/import.js";
 import laporanRouter from "./routes/laporan.js";
 import fasilitatorRouter from "./routes/fasilitator.js";
 import komentarRouter from "./routes/komentar.js";
+import persetujuanRouter from "./routes/persetujuan.js";
 import tunnelRouter from "./routes/tunnel.js";
 import adminRouter from "./admin/routes.js";
 import { loadAdmin, panelPath } from "./admin/store.js";
@@ -98,6 +99,7 @@ app.use("/api/import", importRouter);
 app.use("/api/laporan", laporanRouter);
 app.use("/api/fasilitator", fasilitatorRouter);
 app.use("/api/komentar", komentarRouter);
+app.use("/api/persetujuan", persetujuanRouter);
 app.use("/api/tunnel", tunnelRouter);
 
 // Panel pemeliharaan — path diambil dari database saat request masuk,

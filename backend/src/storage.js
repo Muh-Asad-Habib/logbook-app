@@ -96,6 +96,9 @@ export async function isDefaultUser(userId) {
   return (await getMeta("templateOwnerId")) === userId;
 }
 
+/** Peran yang sah untuk sebuah akun. */
+export const PERAN_SAH = ["tim", "fasilitator", "dosen"];
+
 export async function createUser(username, password, role = "tim") {
   const u = {
     id: newId(),
@@ -103,7 +106,7 @@ export async function createUser(username, password, role = "tim") {
     usernameLower: String(username).trim().toLowerCase(),
     passHash: hashPassword(password),
     createdAt: nowIso(),
-    role: role === "fasilitator" ? "fasilitator" : "tim",
+    role: PERAN_SAH.includes(role) ? role : "tim",
   };
   await q(
     "INSERT INTO users (id, username, username_lower, pass_hash, created_at, role) VALUES ($1, $2, $3, $4, $5, $6)",
@@ -151,8 +154,15 @@ export async function listUsersWithStats() {
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id AND b.bukti_key <> '') AS n_foto_keu,
             (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id)                    AS n_sesi,
             (SELECT COUNT(*) FROM laporan_docx l WHERE l.user_id = u.id)                AS n_laporan,
-            (SELECT COUNT(*) FROM fasilitator_tim ft WHERE ft.tim_user_id = u.id)       AS n_fasilitator,
+            (SELECT COUNT(*) FROM fasilitator_tim ft JOIN users pu ON pu.id = ft.fasilitator_id
+               WHERE ft.tim_user_id = u.id AND COALESCE(pu.role,'tim') = 'fasilitator')  AS n_fasilitator,
+            (SELECT COUNT(*) FROM fasilitator_tim ft JOIN users pu ON pu.id = ft.fasilitator_id
+               WHERE ft.tim_user_id = u.id AND COALESCE(pu.role,'tim') = 'dosen')        AS n_dosen,
             (SELECT COUNT(*) FROM fasilitator_tim ft WHERE ft.fasilitator_id = u.id)    AS n_tim_diampu,
+            (SELECT COUNT(*) FROM persetujuan p
+               WHERE p.tim_user_id = u.id AND p.status = 'disetujui')                    AS n_acc,
+            (SELECT COUNT(*) FROM persetujuan p
+               WHERE p.tim_user_id = u.id AND p.status = 'revisi')                       AS n_revisi,
             GREATEST(
               COALESCE((SELECT MAX(k.created_at) FROM kegiatan k WHERE k.user_id = u.id), ''),
               COALESCE((SELECT MAX(b.created_at) FROM keuangan b WHERE b.user_id = u.id), '')
@@ -175,7 +185,10 @@ export async function listUsersWithStats() {
     sesi: angka(r.n_sesi),
     punya_laporan: angka(r.n_laporan) > 0,
     n_fasilitator: angka(r.n_fasilitator),
+    n_dosen: angka(r.n_dosen),
     n_tim_diampu: angka(r.n_tim_diampu),
+    n_acc: angka(r.n_acc),
+    n_revisi: angka(r.n_revisi),
     aktivitasTerakhir: r.last_at || "",
     pemilikTemplate: ownerId === r.id,
     dana_awal: r.dana_awal || "",
@@ -259,6 +272,7 @@ export async function deleteUser(userId) {
     [userId]
   );
   await q("DELETE FROM komentar  WHERE tim_user_id = $1 OR penulis_id = $1", [userId]);
+  await q("DELETE FROM persetujuan WHERE tim_user_id = $1 OR dosen_id = $1", [userId]);
   await q("DELETE FROM aktivitas WHERE user_id = $1", [userId]);
   await q("DELETE FROM users      WHERE id      = $1", [userId]);
   if ((await getMeta("templateOwnerId")) === userId) {
@@ -376,6 +390,9 @@ export async function updateKegiatan(userId, id, patch) {
     [e.tanggal, e.kegiatan, e.capaian_delta, e.waktu_menit,
      JSON.stringify(e.foto_keys || []), id, userId]
   );
+  // Isi entri berubah → ACC dosen batal, status kembali "menunggu" agar
+  // pengesahan selalu merujuk versi yang benar-benar ditinjau.
+  await hapusPersetujuan("kegiatan", id);
   return e;
 }
 
@@ -383,6 +400,7 @@ export async function deleteKegiatan(userId, id) {
   const rows = await q(
     "DELETE FROM kegiatan WHERE id = $1 AND user_id = $2 RETURNING *", [id, userId]
   );
+  if (rows[0]) await hapusPersetujuan("kegiatan", id);
   return rows[0] ? petaKegiatan(rows[0]) : null;
 }
 
@@ -434,6 +452,7 @@ export async function updateKeuangan(userId, id, patch) {
     [e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total,
      e.bukti_key || "", id, userId]
   );
+  await hapusPersetujuan("keuangan", id); // entri berubah → ACC batal
   return e;
 }
 
@@ -441,6 +460,7 @@ export async function deleteKeuangan(userId, id) {
   const rows = await q(
     "DELETE FROM keuangan WHERE id = $1 AND user_id = $2 RETURNING *", [id, userId]
   );
+  if (rows[0]) await hapusPersetujuan("keuangan", id);
   return rows[0] ? petaKeuangan(rows[0]) : null;
 }
 
@@ -482,6 +502,8 @@ export async function saveLaporan(userId, nama, buffer) {
     [userId, nama, buffer.length, nowIso(), key]
   );
   if (lama[0]?.file_key) await removeFiles([lama[0].file_key]);
+  // Laporan diganti → ACC lama tidak lagi relevan (kembali "menunggu")
+  await hapusPersetujuan("laporan", userId);
   return { nama, ukuran: buffer.length };
 }
 
@@ -530,14 +552,17 @@ export async function deleteLaporan(userId) {
     "DELETE FROM laporan_docx WHERE user_id = $1 RETURNING nama, file_key", [userId]
   );
   if (rows[0]?.file_key) await removeFiles([rows[0].file_key]);
+  if (rows.length) await hapusPersetujuan("laporan", userId);
   return rows.length > 0;
 }
 
-/* ---------- Fasilitator ↔ Tim (assignment many-to-many) ----------
- * 1 tim boleh diampu banyak fasilitator; 1 fasilitator boleh mengampu
- * banyak tim. Assignment hanya diubah lewat pusat kendali. */
+/* ---------- Pendamping (fasilitator & dosen) ↔ Tim (assignment many-to-many) ----------
+ * 1 tim boleh diampu banyak pendamping; 1 pendamping boleh mengampu
+ * banyak tim. Assignment hanya diubah lewat pusat kendali.
+ * Tabel `fasilitator_tim` dipakai untuk KEDUA peran (nama dipertahankan
+ * agar data lama tetap utuh) — peran dibaca dari kolom users.role. */
 
-/** Daftar tim yang diampu seorang fasilitator. */
+/** Daftar tim yang diampu seorang pendamping (fasilitator/dosen). */
 export async function listTimUntukFasilitator(fasilitatorId) {
   const rows = await q(
     `SELECT u.id, u.username, ft.created_at AS sejak
@@ -549,19 +574,21 @@ export async function listTimUntukFasilitator(fasilitatorId) {
   return rows.map((r) => ({ id: r.id, username: r.username, sejak: r.sejak }));
 }
 
-/** Daftar fasilitator yang mengampu sebuah tim. */
+/** Daftar pendamping (fasilitator & dosen) yang mengampu sebuah tim. */
 export async function listFasilitatorUntukTim(timUserId) {
   const rows = await q(
-    `SELECT u.id, u.username, ft.created_at AS sejak
+    `SELECT u.id, u.username, COALESCE(u.role, 'tim') AS role, ft.created_at AS sejak
        FROM fasilitator_tim ft JOIN users u ON u.id = ft.fasilitator_id
       WHERE ft.tim_user_id = $1
-      ORDER BY u.username`,
+      ORDER BY u.role DESC, u.username`,
     [timUserId]
   );
-  return rows.map((r) => ({ id: r.id, username: r.username, sejak: r.sejak }));
+  return rows.map((r) => ({
+    id: r.id, username: r.username, role: r.role, sejak: r.sejak,
+  }));
 }
 
-/** Apakah fasilitator boleh mengakses data tim ini? */
+/** Apakah pendamping ini boleh mengakses data tim tersebut? */
 export async function bolehAksesTim(fasilitatorId, timUserId) {
   const rows = await q(
     "SELECT 1 FROM fasilitator_tim WHERE fasilitator_id = $1 AND tim_user_id = $2",
@@ -736,7 +763,7 @@ export async function setKomentarSelesai(id, selesai) {
  */
 export async function hitungBelumDibaca(userId, role) {
   const scope =
-    role === "fasilitator"
+    role && role !== "tim"
       ? `k.tim_user_id IN (SELECT tim_user_id FROM fasilitator_tim WHERE fasilitator_id = $1)`
       : `k.tim_user_id = $1`;
   const rows = await q(
@@ -765,4 +792,131 @@ export async function tandaiDibaca(userId, komentarIds) {
     );
   }
 }
+
+/* ---------- ACC / pengesahan oleh DOSEN PENDAMPING ----------
+ * jenis: 'kegiatan' | 'keuangan' | 'laporan'
+ * target_id: id entri (laporan → tim_user_id, karena 1 laporan per tim)
+ * status: 'disetujui' | 'revisi'  — tanpa baris = 'menunggu'.
+ * Satu baris per entri (PK jenis+target_id): ACC dosen mana pun menimpa
+ * status sebelumnya, dan selalu tercatat siapa peninjau terakhirnya. */
+
+export const STATUS_ACC = ["disetujui", "revisi"];
+
+const petaPersetujuan = (r) => ({
+  jenis: r.jenis,
+  target_id: r.target_id,
+  tim_user_id: r.tim_user_id,
+  dosen_id: r.dosen_id,
+  dosen_username: r.dosen_username || "",
+  status: r.status,
+  catatan: r.catatan || "",
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+/** Simpan/ubah status ACC sebuah entri (UPSERT). */
+export async function setPersetujuan({ jenis, targetId, timUserId, dosenId, status, catatan = "" }) {
+  const ts = nowIso();
+  await q(
+    `INSERT INTO persetujuan (jenis, target_id, tim_user_id, dosen_id, status, catatan, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+     ON CONFLICT (jenis, target_id) DO UPDATE SET
+       tim_user_id = EXCLUDED.tim_user_id, dosen_id = EXCLUDED.dosen_id,
+       status = EXCLUDED.status, catatan = EXCLUDED.catatan,
+       updated_at = EXCLUDED.updated_at`,
+    [String(jenis), String(targetId), String(timUserId), String(dosenId),
+     String(status), String(catatan).slice(0, 1000), ts]
+  );
+  return getPersetujuan(jenis, targetId);
+}
+
+/** Batalkan ACC sebuah entri → status kembali "menunggu". */
+export async function hapusPersetujuan(jenis, targetId) {
+  const rows = await q(
+    "DELETE FROM persetujuan WHERE jenis = $1 AND target_id = $2 RETURNING jenis",
+    [String(jenis), String(targetId)]
+  );
+  return rows.length > 0;
+}
+
+export async function getPersetujuan(jenis, targetId) {
+  const rows = await q(
+    `SELECT p.*, u.username AS dosen_username
+       FROM persetujuan p LEFT JOIN users u ON u.id = p.dosen_id
+      WHERE p.jenis = $1 AND p.target_id = $2`,
+    [String(jenis), String(targetId)]
+  );
+  return rows[0] ? petaPersetujuan(rows[0]) : null;
+}
+
+/** Peta status ACC seluruh entri satu tim: { [target_id]: {status, …} }. */
+export async function listPersetujuan(timUserId, jenis) {
+  const params = [String(timUserId)];
+  let where = "p.tim_user_id = $1";
+  if (jenis) {
+    params.push(String(jenis));
+    where += " AND p.jenis = $2";
+  }
+  const rows = await q(
+    `SELECT p.*, u.username AS dosen_username
+       FROM persetujuan p LEFT JOIN users u ON u.id = p.dosen_id
+      WHERE ${where}`,
+    params
+  );
+  const peta = {};
+  for (const r of rows) peta[r.target_id] = petaPersetujuan(r);
+  return peta;
+}
+
+/**
+ * Ringkasan ACC satu tim untuk kartu dashboard & panel:
+ * { kegiatan: {total, disetujui, revisi, menunggu}, keuangan: {…}, laporan: {…}, total_revisi }
+ */
+export async function ringkasPersetujuan(timUserId) {
+  const [kegRows, keuRows, lap, accRows] = await Promise.all([
+    q("SELECT COUNT(*) AS n FROM kegiatan WHERE user_id = $1", [timUserId]),
+    q("SELECT COUNT(*) AS n FROM keuangan WHERE user_id = $1", [timUserId]),
+    infoLaporan(timUserId),
+    q(`SELECT jenis, status, COUNT(*) AS n FROM persetujuan
+        WHERE tim_user_id = $1 GROUP BY jenis, status`, [timUserId]),
+  ]);
+  const jml = {
+    kegiatan: angka(kegRows[0]?.n),
+    keuangan: angka(keuRows[0]?.n),
+    laporan: lap.ada ? 1 : 0,
+  };
+  const hasil = {};
+  for (const jenis of ["kegiatan", "keuangan", "laporan"]) {
+    hasil[jenis] = { total: jml[jenis], disetujui: 0, revisi: 0, menunggu: 0 };
+  }
+  for (const r of accRows) {
+    const b = hasil[r.jenis];
+    if (b && (r.status === "disetujui" || r.status === "revisi")) b[r.status] = angka(r.n);
+  }
+  let totalRevisi = 0;
+  let totalDisetujui = 0;
+  for (const jenis of ["kegiatan", "keuangan", "laporan"]) {
+    const b = hasil[jenis];
+    b.menunggu = Math.max(0, b.total - b.disetujui - b.revisi);
+    totalRevisi += b.revisi;
+    totalDisetujui += b.disetujui;
+  }
+  hasil.total_revisi = totalRevisi;
+  hasil.total_disetujui = totalDisetujui;
+  return hasil;
+}
+
+/** Ringkasan ACC untuk SEMUA tim yang diampu seorang pendamping (badge menu). */
+export async function ringkasPersetujuanPendamping(pendampingId) {
+  const rows = await q(
+    `SELECT COUNT(*) FILTER (WHERE p.status = 'revisi')    AS revisi,
+            COUNT(*) FILTER (WHERE p.status = 'disetujui') AS disetujui
+       FROM persetujuan p
+      WHERE p.tim_user_id IN (
+              SELECT tim_user_id FROM fasilitator_tim WHERE fasilitator_id = $1)`,
+    [String(pendampingId)]
+  );
+  return { revisi: angka(rows[0]?.revisi), disetujui: angka(rows[0]?.disetujui) };
+}
+
 

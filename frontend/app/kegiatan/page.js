@@ -6,11 +6,12 @@ import {
 } from "lucide-react";
 import {
   api, fotoUrl, fmtDurasi, fmtTgl, useApi, refreshData,
-  isFasilitator, getTimAktif,
+  isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
+import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -64,14 +65,14 @@ function useJumlahKomentar(jenis, timId, aktif = true) {
 }
 
 export default function KegiatanPage() {
-  // Fasilitator: read-only + komentar; Tim: halaman penuh seperti biasa
+  // Pendamping (fasilitator & dosen): read-only + komentar/ACC; Tim: halaman penuh
   const [fas, setFas] = useState(null);
-  useEffect(() => { setFas(isFasilitator()); }, []);
+  useEffect(() => { setFas(isPendamping()); }, []);
   if (fas === null) return <div className="skel mt" style={{ height: 220 }} />;
   return fas ? <KegiatanFasilitator /> : <KegiatanTim />;
 }
 
-/* ===================== MODE FASILITATOR (lihat + komentar) ===================== */
+/* ===================== MODE PENDAMPING (lihat + komentar + ACC) ===================== */
 function KegiatanFasilitator() {
   const [timId, setTimId] = useState("");
   const [items, setItems] = useState(null);
@@ -80,6 +81,7 @@ function KegiatanFasilitator() {
   const [urut, setUrut] = useState("Terbaru");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("kegiatan", timId, !!timId);
+  const [acc, muatAcc] = useAcc("kegiatan", timId, !!timId);
 
   // Ikuti tim aktif dari switcher topbar
   useEffect(() => {
@@ -114,7 +116,7 @@ function KegiatanFasilitator() {
     return (
       <div className="empty mt">
         <div className="big">📞</div>
-        <p>Hubungi admin untuk menjadikan kamu fasilitator di tim kamu.</p>
+        <p>Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu.</p>
       </div>
     );
   if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
@@ -147,7 +149,7 @@ function KegiatanFasilitator() {
               <button key={u} className={`pill ${urut === u ? "on" : ""}`} onClick={() => setUrut(u)}>{u}</button>
             ))}
           </div>
-          <span className="badge info">👁 Mode fasilitator — lihat &amp; komentar</span>
+          <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
         </div>
       </div>
 
@@ -185,6 +187,8 @@ function KegiatanFasilitator() {
                         ))}
                       </div>
                     )}
+                    <AccPanel jenis="kegiatan" targetId={e.id} timId={timId}
+                              acc={acc[e.id]} onChange={muatAcc} />
                     <KomentarPanel jenis="kegiatan" targetId={e.id} timId={timId}
                                    n={peta[e.id] || 0} />
                   </div>
@@ -199,7 +203,7 @@ function KegiatanFasilitator() {
   );
 }
 
-/* ===================== MODE TIM (halaman lama + komentar) ===================== */
+/* ===================== MODE TIM (halaman lama + komentar + status ACC) ===================== */
 function KegiatanTim() {
   const { data: items, error: loadErr } = useApi("/api/kegiatan");
   const [cari, setCari] = useState("");
@@ -210,6 +214,7 @@ function KegiatanTim() {
   const [lb, setLb] = useState(null);
   const dlgRef = useRef(null);
   const petaKomentar = useJumlahKomentar("kegiatan", "");
+  const [acc, muatAcc] = useAcc("kegiatan", "");
 
   useEffect(() => { if (edit && dlgRef.current) dlgRef.current.showModal(); }, [edit]);
 
@@ -230,6 +235,7 @@ function KegiatanTim() {
       await api.deleteKegiatan(e.id);
       toast.ok("Kegiatan dihapus");
       refreshData();
+      muatAcc();
     } catch (err) {
       toast.err(`Gagal menghapus: ${err.message}`);
     }
@@ -318,6 +324,7 @@ function KegiatanTim() {
                         ))}
                       </div>
                     )}
+                    <AccPanel jenis="kegiatan" targetId={e.id} acc={acc[e.id]} onChange={muatAcc} />
                     <KomentarPanel jenis="kegiatan" targetId={e.id}
                                    n={petaKomentar[e.id] || 0} />
                   </div>
@@ -345,6 +352,8 @@ function KegiatanTim() {
             setEdit(null);
             toast.ok(baru ? "Kegiatan ditambahkan" : "Perubahan tersimpan");
             refreshData();
+            // Entri yang diubah kembali berstatus "menunggu ACC"
+            muatAcc();
           }}
         />
       )}
