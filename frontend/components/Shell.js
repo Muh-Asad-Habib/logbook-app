@@ -159,11 +159,18 @@ const badgeUntuk = (badges, href) =>
  * Satu dropdown untuk semua: berganti tim yang dilihat DAN menambah tim baru
  * memakai kode yang dibagikan tim (fasilitator & dosen pendamping). */
 function TimSwitcher({ role }) {
-  const { data: tim } = useApi("/api/fasilitator/tim");
+  const { data: timData } = useApi("/api/fasilitator/tim");
+  // Simpan daftar terakhir: setTimAktif() memanggil clearCache() sehingga data
+  // hook sempat undefined — tanpa ini chip & dropdown ikut hilang saat diklik.
+  const [tim, setTim] = useState([]);
   const [aktif, setAktif] = useState("");
   const [buka, setBuka] = useState(false);
   const [tambah, setTambah] = useState(false);
   const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (Array.isArray(timData)) setTim(timData);
+  }, [timData]);
 
   useEffect(() => {
     setAktif(getTimAktif());
@@ -174,14 +181,14 @@ function TimSwitcher({ role }) {
   }, []);
   useEffect(() => {
     // Pastikan pilihan valid: default ke tim pertama bila belum/tidak valid
-    if (!Array.isArray(tim) || tim.length === 0) return;
-    if (!tim.some((t) => t.id === aktif)) {
-      setAktif(tim[0].id);
+    if (tim.length === 0) return;
+    if (!tim.some((t) => String(t.id) === String(aktif))) {
+      setAktif(String(tim[0].id));
       setTimAktif(tim[0].id);
     }
   }, [tim, aktif]);
 
-  // Klik di luar → tutup dropdown
+  // Klik di luar / tombol Esc → tutup dropdown
   useEffect(() => {
     if (!buka) return;
     const tutup = (e) => {
@@ -190,16 +197,31 @@ function TimSwitcher({ role }) {
         setTambah(false);
       }
     };
+    const esc = (e) => {
+      if (e.key === "Escape") { setBuka(false); setTambah(false); }
+    };
     document.addEventListener("pointerdown", tutup);
-    return () => document.removeEventListener("pointerdown", tutup);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", tutup);
+      document.removeEventListener("keydown", esc);
+    };
   }, [buka]);
 
   const info = INFO_PERAN[role] || INFO_PERAN.fasilitator;
-  if (!Array.isArray(tim) || tim.length === 0) return null;
-  const namaAktif = tim.find((t) => t.id === aktif)?.username || tim[0].username;
+  if (tim.length === 0) return null;
+  const sama = (t) => String(t.id) === String(aktif);
+  const namaAktif = (tim.find(sama) || tim[0]).username;
+
+  const pilih = (t) => {
+    setAktif(String(t.id));
+    setTimAktif(t.id);
+    setBuka(false);
+    setTambah(false);
+  };
 
   return (
-    <div className="top-chips tim-chips" ref={boxRef} style={{ position: "relative" }}>
+    <div className="top-chips tim-chips" ref={boxRef}>
       <button
         type="button"
         className="chip"
@@ -207,7 +229,6 @@ function TimSwitcher({ role }) {
         aria-haspopup="menu"
         aria-expanded={buka}
         title="Ganti tim yang dilihat / tambah tim"
-        style={{ cursor: "pointer", fontFamily: "inherit" }}
       >
         <Users className="lucide" />
         <b>{namaAktif}</b>
@@ -219,32 +240,29 @@ function TimSwitcher({ role }) {
       <span className="chip chip-role" title="Peran akun">{info.emoji} {info.nama}</span>
 
       {buka && (
-        <div className="user-menu" role="menu"
-             style={{ top: "calc(100% + 8px)", right: 0, minWidth: 268 }}>
-          <div className="muted" style={{ padding: "6px 12px 2px", fontSize: ".66rem", fontWeight: 800, letterSpacing: ".04em" }}>
-            TIM YANG KAMU DAMPINGI
-          </div>
+        <div className="user-menu tim-menu" role="menu">
+          <div className="menu-judul">TIM YANG KAMU DAMPINGI</div>
           {tim.map((t) => (
             <button
               key={t.id}
               type="button"
               role="menuitem"
               className="user-menu-item"
-              onClick={() => { setAktif(t.id); setTimAktif(t.id); setBuka(false); setTambah(false); }}
+              onClick={() => pilih(t)}
             >
               <Users className="lucide" />
               <span>
                 {t.username}
-                {t.id === aktif && <small>sedang dilihat</small>}
+                {sama(t) && <small>sedang dilihat</small>}
               </span>
-              {t.id === aktif && (
+              {sama(t) && (
                 <Check className="lucide" style={{ marginLeft: "auto", width: 16, height: 16 }} />
               )}
             </button>
           ))}
 
           {tambah ? (
-            <div style={{ padding: "8px 12px 4px", borderTop: "1px solid var(--line)", marginTop: 4 }}>
+            <div className="menu-pisah" style={{ padding: "8px 12px 4px" }}>
               <GabungTim
                 ringkas
                 autoFocus
@@ -255,9 +273,8 @@ function TimSwitcher({ role }) {
             <button
               type="button"
               role="menuitem"
-              className="user-menu-item"
+              className="user-menu-item menu-pisah"
               onClick={() => setTambah(true)}
-              style={{ borderTop: "1px solid var(--line)", borderRadius: 0, marginTop: 4 }}
             >
               <Plus className="lucide" />
               <span>

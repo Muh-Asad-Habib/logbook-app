@@ -254,12 +254,23 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .chip.link .chip-url { max-width: min(30vw, 260px); overflow: hidden; text-overflow: ellipsis; }
 .chip.copy { cursor: pointer; font-family: inherit; }
 
-/* Pemilih tim aktif (pendamping) — chip yang membuka dropdown */
-.tim-chips { position: relative; }
+/* Pemilih tim aktif (pendamping) — chip yang membuka dropdown.
+ * PENTING: .top-chips memakai overflow-x:auto (chip statistik bisa digeser).
+ * Untuk baris tim, overflow harus visible — kalau tidak, popover ikut
+ * terpotong kotak scroll sehingga dropdown terlihat "tidak berfungsi". */
+.topbar .top-chips.tim-chips { position: relative; overflow: visible; }
+.tim-chips button.chip { cursor: pointer; font-family: inherit; }
 .tim-chips button.chip b { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tim-chips button.chip[aria-expanded="true"] { border-color: var(--line-hover); color: var(--p1); }
 .tim-chips button.chip:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; }
-.tim-chips .user-menu { max-height: 68vh; overflow-y: auto; }
+.tim-chips .user-menu { max-height: 68vh; overflow-y: auto; z-index: 95; }
+.tim-chips .user-menu.tim-menu { top: calc(100% + 8px); right: 0; left: auto; min-width: 268px; }
 .tim-chips .user-menu input { font-size: 0.8rem; }
+.tim-chips .menu-judul {
+  padding: 6px 12px 2px; font-size: 0.66rem; font-weight: 800;
+  letter-spacing: 0.04em; color: var(--muted);
+}
+.tim-chips .menu-pisah { border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0; }
 
 .mob-head { display: none; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .mob-logo {
@@ -337,7 +348,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .topbar .top-chips.tim-chips { display: flex; flex-basis: 100%; order: 9; margin-left: 0; }
   .tim-chips .chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
   .tim-chips .chip.chip-role { display: none; }
-  .tim-chips .user-menu { left: 0; right: 0; min-width: 0; }
+  .tim-chips .user-menu.tim-menu { left: 0; right: 0; min-width: 0; max-height: 54vh; }
   .tim-chips .user-menu input { font-size: 16px; }
 }
 
