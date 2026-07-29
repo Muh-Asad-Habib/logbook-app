@@ -254,14 +254,12 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .chip.link .chip-url { max-width: min(30vw, 260px); overflow: hidden; text-overflow: ellipsis; }
 .chip.copy { cursor: pointer; font-family: inherit; }
 
-/* Pemilih tim aktif (fasilitator) — select polos di dalam chip */
-.chip select.tim-select {
-  width: auto; max-width: 46vw; margin: 0; padding: 0 2px;
-  border: none; background: transparent; color: inherit;
-  font: inherit; font-weight: 700; cursor: pointer; outline: none;
-}
-.chip select.tim-select:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.4); border-radius: 6px; }
-.chip select.tim-select option { color: var(--ink); background: var(--card-solid); }
+/* Pemilih tim aktif (pendamping) — chip yang membuka dropdown */
+.tim-chips { position: relative; }
+.tim-chips button.chip b { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tim-chips button.chip:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; }
+.tim-chips .user-menu { max-height: 68vh; overflow-y: auto; }
+.tim-chips .user-menu input { font-size: 0.8rem; }
 
 .mob-head { display: none; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .mob-logo {
@@ -339,7 +337,8 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .topbar .top-chips.tim-chips { display: flex; flex-basis: 100%; order: 9; margin-left: 0; }
   .tim-chips .chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
   .tim-chips .chip.chip-role { display: none; }
-  .chip select.tim-select { flex: 1; width: 100%; max-width: none; min-height: 32px; font-size: 16px; }
+  .tim-chips .user-menu { left: 0; right: 0; min-width: 0; }
+  .tim-chips .user-menu input { font-size: 16px; }
 }
 
 /* ================= Kartu & metrik ================= */

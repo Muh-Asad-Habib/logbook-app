@@ -29,8 +29,8 @@ const registerLimiter = rateLimit({
  *     summary: Daftar akun baru (langsung login, dapat token)
  *     description: >
  *       Daftar sebagai TIM (default), FASILITATOR, atau DOSEN PENDAMPING.
- *       Untuk peran pendamping sertakan `peran` + kode yang ditetapkan pusat
- *       kendali (`kode_fasilitator` / `kode_dosen`). Field lama
+ *       Untuk peran pendamping sertakan `peran` + kode yang ditetapkan admin
+ *       (`kode_fasilitator` / `kode_dosen`). Field lama
  *       `sebagai_fasilitator` tetap didukung.
  *     requestBody:
  *       required: true

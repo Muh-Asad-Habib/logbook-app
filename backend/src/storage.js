@@ -558,7 +558,7 @@ export async function deleteLaporan(userId) {
 
 /* ---------- Pendamping (fasilitator & dosen) ↔ Tim (assignment many-to-many) ----------
  * 1 tim boleh diampu banyak pendamping; 1 pendamping boleh mengampu
- * banyak tim. Assignment hanya diubah lewat pusat kendali.
+ * banyak tim. Assignment dibuat lewat kode tim (mandiri) atau oleh admin.
  * Tabel `fasilitator_tim` dipakai untuk KEDUA peran (nama dipertahankan
  * agar data lama tetap utuh) — peran dibaca dari kolom users.role. */
 

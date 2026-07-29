@@ -74,7 +74,7 @@ export default function DashboardFasilitator() {
           <p className="mts" style={{ maxWidth: 460, margin: "8px auto 0" }}>
             Minta <b>kode tim</b> kepada tim yang kamu dampingi — kodenya ada di
             halaman <b>Profil</b> akun mereka. Masukkan di bawah ini dan kamu
-            langsung terhubung. Bisa juga minta admin menugaskanmu lewat pusat kendali.
+            langsung terhubung. Bisa juga minta bantuan admin.
           </p>
         </div>
         <GabungTim />
@@ -204,8 +204,6 @@ export default function DashboardFasilitator() {
       {/* Rekap ACC tim ini (data ikut dari /ringkasan supaya tanpa request tambahan) */}
       <div className="mt"><KartuAcc timId={timId} data={ringkas.persetujuan} /></div>
 
-      {/* Tambah tim lain memakai kode yang dibagikan tim tersebut */}
-      <GabungTim />
 
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>

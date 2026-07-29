@@ -1,7 +1,7 @@
 /**
  * API khusus akun PENDAMPING (fasilitator & dosen pendamping) — read-only
- * terhadap data tim yang di-assign pusat kendali (tabel fasilitator_tim,
- * many-to-many).
+ * terhadap tim yang terhubung lewat kode tim atau ditetapkan admin
+ * (tabel fasilitator_tim, many-to-many).
  *
  * - Semua endpoint memvalidasi assignment (bolehAksesTim) per request.
  * - Tidak ada endpoint tulis data tim di sini; satu-satunya POST hanya
