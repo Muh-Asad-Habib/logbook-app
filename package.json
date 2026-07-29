@@ -12,7 +12,9 @@
     "build": "npm run build --workspace frontend",
     "dev": "npm run dev --workspace backend",
     "start": "npm run start --workspace backend",
-    "migrate": "node tools/migrate-to-cloud.mjs"
+    "migrate": "node tools/migrate-to-cloud.mjs",
+    "deploy": "vercel --prod --yes",
+    "cek:online": "node tools/cek-online.mjs"
   },
   "engines": {
     "node": ">=20"
