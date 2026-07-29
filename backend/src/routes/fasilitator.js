@@ -13,12 +13,20 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import * as store from "../storage.js";
 import { authRequired, hanyaPendamping } from "../auth.js";
-import { bacaAktivitas } from "../aktivitas.js";
+import { bacaAktivitas, catatAktivitas } from "../aktivitas.js";
+import { rateLimit } from "../ratelimit.js";
 import { q } from "../db.js";
 
 const router = Router();
 router.use(authRequired);
 router.use(hanyaPendamping);
+
+// Kode tim ditebak-tebak? Dibatasi 15 percobaan / 10 menit per IP.
+const gabungLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 15,
+  pesan: "Terlalu banyak percobaan kode tim",
+});
 
 /** Pastikan pendamping ini boleh mengakses tim :timId (403 bila belum di-assign). */
 async function pastikanAkses(req, res, next) {
@@ -255,6 +263,83 @@ router.post("/tim/:timId/laporan-tautan", pastikanAkses, async (req, res, next) 
     const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
     const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
     res.json({ url: `${proto}://${host}/api/laporan/publik/${kunci}`, exp });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/gabung:
+ *   post:
+ *     tags: [Fasilitator]
+ *     summary: Gabung ke sebuah tim memakai kode yang dibagikan tim itu sendiri
+ *     description: >
+ *       Tim melihat kodenya di halaman Profil lalu mengirimkannya ke pendamping.
+ *       Endpoint ini membuat assignment tanpa perlu bantuan admin.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [kode]
+ *             properties:
+ *               kode: { type: string, example: "ABCD-2345" }
+ *     responses:
+ *       201: { description: Berhasil bergabung }
+ *       200: { description: Sudah mendampingi tim itu sebelumnya }
+ *       400: { description: Kode tidak valid }
+ *       404: { description: Kode tim tidak ditemukan }
+ *       429: { description: Terlalu banyak percobaan }
+ */
+router.post("/gabung", gabungLimiter, async (req, res, next) => {
+  try {
+    const kode = store.rapikanKode(req.body?.kode);
+    if (kode.length < 6) return res.status(400).json({ error: "Kode tim tidak valid" });
+
+    const tim = await store.cariTimByKode(kode);
+    if (!tim) {
+      return res.status(404).json({
+        error: "Kode tim tidak ditemukan — minta tim menyalin ulang kodenya",
+      });
+    }
+
+    const baru = await store.tambahPendampingKeTim(req.user.id, tim.id);
+    if (baru) {
+      catatAktivitas(tim.id, "pendamping.gabung", {
+        oleh: req.user.username,
+        peran: req.user.role,
+      });
+    }
+    res.status(baru ? 201 : 200).json({ tim, baru });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/tim/{timId}:
+ *   delete:
+ *     tags: [Fasilitator]
+ *     summary: Keluar dari sebuah tim (melepas assignment milik sendiri)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Keluar dari tim }
+ *       403: { description: Bukan pendamping tim ini }
+ */
+router.delete("/tim/:timId", pastikanAkses, async (req, res, next) => {
+  try {
+    await store.hapusPendampingDariTim(req.user.id, req.tim.id);
+    catatAktivitas(req.tim.id, "pendamping.keluar", {
+      oleh: req.user.username,
+      peran: req.user.role,
+    });
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

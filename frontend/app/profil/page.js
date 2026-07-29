@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   User, Lock, Eye, EyeOff, Save, KeyRound, Pencil, ShieldCheck, History,
-  LogIn, LogOut, Plus, Trash2, FileEdit,
+  LogIn, LogOut, Plus, Trash2, FileEdit, UserPlus, UserMinus, Users,
 } from "lucide-react";
-import { api, getUser, setUser as simpanUser } from "@/lib/api";
+import { api, getUser, getRole, setUser as simpanUser } from "@/lib/api";
+import KodeTim from "@/components/KodeTim";
 import { toast } from "@/components/Toast";
 
 function PassInput({ value, onChange, placeholder, autoComplete }) {
@@ -46,6 +47,10 @@ const AKSI_LABEL = {
   "keuangan.tambah": ["Mencatat belanja", Plus],
   "keuangan.ubah": ["Mengubah belanja", FileEdit],
   "keuangan.hapus": ["Menghapus belanja", Trash2],
+  "tim.kode.reset": ["Mencetak ulang kode tim", KeyRound],
+  "pendamping.gabung": ["Pendamping bergabung ke tim", UserPlus],
+  "pendamping.keluar": ["Pendamping keluar dari tim", UserMinus],
+  "pendamping.keluarkan": ["Mengeluarkan pendamping", Users],
 };
 
 const fmtWaktu = (iso) => {
@@ -175,6 +180,9 @@ export default function ProfilPage() {
           </div>
         </div>
       </div>
+
+      {/* Kode tim → dibagikan ke fasilitator/dosen supaya mereka bisa bergabung sendiri */}
+      {getRole() === "tim" && <KodeTim />}
 
       <div className="grid half mt stagger">
         <div className="card">

@@ -21,6 +21,7 @@ import {
 import { retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 import KartuAcc from "@/components/KartuAcc";
+import GabungTim from "@/components/GabungTim";
 
 export default function DashboardFasilitator() {
   const { data: timList, error: timErr } = useApi("/api/fasilitator/tim");
@@ -63,18 +64,21 @@ export default function DashboardFasilitator() {
       </div>
     );
 
-  /* ===== Belum di-assign ===== */
+  /* ===== Belum terhubung ke tim mana pun ===== */
   if ((timList || []).length === 0)
     return (
-      <div className="empty mt">
-        <div className="big"><Phone className="lucide" /></div>
-        <h3>Belum ditugaskan ke tim mana pun</h3>
-        <p className="mts" style={{ maxWidth: 440, margin: "8px auto 0" }}>
-          Akunmu sudah aktif, tetapi admin belum menugaskanmu ke tim mana pun.{" "}
-          <b>Hubungi admin untuk menugaskanmu sebagai pendamping di tim kamu</b> —
-          setelah ditugaskan, ringkasan tim langsung tampil di sini.
-        </p>
-      </div>
+      <>
+        <div className="empty mt">
+          <div className="big"><Phone className="lucide" /></div>
+          <h3>Belum terhubung ke tim mana pun</h3>
+          <p className="mts" style={{ maxWidth: 460, margin: "8px auto 0" }}>
+            Minta <b>kode tim</b> kepada tim yang kamu dampingi — kodenya ada di
+            halaman <b>Profil</b> akun mereka. Masukkan di bawah ini dan kamu
+            langsung terhubung. Bisa juga minta admin menugaskanmu lewat pusat kendali.
+          </p>
+        </div>
+        <GabungTim />
+      </>
     );
 
   if (gagal)
@@ -199,6 +203,9 @@ export default function DashboardFasilitator() {
 
       {/* Rekap ACC tim ini (data ikut dari /ringkasan supaya tanpa request tambahan) */}
       <div className="mt"><KartuAcc timId={timId} data={ringkas.persetujuan} /></div>
+
+      {/* Tambah tim lain memakai kode yang dibagikan tim tersebut */}
+      <GabungTim />
 
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>

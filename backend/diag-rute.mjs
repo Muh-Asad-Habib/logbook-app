@@ -1,7 +1,8 @@
 /**
  * Peta rute + pagar peran. Memastikan:
- *  - `hanyaTim` terpasang di semua router tulis milik tim.
- *  - /api/fasilitator GET-only (kecuali laporan-tautan) + hanyaPendamping.
+ *  - `hanyaTim` terpasang di semua router tulis milik tim (termasuk /api/tim).
+ *  - /api/fasilitator tidak punya route yang mengubah DATA tim; route tulis
+ *    yang diizinkan hanya: tautan penampil laporan, gabung & keluar tim.
  *  - /api/komentar & /api/persetujuan lengkap.
  *
  * Jalankan: node backend/diag-rute.mjs
@@ -15,10 +16,18 @@ const target = [
   ["/api/export", "./src/routes/export.js", "hanyaTim"],
   ["/api/import", "./src/routes/import.js", "hanyaTim"],
   ["/api/laporan", "./src/routes/laporan.js", "hanyaTim"],
+  ["/api/tim", "./src/routes/tim.js", "hanyaTim"],
   ["/api/fasilitator", "./src/routes/fasilitator.js", "hanyaPendamping"],
   ["/api/komentar", "./src/routes/komentar.js", null],
   ["/api/persetujuan", "./src/routes/persetujuan.js", null],
 ];
+
+// Route tulis yang SAH di /api/fasilitator — tidak satu pun mengubah data tim
+const TULIS_DIIZINKAN = new Set([
+  "POST /tim/:timId/laporan-tautan", // tautan penampil Office (read-only)
+  "POST /gabung", // gabung tim memakai kode milik tim
+  "DELETE /tim/:timId", // keluar dari tim (melepas assignment sendiri)
+]);
 
 let gagal = 0;
 
@@ -35,14 +44,15 @@ for (const [mount, path, pagar] of target) {
   console.log(`\n${mount}  ${pagar ? (adaPagar ? `✅ ${pagar}` : `❌ ${pagar} HILANG`) : "(publik/khusus)"}`);
   rute.forEach((r) => console.log(`   ${r}`));
 
-  // Fasilitator wajib read-only: hanya boleh 1 POST (laporan-tautan)
+  // Fasilitator tidak boleh punya route yang mengubah data tim
   if (mount === "/api/fasilitator") {
     const tulis = rute.filter((r) => /^(POST|PUT|PATCH|DELETE)/.test(r));
-    if (tulis.length === 1 && tulis[0].includes("laporan-tautan")) {
-      console.log("   ✅ read-only (hanya POST laporan-tautan)");
+    const nakal = tulis.filter((r) => !TULIS_DIIZINKAN.has(r));
+    if (!nakal.length) {
+      console.log(`   ✅ tidak mengubah data tim (${tulis.length} route tulis terdaftar & sah)`);
     } else {
       gagal += 1;
-      console.log(`   ❌ route tulis tak terduga: ${tulis.join(", ") || "(tidak ada)"}`);
+      console.log(`   ❌ route tulis tak terduga: ${nakal.join(", ")}`);
     }
   }
 }

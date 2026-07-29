@@ -1247,7 +1247,11 @@ var AKSI_INFO = {
   "tim.fasilitator.ubah": ["users","y","Pendamping tim diubah"],
   "acc.setuju":           ["save","g","Entri di-ACC dosen pendamping"],
   "acc.revisi":           ["edit","r","Dosen pendamping minta revisi"],
-  "acc.batal":            ["power","y","Status ACC dikembalikan ke menunggu"]
+  "acc.batal":            ["power","y","Status ACC dikembalikan ke menunggu"],
+  "tim.kode.reset":       ["key","y","Kode tim dicetak ulang"],
+  "pendamping.gabung":    ["users","g","Pendamping bergabung lewat kode tim"],
+  "pendamping.keluar":    ["users","r","Pendamping keluar dari tim"],
+  "pendamping.keluarkan": ["users","r","Tim mengeluarkan pendamping"]
 };
 function tabelAktivitas(list){
   if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';

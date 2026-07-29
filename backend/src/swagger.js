@@ -30,6 +30,7 @@ export const swaggerSpec = swaggerJsdoc({
       { name: "Fasilitator", description: "Akses baca tim yang diampu — fasilitator & dosen pendamping (assignment oleh pusat kendali)" },
       { name: "Komentar", description: "Komentar 2 arah pendamping ↔ tim pada kegiatan/keuangan/laporan" },
       { name: "Persetujuan", description: "ACC / minta revisi entri logbook oleh dosen pendamping" },
+      { name: "Tim", description: "Kode gabung tim & daftar pendamping (khusus akun tim)" },
     ],
     security: [{ bearerAuth: [] }],
     components: {

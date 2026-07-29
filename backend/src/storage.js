@@ -919,4 +919,84 @@ export async function ringkasPersetujuanPendamping(pendampingId) {
   return { revisi: angka(rows[0]?.revisi), disetujui: angka(rows[0]?.disetujui) };
 }
 
+/* ---------- Kode gabung tim (self-service, tanpa admin) ----------
+ * Tiap akun tim punya KODE unik yang bisa ia lihat & bagikan sendiri.
+ * Pendamping memasukkan kode itu → langsung ter-assign ke tim tersebut.
+ * Kode disimpan di tabel `pengaturan` (kunci 'kode_tim') sehingga tidak
+ * perlu perubahan skema. Tim dapat mencetak ulang kode (kode lama mati)
+ * dan mengeluarkan pendamping kapan saja. */
+
+// Tanpa I, O, 0, 1 supaya tidak salah baca saat dikirim lewat WA
+const ABJAD_KODE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function acakKode(n = 8) {
+  let s = "";
+  for (const b of crypto.randomBytes(n)) s += ABJAD_KODE[b % ABJAD_KODE.length];
+  return s;
+}
+
+/** Bersihkan input pengguna: huruf besar, tanpa spasi/tanda hubung. */
+export const rapikanKode = (kode) =>
+  String(kode || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+
+/** Bentuk tampilan yang enak dibaca: ABCD-2345. */
+export const tampilKode = (kode) =>
+  kode && kode.length > 4 ? `${kode.slice(0, 4)}-${kode.slice(4)}` : kode || "";
+
+async function kodeSudahDipakai(kode) {
+  const rows = await q(
+    "SELECT 1 FROM pengaturan WHERE kunci = 'kode_tim' AND nilai = $1", [kode]
+  );
+  return rows.length > 0;
+}
+
+/** Kode tim (dibuat otomatis saat pertama kali dilihat). */
+export async function getKodeTim(timUserId) {
+  const ada = await getSetting(timUserId, "kode_tim");
+  return ada || resetKodeTim(timUserId);
+}
+
+/** Cetak ulang kode — kode lama langsung tidak berlaku. */
+export async function resetKodeTim(timUserId) {
+  let kode = acakKode();
+  for (let i = 0; i < 5 && (await kodeSudahDipakai(kode)); i += 1) kode = acakKode();
+  await setSetting(timUserId, "kode_tim", kode);
+  return kode;
+}
+
+/** Cari akun tim pemilik sebuah kode (null bila tidak ada). */
+export async function cariTimByKode(kode) {
+  const bersih = rapikanKode(kode);
+  if (bersih.length < 6) return null;
+  const rows = await q(
+    `SELECT u.id, u.username
+       FROM pengaturan p JOIN users u ON u.id = p.user_id
+      WHERE p.kunci = 'kode_tim' AND p.nilai = $1
+        AND COALESCE(u.role, 'tim') = 'tim'
+      LIMIT 1`,
+    [bersih]
+  );
+  return rows[0] ? { id: rows[0].id, username: rows[0].username } : null;
+}
+
+/** Pasang satu assignment pendamping↔tim. Return true bila benar-benar baru. */
+export async function tambahPendampingKeTim(pendampingId, timUserId) {
+  const rows = await q(
+    `INSERT INTO fasilitator_tim (fasilitator_id, tim_user_id, created_at)
+     VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING tim_user_id`,
+    [String(pendampingId), String(timUserId), nowIso()]
+  );
+  return rows.length > 0;
+}
+
+/** Lepas satu assignment (dipakai tim "keluarkan" & pendamping "keluar"). */
+export async function hapusPendampingDariTim(pendampingId, timUserId) {
+  const rows = await q(
+    `DELETE FROM fasilitator_tim
+      WHERE fasilitator_id = $1 AND tim_user_id = $2 RETURNING tim_user_id`,
+    [String(pendampingId), String(timUserId)]
+  );
+  return rows.length > 0;
+}
+
 
