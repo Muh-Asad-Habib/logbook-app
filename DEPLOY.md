@@ -189,10 +189,34 @@ SELESAI 🎉
    selamanya; URL tidak pernah berubah.
 
 ### Update aplikasi di kemudian hari
-Cukup push perubahan — Vercel otomatis build & deploy ulang:
+
+> ⚠️ **Penting:** proyek ini **belum tersambung ke GitHub** di sisi Vercel
+> (dibuat lewat Vercel CLI, bukan tombol *Import Git Repository*). Artinya
+> `git push` **TIDAK** otomatis men-deploy — kode di GitHub bisa lebih baru
+> daripada yang online.
+
+**Cara update (dipakai sekarang) — deploy manual dari laptop:**
 ```powershell
-git add . ; git commit -m "perubahan" ; git push
+cd "<folder-proyek>\logbook-app"
+git add . ; git commit -m "perubahan" ; git push   # simpan kode
+npm run deploy                                      # kirim ke Vercel (produksi)
+npm run cek:online                                  # pastikan versi online = commit terakhir
 ```
+`npm run deploy` = `vercel --prod --yes` (butuh login sekali: `npx vercel login`).
+
+`npm run cek:online` membandingkan commit yang **sedang online** (dibaca dari
+`/health`) dengan commit terakhir di laptop, lalu menguji halaman & pagar peran.
+Contoh keluaran sehat:
+```
+commit live : f4ceeec
+commit lokal: f4ceeec
+status      : ✅ ONLINE = commit terakhir
+```
+
+**Ingin `git push` otomatis deploy lagi?** Sambungkan repo di dashboard:
+Vercel → proyek **logbook-app** → **Settings → Git → Connect Git Repository**
+→ pilih **GitHub** → izinkan akses ke repo `logbook-app` (repo privat perlu
+tombol *Configure GitHub App*). Setelah tersambung, cukup `git push` saja.
 
 ---
 
