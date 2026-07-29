@@ -6,7 +6,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "diag:rute": "node diag-rute.mjs",
+    "diag:panel": "node diag-panel.mjs",
+    "diag": "npm run diag:rute && npm run diag:panel"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
