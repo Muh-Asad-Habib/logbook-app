@@ -98,17 +98,22 @@ logbook tim:
   Pendamping). Untuk pendamping, masukkan **kode** yang ditetapkan admin di
   pusat kendali — kode fasilitator dan kode dosen **berbeda**; tanpa kode yang
   benar pendaftaran ditolak.
+- **🔗 Menghubungkan diri (tanpa admin)**: tiap tim punya **Kode tim** di
+  halaman **Profil** (mis. `ABCD-2345`). Tim menyalin kode itu, mengirimkannya
+  ke fasilitator/dosen, lalu pendamping memasukkannya di **Dashboard →
+  Gabung ke tim dengan kode** → langsung terhubung. Tim bisa **mencetak ulang
+  kode** (kode lama mati) dan **mengeluarkan** pendamping kapan saja; pendamping
+  juga bisa keluar sendiri. Admin tetap dapat menugaskan manual lewat pusat kendali.
 - **Akses**: pendamping hanya bisa **melihat & mengomentari** kegiatan,
-  keuangan, dan laporan kemajuan tim yang **ditugaskan pusat kendali** —
+  keuangan, dan laporan kemajuan tim yang **terhubung dengannya** —
   tidak bisa menambah/mengubah/menghapus data tim (dipagari di server).
 - **Many-to-many**: satu tim boleh punya banyak pendamping, dan satu
   pendamping boleh mengampu banyak tim (ada pemilih tim di bilah atas).
 - **Komentar 2 arah**: pendamping memulai komentar pada entri; tim membalas,
   menandai selesai, dan keduanya bisa mengedit (berlabel *"(diedit)"*) atau
   menghapus komentar miliknya. Ada badge jumlah komentar belum dibaca di menu.
-- **Belum ditugaskan?** Setelah login, pendamping melihat pesan
-  *"Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu"* sampai
-  pusat kendali menetapkan timnya.
+- **Belum ditugaskan?** Setelah login, pendamping melihat kolom
+  *"Gabung ke tim dengan kode"* — minta kodenya ke tim, atau hubungi admin.
 - **Pusat kendali**: tabel akun bertab **👥 Tim / 🎓 Fasilitator /
   👨‍🏫 Dosen Pendamping** — kelola kode pendaftaran tiap peran, tetapkan tim
   per pendamping (multi-pilih), dan lihat laporan kemajuan tiap tim.
@@ -248,12 +253,23 @@ curl -X POST https://xxxx.trycloudflare.com/api/kegiatan \
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | GET | `/api/fasilitator/tim` | Daftar tim yang diampu (bisa lebih dari satu) |
+| POST | `/api/fasilitator/gabung` | Gabung ke tim memakai kode yang dibagikan tim |
+| DELETE | `/api/fasilitator/tim/{id}` | Keluar dari sebuah tim |
 | GET | `/api/fasilitator/tim/{id}/kegiatan` | Kegiatan tim tersebut |
 | GET | `/api/fasilitator/tim/{id}/keuangan` | Belanja tim tersebut |
 | GET | `/api/fasilitator/tim/{id}/statistik` | Ringkasan angka tim |
 | GET | `/api/fasilitator/tim/{id}/ringkasan` | Dashboard: statistik + entri & aktivitas terakhir |
 | GET | `/api/fasilitator/tim/{id}/laporan-info` \| `/laporan-file` | Info / isi laporan kemajuan |
 | POST | `/api/fasilitator/tim/{id}/laporan-tautan` | Tautan penampil Office (tidak mengubah data) |
+
+**👥 Kode tim (akun tim)**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/api/tim/kode` | Kode tim untuk dibagikan ke pendamping |
+| POST | `/api/tim/kode/reset` | Cetak ulang kode (kode lama langsung mati) |
+| GET | `/api/tim/pendamping` | Daftar pendamping yang terhubung |
+| DELETE | `/api/tim/pendamping/{id}` | Keluarkan seorang pendamping |
 
 **💬 Komentar & ✅ ACC**
 

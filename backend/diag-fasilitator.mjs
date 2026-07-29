@@ -6,7 +6,8 @@
  * Alur: set kode → daftar tim & fasilitator → pagar tulis → assignment →
  * baca data tim → komentar induk → balasan tim → edit → selesai →
  * belum-dibaca → hapus → ACC dosen (revisi → batal otomatis saat entri
- * diubah → disetujui → rekap) → bersih-bersih akun uji.
+ * diubah → disetujui) → gabung tim lewat KODE TIM (cetak ulang, keluarkan,
+ * keluar sendiri) → bersih-bersih akun uji.
  */
 import { hashPassword } from "./src/passwords.js";
 import * as store from "./src/storage.js";
@@ -230,6 +231,69 @@ try {
       method: "PUT", headers: H(tokDos),
       body: JSON.stringify({ jenis: "kegiatan", target_id: keg.id, tim: dosId, status: "disetujui" }),
     })).status === 403);
+
+  console.log("== Gabung lewat kode tim (tanpa admin) ==");
+  const rKode = await jfetch("/api/tim/kode", { headers: H(tokTim) });
+  cek("tim melihat kodenya (8 karakter)",
+    rKode.status === 200 && String(rKode.body.kode || "").length === 8);
+  cek("pendamping tidak punya kode tim → 403",
+    (await jfetch("/api/tim/kode", { headers: H(tokFas) })).status === 403);
+  cek("kode tim tidak bisa ditulis lewat /api/pengaturan → 403",
+    (await jfetch("/api/pengaturan/kode_tim", {
+      method: "PUT", headers: H(tokTim), body: JSON.stringify({ nilai: "TEBAKAN1" }),
+    })).status === 403);
+
+  // Lepas assignment yang tadi dipasang "admin" supaya alur kode benar-benar diuji
+  await store.hapusPendampingDariTim(fasId, timId);
+  cek("kode ngawur → 404",
+    (await jfetch("/api/fasilitator/gabung", {
+      method: "POST", headers: H(tokFas), body: JSON.stringify({ kode: "ZZZZ-9999" }),
+    })).status === 404);
+
+  const rGabung = await jfetch("/api/fasilitator/gabung", {
+    method: "POST", headers: H(tokFas),
+    body: JSON.stringify({ kode: String(rKode.body.kode_tampil).toLowerCase() }),
+  });
+  cek("gabung pakai kode (huruf kecil + tanda hubung) → 201",
+    rGabung.status === 201 && rGabung.body.tim?.id === timId && rGabung.body.baru === true);
+  cek("fas bisa baca data tim setelah gabung",
+    (await jfetch(`/api/fasilitator/tim/${timId}/kegiatan`, { headers: H(tokFas) })).status === 200);
+
+  const rUlang = await jfetch("/api/fasilitator/gabung", {
+    method: "POST", headers: H(tokFas), body: JSON.stringify({ kode: rKode.body.kode }),
+  });
+  cek("gabung ulang → 200 & tidak ganda", rUlang.status === 200 && rUlang.body.baru === false);
+
+  const rDaftar = await jfetch("/api/tim/pendamping", { headers: H(tokTim) });
+  cek("tim melihat daftar pendampingnya",
+    rDaftar.status === 200 && rDaftar.body.some((p) => p.id === fasId));
+
+  const kodeLama = rKode.body.kode;
+  const rBaru = await jfetch("/api/tim/kode/reset", { method: "POST", headers: H(tokTim) });
+  cek("cetak ulang kode → kode berubah", rBaru.status === 200 && rBaru.body.kode !== kodeLama);
+
+  // Dosen masih ter-assign dari blok ACC (jalur pusat kendali) → keluar dulu
+  // supaya jalur "gabung lewat kode" benar-benar teruji dari nol.
+  cek("dosen keluar sendiri dari tim → 200",
+    (await jfetch(`/api/fasilitator/tim/${timId}`, { method: "DELETE", headers: H(tokDos) })).status === 200);
+  cek("setelah keluar → daftar tim dosen kosong",
+    (await jfetch("/api/fasilitator/tim", { headers: H(tokDos) })).body.length === 0);
+  cek("kode lama tidak berlaku lagi → 404",
+    (await jfetch("/api/fasilitator/gabung", {
+      method: "POST", headers: H(tokDos), body: JSON.stringify({ kode: kodeLama }),
+    })).status === 404);
+  cek("dosen gabung pakai kode baru → 201",
+    (await jfetch("/api/fasilitator/gabung", {
+      method: "POST", headers: H(tokDos), body: JSON.stringify({ kode: rBaru.body.kode }),
+    })).status === 201);
+
+  cek("tim mengeluarkan pendamping → 200",
+    (await jfetch(`/api/tim/pendamping/${fasId}`, { method: "DELETE", headers: H(tokTim) })).status === 200);
+  cek("setelah dikeluarkan → akses data tim 403",
+    (await jfetch(`/api/fasilitator/tim/${timId}/kegiatan`, { headers: H(tokFas) })).status === 403);
+  cek("keluarkan orang yang bukan pendamping → 404",
+    (await jfetch(`/api/tim/pendamping/${fasId}`, { method: "DELETE", headers: H(tokTim) })).status === 404);
+
 
   console.log(`\n== HASIL: ${lulus} lulus, ${gagal} gagal ==`);
   if (!adaKode) {

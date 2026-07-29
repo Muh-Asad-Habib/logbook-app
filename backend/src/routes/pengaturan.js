@@ -7,6 +7,13 @@ router.use(authRequired); // pengaturan per akun
 router.use(hanyaTim); // fasilitator tidak punya pengaturan dana
 
 /**
+ * Kunci yang dikelola endpoint khusus dan TIDAK boleh ditulis lewat
+ * key-value bebas — kalau bisa, seseorang dapat menyetel kode timnya
+ * menyamai kode tim lain (tabrakan saat pendamping bergabung).
+ */
+const KUNCI_TERKUNCI = new Set(["kode_tim"]);
+
+/**
  * @openapi
  * /api/pengaturan/{kunci}:
  *   get:
@@ -49,6 +56,9 @@ router.get("/:kunci", async (req, res, next) => {
 
 router.put("/:kunci", async (req, res, next) => {
   try {
+    if (KUNCI_TERKUNCI.has(req.params.kunci)) {
+      return res.status(403).json({ error: "Kunci ini dikelola lewat /api/tim/kode" });
+    }
     const nilai = String(req.body?.nilai ?? "");
     await store.setSetting(req.userId, req.params.kunci, nilai);
     res.json({ kunci: req.params.kunci, nilai });

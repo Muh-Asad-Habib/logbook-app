@@ -307,9 +307,29 @@ export const api = {
     return res.arrayBuffer();
   },
 
+  // ---- Kode tim (akun tim) — hubungkan pendamping tanpa bantuan admin ----
+  tim: {
+    /** Kode milik tim yang login: { kode, kode_tampil }. */
+    kode: () => aFetch("/api/tim/kode", { cache: "no-store" }),
+    /** Cetak ulang kode — kode lama langsung tidak berlaku. */
+    resetKode: () => aFetch("/api/tim/kode/reset", { method: "POST" }),
+    /** Fasilitator & dosen yang sedang mendampingi tim ini. */
+    pendamping: () => aFetch("/api/tim/pendamping", { cache: "no-store" }),
+    keluarkan: (id) => aFetch(`/api/tim/pendamping/${id}`, { method: "DELETE" }),
+  },
+
   // ---- Fasilitator (read-only terhadap tim yang di-assign) ----
   fasilitator: {
     tim: () => aFetch("/api/fasilitator/tim", { cache: "no-store" }),
+    /** Gabung ke tim memakai kode yang dibagikan tim itu sendiri. */
+    gabung: (kode) =>
+      aFetch("/api/fasilitator/gabung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kode }),
+      }),
+    /** Keluar dari sebuah tim (melepas assignment milik sendiri). */
+    keluar: (timId) => aFetch(`/api/fasilitator/tim/${timId}`, { method: "DELETE" }),
     kegiatan: (timId) => aFetch(`/api/fasilitator/tim/${timId}/kegiatan`, { cache: "no-store" }),
     keuangan: (timId) => aFetch(`/api/fasilitator/tim/${timId}/keuangan`, { cache: "no-store" }),
     statistik: (timId) => aFetch(`/api/fasilitator/tim/${timId}/statistik`, { cache: "no-store" }),

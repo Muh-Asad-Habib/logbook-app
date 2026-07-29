@@ -235,8 +235,9 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
       → login dengan kredensial panel lama
 - [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
       pendamping** di panel → setel kodenya
-- [ ] Daftar akun pendamping memakai kode itu → di panel, tab **🎓 Fasilitator /
-      👨‍🏫 Dosen Pendamping** → tombol **🔗 Tim** → pilih tim yang diampu
+- [ ] Daftar akun pendamping memakai kode itu → hubungkan ke tim: **Profil tim →
+      Kode tim** disalin & dikirim, lalu pendamping memasukkannya di Dashboard
+      (atau tetapkan lewat tombol **🔗 Tim** di pusat kendali)
 - [ ] Login sebagai pendamping → data tim tampil (read-only), komentar terkirim;
       akun dosen bisa **ACC / minta revisi** sebuah entri
 
@@ -252,8 +253,13 @@ Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
    Selama kode belum diset, pendaftaran peran itu ditolak (403).
 2. Bagikan kode ke pendamping → mereka daftar di tab **✨ Daftar** dengan
    memilih perannya.
-3. Tetapkan **tim yang diampu** lewat tombol **🔗 Tim** (multi-pilih —
-   satu pendamping boleh banyak tim, satu tim boleh banyak pendamping).
+3. **Menghubungkan ke tim — dua cara:**
+   - **Mandiri (disarankan):** tim membuka **Profil → Kode tim**, menyalin
+     kodenya (mis. `ABCD-2345`), lalu mengirimkannya ke pendamping. Pendamping
+     memasukkannya di **Dashboard → Gabung ke tim dengan kode**. Tim bisa
+     mencetak ulang kode atau mengeluarkan pendamping kapan saja.
+   - **Oleh admin:** tombol **🔗 Tim** di pusat kendali (multi-pilih —
+     satu pendamping boleh banyak tim, satu tim boleh banyak pendamping).
 4. Perubahan peran/penugasan terasa maksimal **±30 detik** (cache sesi).
 
 > 🔒 Semua endpoint tulis milik tim dipagari di server (`403` untuk pendamping),
