@@ -67,8 +67,21 @@ app.use(async (_req, _res, next) => {
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "Logbook API" }));
 app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
 
-// Health check
-app.get("/health", (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+// Health check + penanda build.
+// `deploy` berubah setiap kali ada deploy baru (URL unik Vercel) sehingga
+// mudah memastikan versi mana yang sedang online, dan `boot` menunjukkan
+// kapan instance serverless ini pertama kali dijalankan.
+const BOOT_TS = new Date().toISOString();
+app.get("/health", (_req, res) =>
+  res.json({
+    ok: true,
+    ts: new Date().toISOString(),
+    boot: BOOT_TS,
+    deploy: process.env.VERCEL_URL || "lokal",
+    commit: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7),
+    region: process.env.VERCEL_REGION || "",
+  })
+);
 
 // REST API
 app.use("/api/auth", authRouter);
