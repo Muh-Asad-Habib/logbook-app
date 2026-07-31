@@ -35,9 +35,14 @@ router.get(/^\/(.+)/, async (req, res) => {
     }
 
     // Cegah IDOR: key hanya boleh disajikan bila memang tercatat milik
-    // akun yang login — atau, bila fasilitator, milik salah satu tim yang
-    // benar-benar ia ampu (bukan sekadar "sudah login pakai akun apa pun").
-    const scope = req.user.role === "fasilitator"
+    // akun yang login — atau, bila PENDAMPING (fasilitator *dan* dosen),
+    // milik salah satu tim yang benar-benar ia ampu (bukan sekadar
+    // "sudah login pakai akun apa pun").
+    // Catatan: sebelumnya hanya "fasilitator" yang dikecualikan, sehingga
+    // akun dosen ikut jatuh ke cabang [req.userId] — dosen tidak pernah
+    // memiliki berkas, jadi SEMUA foto tim balas 404 (gambar rusak).
+    const pendamping = req.user.role === "fasilitator" || req.user.role === "dosen";
+    const scope = pendamping
       ? (await store.listTimUntukFasilitator(req.userId)).map((t) => t.id)
       : [req.userId];
     if (!(await store.fileDimilikiOleh(key, scope))) {
