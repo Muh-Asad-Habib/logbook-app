@@ -4,13 +4,21 @@
  * Dipakai untuk menjawab pertanyaan "sudah ke-deploy belum?" tanpa membuka
  * dashboard: /health kini mengembalikan penanda deploy + commit.
  *
- * Jalankan:  npm run cek:online
- *            node tools/cek-online.mjs https://domain-lain.vercel.app
+ * Jalankan:  node tools/cek-online.mjs https://alamat-aplikasimu.vercel.app
+ *            $env:LOGBOOK_URL="https://alamat-aplikasimu.vercel.app"; npm run cek:online
  */
 import { execSync } from "node:child_process";
 
-const URL_DASAR = (process.argv[2] || process.env.LOGBOOK_URL || "https://URL-KAMU.vercel.app")
-  .replace(/\/$/, "");
+const URL_DASAR = (process.argv[2] || process.env.LOGBOOK_URL || "").replace(/\/$/, "");
+
+if (!URL_DASAR) {
+  console.error(
+    "Alamat aplikasi belum diberikan.\n" +
+    "Pakai:  node tools/cek-online.mjs https://alamat-aplikasimu.vercel.app\n" +
+    "atau setel variabel lingkungan LOGBOOK_URL lebih dulu."
+  );
+  process.exit(1);
+}
 
 const commitLokal = (() => {
   try {

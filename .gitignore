@@ -2,6 +2,7 @@
 node_modules/
 frontend/.next/
 frontend/out/
+.vercel
 .vercel/
 
 # rahasia — JANGAN pernah di-push
@@ -19,17 +20,20 @@ tools/cloudflared.exe
 # referensi desain (gambar lokal, tidak dipakai aplikasi)
 Referensi Desain UI/
 
-# salinan template di root (yang dipakai aplikasi: backend/src/assets/)
-/template-logbook.docx
+# dokumen pribadi/organisasi di root & artefak uji ekspor
+# (template yang dipakai aplikasi ada di backend/src/assets/ — tetap ikut)
+/*.docx
+/*.pptx
+/*.xlsx
+/*.pdf
+tools/*.docx
+tools/*.pdf
+tools/*.xlsx
+
+# catatan perencanaan internal
+*.prompt.md
 
 # lain-lain
 *.log
 .DS_Store
 Thumbs.db
-
-
-.vercel
-.env*
-
-# artefak uji ekspor (berisi data pribadi)
-tools/hasil-ekspor-uji.docx
