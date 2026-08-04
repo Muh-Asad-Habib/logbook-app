@@ -1,5 +1,5 @@
-/**
- * Panel pemeliharaan — satu halaman HTML mandiri (CSS & JS inline).
+﻿/**
+ * panel admin — satu halaman HTML mandiri (CSS & JS inline).
  * Disajikan LANGSUNG oleh backend di path rahasia; sama sekali bukan bagian
  * dari build Next.js, jadi tidak ada jejaknya di bundel frontend (F12 aman).
  *
@@ -305,13 +305,21 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     border:1px solid var(--line2);border-radius:18px;color:var(--ink);
     background:#0e1330;
     padding:0;width:calc(100% - 36px);box-shadow:0 50px 130px rgba(0,0,0,.65);
-    margin:auto;max-height:calc(100vh - 44px);max-height:calc(100dvh - 44px);
+    margin:auto;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);
   }
   dialog[open]{animation:pop .24s ease}
   dialog::backdrop{background:rgba(3,5,12,.66);backdrop-filter:blur(6px)}
   dialog.mini{max-width:430px}
-  dialog.besar{width:calc(100vw - 32px);max-width:1440px}
-  dialog.besar .dlg-b{max-height:calc(100vh - 168px);max-height:calc(100dvh - 168px);padding:20px 24px 24px}
+  /* Dialog detail memakai TINGGI LAYAR PENUH: kepala tetap di atas, isinya
+     mengisi seluruh sisa ruang (satu area scroll saja) sehingga lebih banyak
+     data terlihat sekaligus tanpa scroll bertumpuk. */
+  dialog.besar{
+    width:calc(100vw - 24px);max-width:1440px;
+    height:calc(100vh - 24px);height:calc(100dvh - 24px);
+    display:flex;flex-direction:column;
+  }
+  dialog.besar .dlg-h{flex:0 0 auto}
+  dialog.besar .dlg-b{flex:1 1 auto;min-height:0;max-height:none;padding:20px 24px 24px}
   dialog.besar table{font-size:.88rem;min-width:760px}
   dialog.besar th,dialog.besar td{padding:13px 15px}
   dialog.besar .th{width:54px;height:54px;border-radius:10px}
@@ -320,7 +328,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   dialog.besar .chip small{font-size:.62rem}
   dialog.besar .tabs button{font-size:.84rem;padding:9px 20px}
   dialog.besar .prog{min-width:110px;height:9px}
-  dialog.besar .tline{max-height:calc(100vh - 420px);max-height:calc(100dvh - 420px)}
+  /* linimasa ikut memanjang — cukup satu scrollbar milik .dlg-b */
+  dialog.besar .tline{max-height:none;overflow:visible}
   .dlg-h{display:flex;align-items:center;gap:12px;padding:16px 20px;
     background:linear-gradient(120deg,rgba(109,124,255,.14),rgba(34,211,238,.06));
     border-bottom:1px solid var(--line)}
@@ -533,15 +542,15 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .acts .btn.sm{padding:8px 10px}
     .acts .btn.sm.ic{padding:8px 11px}
     /* --- dialog nyaris layar penuh --- */
-    dialog{width:calc(100% - 20px);max-height:calc(100dvh - 20px)}
-    dialog.besar{width:calc(100vw - 16px)}
-    dialog.besar .dlg-b{max-height:calc(100dvh - 140px);padding:13px 13px 17px}
+    dialog{width:calc(100% - 20px);max-height:calc(100dvh - 16px)}
+    dialog.besar{width:calc(100vw - 12px);height:calc(100dvh - 16px)}
+    dialog.besar .dlg-b{max-height:none;padding:13px 13px 17px}
     dialog.besar table{min-width:620px;font-size:.8rem}
     dialog.besar th,dialog.besar td{padding:11px 12px}
     dialog.besar .chip{padding:9px 12px;font-size:.76rem;min-width:0}
     dialog.besar .chip b{font-size:.92rem}
     dialog.besar .tabs button{font-size:.78rem;padding:9px 14px}
-    dialog.besar .tline{max-height:calc(100dvh - 350px)}
+    dialog.besar .tline{max-height:none}
     .dlg-h{padding:12px 13px;gap:9px}
     .dlg-h h3{font-size:.9rem}
     .dlg-b{padding:14px 13px;max-height:calc(100dvh - 170px)}
@@ -636,7 +645,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     </button>
     <div class="side-top">
       <div class="side-logo" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></div>
-      <div class="side-brand"><b>Panel Admin</b><span>panel pemeliharaan</span></div>
+      <div class="side-brand"><b>Panel Admin</b><span>kelola akun &amp; data</span></div>
     </div>
     <nav class="side-nav">
       <a href="#statistik" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
@@ -726,7 +735,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
             </form>
           </div>
           <div class="card">
-            <h2><svg class="i"><use href="#i-lock"/></svg> Akun pemeliharaan</h2>
+            <h2><svg class="i"><use href="#i-lock"/></svg> Akun admin</h2>
             <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
             hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
             <form id="f-self">
@@ -858,6 +867,44 @@ var ES = null;          // EventSource siaran langsung
 var muatTimer = null;   // debounce pembaruan live
 
 function $(s){ return document.querySelector(s); }
+
+/* ---------- render tanpa mengganggu posisi layar ----------
+ * Panel menyegarkan data otomatis (SSE / polling 8 detik). Kalau isi elemen
+ * ditimpa mentah-mentah dengan innerHTML, posisi scroll ikut lompat ke atas —
+ * sangat mengganggu saat sedang membaca daftar panjang.
+ *
+ * setHTML() memecahkan itu dengan dua lapis:
+ *   1. TIDAK menyentuh DOM sama sekali bila hasil render sama persis dengan
+ *      render sebelumnya (dibandingkan lewat tanda tangan "kunci"), sehingga
+ *      pembaruan berkala yang tidak membawa perubahan tidak terasa apa pun.
+ *   2. Bila memang berubah, posisi scroll seluruh wadah induk yang bisa
+ *      di-scroll (mis. .dlg-b) dan posisi scroll halaman disimpan lalu
+ *      dikembalikan setelah konten baru dipasang.
+ */
+var SIG = {};                       // tanda tangan render terakhir per elemen
+function setHTML(el, html, kunci){
+  if (!el) return false;
+  if (kunci) {
+    if (SIG[kunci] === html) return false;   // tidak ada perubahan → biarkan
+    SIG[kunci] = html;
+  } else if (el.innerHTML === html) return false;
+
+  var simpan = [], p = el;
+  while (p && p.nodeType === 1) {
+    if (p.scrollTop > 0) simpan.push([p, p.scrollTop]);
+    p = p.parentElement;
+  }
+  var wy = window.scrollY || window.pageYOffset || 0;
+
+  el.innerHTML = html;
+
+  for (var i = 0; i < simpan.length; i++) simpan[i][0].scrollTop = simpan[i][1];
+  if (wy) window.scrollTo(0, wy);
+  return true;
+}
+/** Kosongkan tanda tangan agar render berikutnya dipaksa ulang. */
+function lupakanSig(kunci){ delete SIG[kunci]; }
+
 function esc(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
@@ -1005,14 +1052,17 @@ function muat(){
     .then(function(rs){
       var ov = rs[0]; USERS = rs[1].users;
       var nPendamping = (ov.fasilitator || 0) + (ov.dosen || 0);
-      $("#statistik").innerHTML =
+      var htmlStat =
         stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
         stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
         stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("user","Dosen pendamping",(ov.dosen||0),"s2") +
         stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6");
-      document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
-        hitungNaik(b, Number(b.dataset.n));
-      });
+      // Angka hanya dianimasikan ulang bila nilainya memang berubah
+      if (setHTML($("#statistik"), htmlStat, "statistik")) {
+        document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
+          hitungNaik(b, Number(b.dataset.n));
+        });
+      }
       $("#jml-user").textContent = ov.users + " akun";
       renderUsers();
       function statusKode(el, j){
@@ -1023,12 +1073,12 @@ function muat(){
       }
       statusKode($("#kode-status"), rs[3]);
       statusKode($("#kode-status-dosen"), rs[4]);
-      $("#audit").innerHTML = rs[2].rows.map(function(r){
+      setHTML($("#audit"), rs[2].rows.map(function(r){
         var aksi = r.aksi || r.raw || "";
         return '<div class="row-a"><span class="t">' + esc(tglJam(r.ts)) + '</span>' +
           '<span class="badge ' + auditCls(aksi) + '">' + esc(aksi) + '</span>' +
           '<span class="tg">' + esc(namaTarget(r)) + '</span></div>';
-      }).join("") || '<div class="mut">Belum ada catatan.</div>';
+      }).join("") || '<div class="mut">Belum ada catatan.</div>', "audit");
       var up = $("#upd");
       if (up) {
         var d = new Date();
@@ -1089,13 +1139,13 @@ function renderUsers(){
         '<th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th><th style="text-align:right">Aksi</th>';
   }
   var kolom = lihatPendamping ? 5 : 7;
-  $("#t-users").innerHTML = rows.map(lihatPendamping ? barisPendamping : barisUser).join("") ||
+  setHTML($("#t-users"), rows.map(lihatPendamping ? barisPendamping : barisUser).join("") ||
     '<tr><td colspan="' + kolom + '"><div class="kosong"><div class="big">' +
     (VIEW_ROLE === "dosen" ? "👨‍🏫" : VIEW_ROLE === "fasilitator" ? "🎓" : "🔍") + '</div>' +
     (lihatPendamping && !q
       ? "Belum ada akun " + (VIEW_ROLE === "dosen" ? "dosen pendamping" : "fasilitator") +
         ".<div class='mut' style='margin-top:6px'>Set kode pendaftaran di kartu bawah, lalu bagikan kodenya.</div>"
-      : "Tidak ada akun yang cocok.") + "</div></td></tr>";
+      : "Tidak ada akun yang cocok.") + "</div></td></tr>", "t-users");
 }
 function barisUser(u){
   var ini = (u.username || "?").charAt(0).toUpperCase();
@@ -1152,6 +1202,11 @@ function barisPendamping(u){
 function findU(id){ return USERS.find(function(x){ return x.id === id; }); }
 
 /* ---------- detail data pengguna ---------- */
+/** Gulirkan isi dialog detail kembali ke atas (saat dibuka / ganti tab). */
+function keAtasDetail(){
+  var b = document.querySelector("#d-detail .dlg-b");
+  if (b) b.scrollTop = 0;
+}
 function bukaDetail(id, tabAwal){
   Promise.all([
     call("/data/pengguna/" + id),
@@ -1162,6 +1217,7 @@ function bukaDetail(id, tabAwal){
     var tb = document.querySelectorAll("#d-detail .tabs button");
     tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === TAB); });
     renderTab();
+    keAtasDetail();
     $("#d-detail").showModal();
   }).catch(function(e){ toast(e.message, true); });
 }
@@ -1175,23 +1231,31 @@ function isiKepalaDetail(){
     j.kegiatan.length + " kegiatan · " + j.keuangan.length + " belanja · " +
     AKTIVITAS.length + " aktivitas";
   var r = j.ringkasan;
-  $("#dt-chips").innerHTML =
+  setHTML($("#dt-chips"),
     chip("ungu","Capaian", r.capaian_total + "%") +
     chip("biru","Total waktu", dur(r.total_menit)) +
     chip("","Dana awal", rp(r.dana_awal)) +
     chip("merah","Pengeluaran", rp(r.pengeluaran)) +
-    chip("hijau","Sisa dana", rp(r.sisa));
+    chip("hijau","Sisa dana", rp(r.sisa)), "dt-chips");
 }
 function chip(cls, lbl, v){
   return '<div class="chip ' + cls + '"><small>' + lbl + "</small><b>" + v + "</b></div>";
 }
 function renderTab(){
   if (!DETAIL) return;
-  $("#dt-isi").innerHTML =
+  var box = $("#dt-isi");
+  // Simpan posisi scroll linimasa (bila ada) agar tidak lompat saat data disegarkan
+  var tlLama = box ? box.querySelector(".tline") : null;
+  var tlPos = tlLama ? tlLama.scrollTop : 0;
+  var berubah = setHTML(box,
     TAB === "keg" ? tabelKegiatan(DETAIL.kegiatan) :
     TAB === "keu" ? tabelKeuangan(DETAIL.keuangan) :
     TAB === "lap" ? tabelLaporan(DETAIL) :
-    tabelAktivitas(AKTIVITAS);
+    tabelAktivitas(AKTIVITAS), "dt-isi");
+  if (berubah && tlPos) {
+    var tlBaru = box.querySelector(".tline");
+    if (tlBaru) tlBaru.scrollTop = tlPos;
+  }
 }
 function ukur(b){
   b = Number(b || 0);
@@ -1230,6 +1294,10 @@ var AKSI_INFO = {
   "keuangan.hapus":       ["trash","r","Menghapus belanja"],
   "laporan.unggah":       ["save","g","Mengunggah laporan kemajuan"],
   "laporan.hapus":        ["trash","r","Menghapus laporan kemajuan"],
+  "presentasi.unggah":      ["save","g","Mengunggah presentasi (.pptx)"],
+  "presentasi.hapus-file":  ["trash","r","Menghapus berkas presentasi"],
+  "presentasi.canva":       ["save","g","Menautkan presentasi Canva"],
+  "presentasi.hapus-canva": ["trash","r","Menghapus tautan Canva"],
   "komentar.tambah":      ["scroll","c","Komentar baru"],
   "komentar.ubah":        ["edit","y","Komentar diedit"],
   "komentar.hapus":       ["trash","r","Komentar dihapus"],
@@ -1465,6 +1533,7 @@ document.addEventListener("click", function(ev){
       b.classList.toggle("on", b === el);
     });
     renderTab();
+    keAtasDetail(); // ganti tab = mulai membaca dari atas
     return;
   }
   switch (el.dataset.act) {
