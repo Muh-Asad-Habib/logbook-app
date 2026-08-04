@@ -35,7 +35,10 @@ router.get("/publik/:kunci", async (req, res, next) => {
     if (!/^[a-f0-9]{48}$/.test(kunci)) {
       return res.status(400).json({ error: "kunci tidak valid" });
     }
-    const rows = await q("SELECT user_id, exp FROM laporan_links WHERE kunci = $1", [kunci]);
+    const rows = await q(
+      "SELECT user_id, exp FROM laporan_links WHERE kunci = $1 AND jenis = 'laporan'",
+      [kunci]
+    );
     const l = rows[0];
     if (!l || Date.now() > Number(l.exp)) {
       if (l) q("DELETE FROM laporan_links WHERE kunci = $1", [kunci]).catch(() => {});
@@ -71,9 +74,15 @@ router.post("/tautan", async (req, res, next) => {
     const kunci = crypto.randomBytes(24).toString("hex");
     const exp = Date.now() + UMUR_TAUTAN_MS;
     // satu tautan aktif per user + bersihkan yang kedaluwarsa
-    await q("DELETE FROM laporan_links WHERE user_id = $1 OR exp < $2", [req.userId, Date.now()]);
-    await q("INSERT INTO laporan_links (kunci, user_id, exp) VALUES ($1, $2, $3)",
-      [kunci, req.userId, exp]);
+    await q(
+      `DELETE FROM laporan_links
+        WHERE (user_id = $1 AND jenis = 'laporan') OR exp < $2`,
+      [req.userId, Date.now()]
+    );
+    await q(
+      "INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'laporan')",
+      [kunci, req.userId, exp]
+    );
     const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
     const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
     res.json({ url: `${proto}://${host}/api/laporan/publik/${kunci}`, exp });

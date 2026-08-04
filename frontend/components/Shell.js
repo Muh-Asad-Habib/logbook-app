@@ -17,7 +17,7 @@ import {
   FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, ChevronDown,
   PanelLeftClose, PanelLeftOpen,
   Trophy, Flame, Banknote, Users,
-  Link as LinkIcon, Copy, Check,
+  Link as LinkIcon, Copy, Check, Presentation,
 } from "lucide-react";
 import LogoMark from "./Logo";
 import Prefetch from "./Prefetch";
@@ -33,6 +33,7 @@ const MENU = [
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
+  { href: "/presentasi", label: "Presentasi", Ic: Presentation },
   { href: "/galeri", label: "Galeri", Ic: Images },
   { href: "/ekspor", label: "Ekspor", Ic: FileOutput },
 ];
@@ -43,6 +44,7 @@ const MENU_FAS = [
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
+  { href: "/presentasi", label: "Presentasi", Ic: Presentation },
 ];
 
 /** Label & ikon peran — dipakai di sidebar dan chip topbar. */
@@ -56,6 +58,7 @@ const JUDUL = {
   "/kegiatan": "Kegiatan",
   "/keuangan": "Keuangan",
   "/laporan": "Laporan Kemajuan",
+  "/presentasi": "Presentasi",
   "/galeri": "Galeri",
   "/ekspor": "Ekspor / Impor",
   "/profil": "Pengaturan akun",
@@ -147,13 +150,14 @@ function useBelumDibaca(path, aktif = true) {
       .catch(() => {});
     return () => { hidup = false; };
   }, [path, aktif]); // segarkan tiap pindah halaman
-  return n || { kegiatan: 0, keuangan: 0, laporan: 0, total: 0 };
+  return n || { kegiatan: 0, keuangan: 0, laporan: 0, presentasi: 0, total: 0 };
 }
 
 const badgeUntuk = (badges, href) =>
   href === "/kegiatan" ? badges.kegiatan :
   href === "/keuangan" ? badges.keuangan :
-  href === "/laporan" ? badges.laporan : 0;
+  href === "/laporan" ? badges.laporan :
+  href === "/presentasi" ? badges.presentasi : 0;
 
 /* ---------- Pemilih tim aktif (topbar pendamping, dukung multi-tim) ----------
  * Satu dropdown untuk semua: berganti tim yang dilihat DAN menambah tim baru

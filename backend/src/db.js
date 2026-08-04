@@ -132,6 +132,22 @@ const SKEMA = [
      user_id TEXT NOT NULL,
      exp     BIGINT NOT NULL
    )`,
+  // Tautan publik sementara dipakai bersama oleh laporan (.docx) & presentasi
+  // (.pptx) — kolom `jenis` memisahkan keduanya (baris lama = 'laporan').
+  `ALTER TABLE laporan_links ADD COLUMN IF NOT EXISTS jenis TEXT NOT NULL DEFAULT 'laporan'`,
+  // ---- Presentasi tim: SATU berkas .pptx + SATU tautan Canva per akun ----
+  // Keduanya boleh ada bersamaan dan bisa dihapus sendiri-sendiri.
+  // Berkas fisik .pptx disimpan di ImageKit (kolom file_key).
+  `CREATE TABLE IF NOT EXISTS presentasi (
+     user_id    TEXT PRIMARY KEY,
+     nama       TEXT NOT NULL DEFAULT '',
+     ukuran     INTEGER NOT NULL DEFAULT 0,
+     file_key   TEXT NOT NULL DEFAULT '',
+     canva_url  TEXT NOT NULL DEFAULT '',
+     file_at    TEXT NOT NULL DEFAULT '',
+     canva_at   TEXT NOT NULL DEFAULT '',
+     updated_at TEXT NOT NULL
+   )`,
   // ---- Fitur Fasilitator (aditif — data lama tidak tersentuh) ----
   // Peran akun: 'tim' (default, perilaku lama), 'fasilitator', atau 'dosen'
   // (Dosen Pendamping = fasilitator + wewenang ACC/pengesahan).
