@@ -75,7 +75,7 @@ router.post("/keluar", async (req, res, next) => {
 
 router.get("/data/ringkas", async (_req, res, next) => {
   try {
-    const [u, k, b, s, f, l, d, acc] = await Promise.all([
+    const [u, k, b, s, f, l, d, acc, pre] = await Promise.all([
       q("SELECT COUNT(*) AS n FROM users"),
       q("SELECT COUNT(*) AS n FROM kegiatan"),
       q("SELECT COUNT(*) AS n FROM keuangan"),
@@ -84,6 +84,7 @@ router.get("/data/ringkas", async (_req, res, next) => {
       q("SELECT COUNT(*) AS n FROM laporan_docx"),
       q("SELECT COUNT(*) AS n FROM users WHERE role = 'dosen'"),
       q("SELECT COUNT(*) AS n FROM persetujuan WHERE status = 'disetujui'"),
+      q("SELECT COUNT(*) AS n FROM presentasi WHERE file_key <> '' OR canva_url <> ''"),
     ]);
     res.json({
       users: angka(u[0]?.n),
@@ -94,6 +95,7 @@ router.get("/data/ringkas", async (_req, res, next) => {
       dosen: angka(d[0]?.n),
       laporan: angka(l[0]?.n),
       acc: angka(acc[0]?.n),
+      presentasi: angka(pre[0]?.n),
     });
   } catch (err) {
     next(err);
@@ -198,6 +200,32 @@ router.get("/events", (req, res) => {
 });
 
 /* ---------- aksi pada akun pengguna ---------- */
+
+/** Buat akun baru langsung dari panel (tim/fasilitator/dosen — tanpa kode pendaftaran). */
+router.post("/data/pengguna", async (req, res, next) => {
+  try {
+    const username = String(req.body?.username || "").trim();
+    const password = String(req.body?.password || "");
+    const role = String(req.body?.role || "tim");
+    if (username.length < 3 || username.length > 40) {
+      return res.status(400).json({ error: "Username minimal 3 karakter (maks. 40)" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password minimal 8 karakter" });
+    }
+    if (!store.PERAN_SAH.includes(role)) {
+      return res.status(400).json({ error: "Peran tidak dikenal" });
+    }
+    if (await store.findUserByUsername(username)) {
+      return res.status(409).json({ error: "Username sudah dipakai akun lain" });
+    }
+    const u = await store.createUser(username, password, role);
+    adminStore.audit(req, "user.buat", { target: u.id, username: u.username, role: u.role });
+    res.status(201).json({ ok: true, id: u.id, username: u.username, role: u.role });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.put("/data/pengguna/:id/username", async (req, res, next) => {
   try {
@@ -430,6 +458,23 @@ router.get("/data/pengguna/:id/laporan-file", async (req, res, next) => {
     res.setHeader("Content-Disposition",
       `${unduh}; filename="${encodeURIComponent(l.nama)}"`);
     res.send(l.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Sajikan presentasi .pptx sebuah tim untuk panel (sesi panel; dukung ?t=). */
+router.get("/data/pengguna/:id/presentasi-file", async (req, res, next) => {
+  try {
+    const p = await store.getPresentasi(req.params.id);
+    if (!p) return res.status(404).json({ error: "Belum ada berkas presentasi tersimpan" });
+    adminStore.audit(req, "user.presentasi.lihat", { target: req.params.id });
+    res.setHeader("Content-Type",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    const unduh = req.query.unduh ? "attachment" : "inline";
+    res.setHeader("Content-Disposition",
+      `${unduh}; filename="${encodeURIComponent(p.nama)}"`);
+    res.send(p.buffer);
   } catch (err) {
     next(err);
   }

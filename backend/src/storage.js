@@ -154,6 +154,8 @@ export async function listUsersWithStats() {
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id AND b.bukti_key <> '') AS n_foto_keu,
             (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id)                    AS n_sesi,
             (SELECT COUNT(*) FROM laporan_docx l WHERE l.user_id = u.id)                AS n_laporan,
+            (SELECT COUNT(*) FROM presentasi pr
+               WHERE pr.user_id = u.id AND (pr.file_key <> '' OR pr.canva_url <> ''))    AS n_presentasi,
             (SELECT COUNT(*) FROM fasilitator_tim ft JOIN users pu ON pu.id = ft.fasilitator_id
                WHERE ft.tim_user_id = u.id AND COALESCE(pu.role,'tim') = 'fasilitator')  AS n_fasilitator,
             (SELECT COUNT(*) FROM fasilitator_tim ft JOIN users pu ON pu.id = ft.fasilitator_id
@@ -184,6 +186,7 @@ export async function listUsersWithStats() {
     foto: angka(r.n_foto_keg) + angka(r.n_foto_keu),
     sesi: angka(r.n_sesi),
     punya_laporan: angka(r.n_laporan) > 0,
+    punya_presentasi: angka(r.n_presentasi) > 0,
     n_fasilitator: angka(r.n_fasilitator),
     n_dosen: angka(r.n_dosen),
     n_tim_diampu: angka(r.n_tim_diampu),
