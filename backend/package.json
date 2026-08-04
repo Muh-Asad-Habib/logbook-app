@@ -9,6 +9,7 @@
     "dev": "node --watch src/server.js",
     "diag:rute": "node diag-rute.mjs",
     "diag:panel": "node diag-panel.mjs",
+    "diag:panel-api": "node diag-panel-api.mjs",
     "diag:peran": "node diag-fasilitator.mjs",
     "diag:presentasi": "node diag-presentasi.mjs",
     "diag": "npm run diag:rute && npm run diag:panel"

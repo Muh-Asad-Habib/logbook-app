@@ -36,6 +36,13 @@ const wajib = [
   "/laporan-file",
   "AKSI_INFO",
   "acc.setuju",
+  // fitur presentasi & buat akun dari panel
+  'data-tab="pre"',
+  "tabelPresentasi",
+  "/presentasi-file",
+  'id="d-baru"',
+  "user.buat",
+  "punya_presentasi",
 ];
 const hilang = wajib.filter((k) => !PANEL_HTML.includes(k));
 if (hilang.length) {

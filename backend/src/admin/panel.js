@@ -1,5 +1,5 @@
 ﻿/**
- * panel admin — satu halaman HTML mandiri (CSS & JS inline).
+ * Panel admin — satu halaman HTML mandiri (CSS & JS inline).
  * Disajikan LANGSUNG oleh backend di path rahasia; sama sekali bukan bagian
  * dari build Next.js, jadi tidak ada jejaknya di bundel frontend (F12 aman).
  *
@@ -225,6 +225,11 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   }
   input:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(109,124,255,.22)}
   input::placeholder{color:#4d5580}
+  select{
+    width:100%;margin-top:6px;padding:11px 13px;border-radius:11px;border:1px solid var(--line2);
+    background:#0c1128;color:var(--ink);font:inherit;font-size:.88rem;transition:.15s;cursor:pointer;
+  }
+  select:focus{outline:none;border-color:var(--p);box-shadow:0 0 0 3px rgba(109,124,255,.22)}
   .in-wrap{position:relative;display:block;margin-top:6px}
   .in-wrap .i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#565e8c;pointer-events:none}
   .in-wrap input{margin-top:0;padding-left:38px}
@@ -683,8 +688,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <div class="card" id="sec-akun">
         <div class="row spread">
           <h2><svg class="i"><use href="#i-users"/></svg> Akun pengguna <span class="tag" id="jml-user"></span></h2>
-          <span class="search"><svg class="i"><use href="#i-search"/></svg>
-          <input id="cari" placeholder="Cari username…"><kbd>/</kbd></span>
+          <div class="row" style="gap:10px;align-items:center">
+            <span class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="cari" placeholder="Cari username…"><kbd>/</kbd></span>
+            <button class="btn sm p" data-act="baru" title="Buat akun baru tanpa kode pendaftaran">
+              <svg class="i"><use href="#i-user"/></svg><span class="btn-txt"> Akun baru</span>
+            </button>
+          </div>
         </div>
         <div class="tabs" style="margin-top:12px">
           <button class="on" data-role-tab="tim">👥 Tim</button>
@@ -778,6 +788,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <button class="on" data-tab="keg">🗓️ Kegiatan</button>
       <button data-tab="keu">💰 Keuangan</button>
       <button data-tab="lap">📄 Laporan</button>
+      <button data-tab="pre">📽️ Presentasi</button>
       <button data-tab="akt">📜 Aktivitas</button>
     </div>
     <div id="dt-isi"></div>
@@ -847,6 +858,36 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <div class="row" style="justify-content:flex-end;margin-top:16px">
         <button value="batal" class="btn">Batal</button>
         <button value="ok" class="btn p">Simpan</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- ===== DIALOG AKUN BARU ===== -->
+<dialog id="d-baru" class="mini">
+  <div class="dlg-h"><h3>➕ Buat akun baru</h3></div>
+  <div class="dlg-b">
+    <p class="mut">Akun dibuat langsung tanpa kode pendaftaran. Sampaikan kredensialnya
+    secara pribadi, lalu minta pemiliknya mengganti password lewat menu profil.</p>
+    <form method="dialog" id="f-baru">
+      <label>Username (min. 3 karakter)
+        <span class="in-wrap"><svg class="i"><use href="#i-user"/></svg>
+        <input id="d-baru-u" autocomplete="off" placeholder="mis. Tim Riset Pesisir"></span>
+      </label>
+      <label>Password (min. 8 karakter)
+        <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+        <input id="d-baru-p" autocomplete="off" placeholder="password awal"></span>
+      </label>
+      <label>Peran
+        <select id="d-baru-r">
+          <option value="tim">👥 Tim (default)</option>
+          <option value="fasilitator">🎓 Fasilitator</option>
+          <option value="dosen">👨‍🏫 Dosen Pendamping</option>
+        </select>
+      </label>
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button value="batal" class="btn">Batal</button>
+        <button value="ok" class="btn p">Buat akun</button>
       </div>
     </form>
   </div>
@@ -1056,7 +1097,8 @@ function muat(){
         stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
         stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
         stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("user","Dosen pendamping",(ov.dosen||0),"s2") +
-        stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6");
+        stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6") +
+        stat("folder","Presentasi tim",(ov.presentasi||0),"s5");
       // Angka hanya dianimasikan ulang bila nilainya memang berubah
       if (setHTML($("#statistik"), htmlStat, "statistik")) {
         document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
@@ -1154,6 +1196,7 @@ function barisUser(u){
       "<b>" + esc(u.username) + "</b>" +
       (u.pemilikTemplate ? ' <span class="badge b">arsip</span>' : "") +
       (u.punya_laporan ? ' <span class="badge c">📄 laporan</span>' : "") +
+      (u.punya_presentasi ? ' <span class="badge b">📽️ presentasi</span>' : "") +
       (u.n_fasilitator ? ' <span class="badge y">🎓 ' + u.n_fasilitator + '</span>' : "") +
       (u.n_dosen ? ' <span class="badge c">👨‍🏫 ' + u.n_dosen + '</span>' : "") +
       (u.n_acc ? ' <span class="badge g">✔ ' + u.n_acc + ' ACC</span>' : "") +
@@ -1251,6 +1294,7 @@ function renderTab(){
     TAB === "keg" ? tabelKegiatan(DETAIL.kegiatan) :
     TAB === "keu" ? tabelKeuangan(DETAIL.keuangan) :
     TAB === "lap" ? tabelLaporan(DETAIL) :
+    TAB === "pre" ? tabelPresentasi(DETAIL) :
     tabelAktivitas(AKTIVITAS), "dt-isi");
   if (berubah && tlPos) {
     var tlBaru = box.querySelector(".tline");
@@ -1278,6 +1322,35 @@ function tabelLaporan(d){
       '</div>' +
     '</div></div>';
 }
+function tabelPresentasi(d){
+  var p = d.presentasi || { ada: false, file: { ada: false }, canva: { ada: false } };
+  if (!p.ada) return '<div class="kosong"><div class="big">📽️</div>Tim ini belum mengunggah presentasi (.pptx) maupun menautkan Canva.</div>';
+  var out = "";
+  if (p.file && p.file.ada) {
+    var url = B + "/data/pengguna/" + d.user.id + "/presentasi-file?t=" + encodeURIComponent(TOK);
+    out += '<div class="card" style="margin-top:14px">' +
+      '<div class="row spread">' +
+        '<div><b style="font-size:.95rem">📽️ ' + esc(p.file.nama) + '</b>' +
+        '<div class="mut" style="margin-top:4px">' + ukur(p.file.ukuran) +
+        ' · diunggah ' + esc(tglJam(p.file.updated_at)) + '</div></div>' +
+        '<div class="row" style="gap:8px">' +
+          '<a class="btn sm p" href="' + url + '" target="_blank" rel="noopener">' + sv("folder") + ' Buka</a>' +
+          '<a class="btn sm" href="' + url + '&unduh=1">' + sv("save") + ' Unduh</a>' +
+        '</div>' +
+      '</div></div>';
+  }
+  if (p.canva && p.canva.ada) {
+    out += '<div class="card" style="margin-top:14px">' +
+      '<div class="row spread">' +
+        '<div><b style="font-size:.95rem">🎨 Tautan presentasi Canva</b>' +
+        '<div class="mut" style="margin-top:4px;word-break:break-all">' + esc(p.canva.url) +
+        '<br>ditautkan ' + esc(tglJam(p.canva.updated_at)) + '</div></div>' +
+        '<a class="btn sm p" href="' + esc(p.canva.url) + '" target="_blank" rel="noopener">' +
+          sv("folder") + ' Buka Canva</a>' +
+      '</div></div>';
+  }
+  return out;
+}
 
 /* peta aksi → [ikon, warna, label] */
 var AKSI_INFO = {
@@ -1303,11 +1376,13 @@ var AKSI_INFO = {
   "komentar.hapus":       ["trash","r","Komentar dihapus"],
   "komentar.selesai":     ["save","g","Komentar ditandai selesai"],
   "user.lihat":           ["search","c","Data dilihat lewat panel"],
+  "user.buat":            ["user","g","Akun dibuat lewat panel"],
   "user.username":        ["edit","y","Username diganti lewat panel"],
   "user.password.reset":  ["key","r","Password direset lewat panel"],
   "user.sesi.cabut":      ["power","r","Sesi dicabut lewat panel"],
   "user.hapus":           ["trash","r","Akun dihapus lewat panel"],
   "user.laporan.lihat":   ["folder","c","Laporan dilihat lewat panel"],
+  "user.presentasi.lihat":["folder","c","Presentasi dilihat lewat panel"],
   "fasilitator.kode.ubah":["key","y","Kode fasilitator diganti"],
   "fasilitator.tim.ubah": ["users","y","Assignment tim fasilitator diubah"],
   "dosen.kode.ubah":      ["key","y","Kode dosen pendamping diganti"],
@@ -1515,6 +1590,34 @@ function assignFasilitator(id){
   }).catch(function(e){ toast(e.message, true); });
 }
 
+/* ---------- buat akun baru dari panel ---------- */
+function buatAkun(){
+  $("#d-baru-u").value = "";
+  $("#d-baru-p").value = "";
+  $("#d-baru-r").value = "tim";
+  var dlg = $("#d-baru");
+  dlg.showModal();
+  dlg.addEventListener("close", function h(){
+    dlg.removeEventListener("close", h);
+    if (dlg.returnValue !== "ok") return;
+    var u = $("#d-baru-u").value.trim(),
+        p = $("#d-baru-p").value,
+        r = $("#d-baru-r").value;
+    if (u.length < 3) { toast("Username minimal 3 karakter", true); return; }
+    if (p.length < 8) { toast("Password minimal 8 karakter", true); return; }
+    call("/data/pengguna", {
+      method: "POST", body: JSON.stringify({ username: u, password: p, role: r })
+    }).then(function(j){
+      toast("Akun " + j.username + " (" + j.role + ") dibuat");
+      VIEW_ROLE = j.role === "tim" ? "tim" : j.role;
+      document.querySelectorAll("[data-role-tab]").forEach(function(b){
+        b.classList.toggle("on", b.dataset.roleTab === VIEW_ROLE);
+      });
+      muat();
+    }).catch(function(e){ toast(e.message, true); });
+  });
+}
+
 /* ---------- event delegation ---------- */
 document.addEventListener("click", function(ev){
   var el = ev.target.closest("[data-act],[data-tab],[data-role-tab]");
@@ -1538,6 +1641,7 @@ document.addEventListener("click", function(ev){
   }
   switch (el.dataset.act) {
     case "muat": muat(); break;
+    case "baru": buatAkun(); break;
     case "keluar":
       call("/keluar", { method: "POST" }).catch(function(){});
       lihatLogin(); break;
