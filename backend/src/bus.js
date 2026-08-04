@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Bus peristiwa internal — dipakai untuk siaran "ada perubahan data"
- * ke panel pemeliharaan (SSE), tanpa polling.
+ * ke panel admin (SSE), tanpa polling.
  */
 import { EventEmitter } from "node:events";
 

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Jejak aktivitas per pengguna aplikasi (bukan panel).
  *
  * Setiap aksi penting pengguna (login, logout, tambah/ubah/hapus kegiatan &
  * belanja, ganti profil) dicatat satu baris ke tabel `aktivitas` (Postgres).
- * Dibaca oleh halaman profil & panel pemeliharaan. Password TIDAK pernah dicatat.
+ * Dibaca oleh halaman profil & panel admin. Password TIDAK pernah dicatat.
  */
 import { q, objek } from "./db.js";
 import { siarkan } from "./bus.js";

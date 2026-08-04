@@ -1,4 +1,4 @@
-# 🚀 DEPLOY.md — Online-kan Logbook 24 Jam, 100% Gratis, Laptop Boleh Mati
+﻿# 🚀 DEPLOY.md — Online-kan Logbook 24 Jam, 100% Gratis, Laptop Boleh Mati
 
 > Panduan ini ditulis **dari nol** — ikuti urut dari atas ke bawah, ±30–45 menit.
 > Hasil akhir: aplikasi punya **URL permanen** `https://nama-kamu.vercel.app`
@@ -231,13 +231,13 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 - [ ] **Tambah kegiatan baru + foto** dari HP → tersimpan & tampil
 - [ ] **Ekspor DOCX / PDF / Excel** → file terunduh, foto ikut di dalamnya
 - [ ] `https://URL-kamu/docs` → dokumentasi API (Swagger) terbuka
-- [ ] Panel pemeliharaan: `https://URL-kamu/pusat-kendali` (atau path custom-mu)
+- [ ] panel admin: `https://URL-kamu/pusat-kendali` (atau path custom-mu)
       → login dengan kredensial panel lama
 - [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
       pendamping** di panel → setel kodenya
 - [ ] Daftar akun pendamping memakai kode itu → hubungkan ke tim: **Profil tim →
       Kode tim** disalin & dikirim, lalu pendamping memasukkannya di Dashboard
-      (atau tetapkan lewat tombol **🔗 Tim** di pusat kendali)
+      (atau tetapkan lewat tombol **🔗 Tim** di panel admin)
 - [ ] Login sebagai pendamping → data tim tampil (read-only), komentar terkirim;
       akun dosen bisa **ACC / minta revisi** sebuah entri
 
@@ -248,7 +248,7 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
 **👨‍🏫 Dosen Pendamping**. Yang perlu disiapkan admin sekali saja:
 
-1. Buka pusat kendali → setel **kode pendaftaran** untuk fasilitator dan dosen
+1. Buka panel admin → setel **kode pendaftaran** untuk fasilitator dan dosen
    (dua kode berbeda, disimpan sebagai hash scrypt di tabel `meta`).
    Selama kode belum diset, pendaftaran peran itu ditolak (403).
 2. Bagikan kode ke pendamping → mereka daftar di tab **✨ Daftar** dengan
@@ -258,7 +258,7 @@ Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
      kodenya (mis. `ABCD-2345`), lalu mengirimkannya ke pendamping. Pendamping
      memasukkannya di **Dashboard → Gabung ke tim dengan kode**. Tim bisa
      mencetak ulang kode atau mengeluarkan pendamping kapan saja.
-   - **Oleh admin:** tombol **🔗 Tim** di pusat kendali (multi-pilih —
+   - **Oleh admin:** tombol **🔗 Tim** di panel admin (multi-pilih —
      satu pendamping boleh banyak tim, satu tim boleh banyak pendamping).
 4. Perubahan peran/penugasan terasa maksimal **±30 detik** (cache sesi).
 
@@ -274,7 +274,7 @@ Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
 
 ## Bagian 8 — Hal yang perlu diketahui
 
-**Kredensial panel pemeliharaan.** Ikut termigrasi dari `data/admin.json`
+**Kredensial panel admin.** Ikut termigrasi dari `data/admin.json`
 (username/password panel lama tetap berlaku). Bila dulu belum pernah ada,
 kredensial acak dibuat otomatis dan **dicetak sekali ke log**: buka proyek di
 Vercel → tab **Logs** → cari baris `[keamanan]`. Lupa password panel?

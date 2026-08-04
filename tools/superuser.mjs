@@ -1,5 +1,5 @@
-/**
- * Akses khusus pemilik aplikasi: setel ulang kredensial panel pemeliharaan.
+﻿/**
+ * Akses khusus pemilik aplikasi: setel ulang kredensial panel admin.
  * Hanya bisa dijalankan oleh orang yang memegang DATABASE_URL (file .env) —
  * inilah "kunci cadangan" bila kredensial panel terlupa.
  *
@@ -79,7 +79,7 @@ await q(
 await q("DELETE FROM admin_sessions");
 
 console.log("=".repeat(60));
-console.log("Kredensial panel pemeliharaan diperbarui. CATAT SEKARANG —");
+console.log("Kredensial panel admin diperbarui. CATAT SEKARANG —");
 console.log("nilai ini TIDAK BISA dilihat lagi (tersimpan sebagai hash):");
 console.log("");
 console.log(`  Alamat panel : ${admin.path}`);

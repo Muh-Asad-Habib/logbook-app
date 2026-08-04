@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Diagnosa fitur PENDAMPING (fasilitator & dosen) end-to-end terhadap
  * server lokal + Neon. Jalankan: node diag-fasilitator.mjs
  * (server harus hidup di :4000)
@@ -272,7 +272,7 @@ try {
   const rBaru = await jfetch("/api/tim/kode/reset", { method: "POST", headers: H(tokTim) });
   cek("cetak ulang kode → kode berubah", rBaru.status === 200 && rBaru.body.kode !== kodeLama);
 
-  // Dosen masih ter-assign dari blok ACC (jalur pusat kendali) → keluar dulu
+  // Dosen masih ter-assign dari blok ACC (jalur panel admin) → keluar dulu
   // supaya jalur "gabung lewat kode" benar-benar teruji dari nol.
   cek("dosen keluar sendiri dari tim → 200",
     (await jfetch(`/api/fasilitator/tim/${timId}`, { method: "DELETE", headers: H(tokDos) })).status === 200);
