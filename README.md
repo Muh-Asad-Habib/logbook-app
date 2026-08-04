@@ -10,6 +10,10 @@ tugas besar, program pendampingan): setiap catatan harus lengkap dengan **foto
 bukti**, **rekap dana**, dan **pengesahan dosen** — lalu pada akhirnya harus
 bisa dicetak menjadi dokumen laporan.
 
+> ⚡ **Ingin langsung memakainya?** *Fork* repo ini, lalu ikuti
+> **[DEPLOY.md](DEPLOY.md)** — ±30 menit sampai aplikasi hidup di alamat tetap
+> `https://nama-kamu.vercel.app`, gratis dan tanpa kartu kredit.
+
 ---
 
 ## 📌 Daftar isi
@@ -20,6 +24,7 @@ bisa dicetak menjadi dokumen laporan.
 - [Panduan untuk pembimbing](#-panduan-untuk-pembimbing-fasilitator--dosen)
 - [Panduan untuk admin](#-panduan-untuk-admin)
 - [Menjalankan aplikasi](#-menjalankan-aplikasi)
+- [Daftar perintah npm](#-daftar-perintah-npm)
 - [Konfigurasi (.env)](#-konfigurasi-env)
 - [Di mana data disimpan](#-di-mana-data-disimpan)
 - [REST API & dokumentasi Swagger](#-rest-api--dokumentasi-swagger)
@@ -268,15 +273,38 @@ aplikasi memperoleh alamat publik sementara yang dapat dibagikan.
 ### Pilihan C — Mode pengembangan
 
 ```powershell
-cd backend;  npm run dev     # API pada :4000 (muat ulang otomatis)
-cd frontend; npm run dev     # Antarmuka pada :3000 (API → localhost:4000)
+npm run dev --workspace backend      # API pada :4000 (muat ulang otomatis)
+npm run dev --workspace frontend     # Antarmuka pada :3000 (API → localhost:4000)
 ```
+
+---
+
+## 🧰 Daftar perintah npm
+
+Dijalankan dari folder proyek (akar):
+
+| Perintah | Fungsi |
+|---|---|
+| `npm install` | Pasang seluruh dependensi (backend + frontend sekaligus) |
+| `npm run build` | Bangun frontend menjadi berkas statis (`frontend/out`) |
+| `npm start` | Jalankan server API + penyaji frontend pada `:4000` |
+| `npm run dev` | Mode pengembangan backend (muat ulang otomatis) |
+| `npm run migrate` | Pindahkan data lokal lama (`data/` + `uploads/`) ke Neon & ImageKit |
+| `npm run deploy` | Deploy produksi ke Vercel (`npx vercel --prod --yes`) |
+| `npm run cek:online <url>` | Bandingkan versi online dengan commit terakhir + uji halaman |
+
+Utilitas lain di folder `tools/`:
+
+| Perintah | Fungsi |
+|---|---|
+| `node tools/superuser.mjs -u NAMA -p SANDI` | Setel ulang kredensial panel admin |
+| `node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"` | Impor dokumen Word besar langsung ke sebuah akun |
 
 ---
 
 ## ⚙️ Konfigurasi (.env)
 
-Salin `.env.example` menjadi `.env` di dalam folder `logbook-app`, lalu isi:
+Salin `.env.example` menjadi `.env` di akar folder proyek, lalu isi:
 
 | Variabel | Kegunaan |
 |---|---|
@@ -348,9 +376,18 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET / PUT | `/api/pengaturan/{kunci}` | Pengaturan (mis. `dana_awal`) |
 | GET | `/api/statistik` | Ringkasan dashboard |
 | GET | `/api/files/{key}` | Ambil gambar |
+| GET | `/api/export/info` | Jumlah entri baru yang akan masuk ke dokumen |
 | GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
 | POST | `/api/import/docx` | Impor entri + foto dari dokumen Word |
-| GET | `/health` | Pemeriksaan status (tanpa login) |
+| POST | `/api/import/docx/chunk` \| `/docx/selesai` | Impor berkas besar secara terpotong |
+
+**Umum (tanpa login)**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/health` | Pemeriksaan status + penanda versi deploy |
+| GET | `/docs` | Dokumentasi Swagger interaktif |
+| GET | `/openapi.json` | Spesifikasi OpenAPI mentah |
 
 **Laporan kemajuan**
 
@@ -408,9 +445,10 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 logbook-app/
 ├── start.ps1            ← menjalankan aplikasi secara lokal
 ├── stop.ps1             ← menghentikan proses terkait
-├── .env                 ← konfigurasi database & penyimpanan berkas
+├── vercel.json          ← pengaturan hosting serverless (build, rewrite, region)
+├── .env                 ← konfigurasi database & penyimpanan berkas (lokal saja)
 ├── api/index.js         ← titik masuk untuk hosting serverless (Vercel)
-├── tools/               ← utilitas: kredensial admin, migrasi data, dsb.
+├── tools/               ← utilitas: kredensial admin, migrasi data, cek online
 ├── backend/             ← Express: REST API + Swagger + penyaji frontend
 │   └── src/
 │       ├── server.js    ← titik masuk & pemasangan seluruh rute
@@ -418,13 +456,21 @@ logbook-app/
 │       ├── storage.js   ← seluruh akses data (akun, entri, komentar, ACC)
 │       ├── files.js     ← unggah foto, .docx & .pptx ke penyimpanan berkas
 │       ├── auth.js      ← sesi login + pembatasan hak akses per peran
+│       ├── assets/      ← template-logbook.docx (kerangka dokumen ekspor)
+│       ├── export/      ← penyusun berkas docx, pdf, xlsx
+│       ├── import/      ← pembaca logbook Word lama
 │       ├── admin/       ← panel admin (panel.js + routes.js)
 │       └── routes/      ← kegiatan, keuangan, laporan, presentasi, dst.
 └── frontend/            ← Next.js, dibangun menjadi berkas statis
     ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
     │                       Galeri, Ekspor, Profil
+    ├── lib/api.js       ← pemanggil REST API + cache sisi klien
     └── components/      ← Shell, Komentar, Acc, KartuAcc, dsb.
 ```
+
+> Template `backend/src/assets/template-logbook.docx` hanya berisi **kerangka
+> tabel kosong** (judul kolom) — hasil ekspor diisi sepenuhnya dari data akun
+> yang sedang masuk.
 
 ---
 
@@ -434,7 +480,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 
 | Perintah | Yang diuji |
 |---|---|
-| `npm run diag --workspace backend` | Seluruh rute terdaftar, pembatasan hak akses per peran, dan keutuhan panel admin |
+| `npm run diag --workspace backend` | Seluruh rute terdaftar (`diag:rute`) dan keutuhan panel admin (`diag:panel`) |
+| `npm run diag:panel-api --workspace backend` | Endpoint panel admin: validasi input, pengelolaan akun, audit |
 | `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
 
@@ -462,6 +509,11 @@ tidak terganggu.
 
 ## ❓ Tanya-jawab
 
+**Bisakah saya memakainya untuk timku sendiri?**
+Bisa. *Fork* repo ini, buat akun gratis di Vercel + Neon + ImageKit, lalu ikuti
+[DEPLOY.md](DEPLOY.md). Seluruh data (akun, foto, dokumen) tersimpan di layanan
+milikmu sendiri — tidak ada yang dikirim ke pemilik repo.
+
 **Apakah data hilang bila perangkat dimatikan?**
 Tidak. Seluruh data tersimpan pada layanan cloud (database dan penyimpanan
 berkas), bukan pada perangkat yang menjalankan aplikasi.
@@ -482,7 +534,8 @@ melalui CDN sehingga pemuatan tetap ringan.
 
 **Apakah hasil ekspor menimpa data?**
 Tidak. Ekspor selalu menghasilkan salinan baru dan tidak pernah mengubah isi
-logbook, jadi aman diunduh berkali-kali.
+logbook, jadi aman diunduh berkali-kali. Nama berkasnya pun mengandung nama akun
+dan tanggal unduh sehingga tidak saling menimpa di folder unduhan.
 
 **Bisakah aplikasi dipasang di ponsel?**
 Bisa. Buka aplikasi pada peramban ponsel lalu pilih **"Tambahkan ke layar
