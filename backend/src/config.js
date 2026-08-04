@@ -39,4 +39,3 @@ export const config = {
   // true bila berjalan di Vercel (filesystem read-only, tanpa tunnel lokal)
   diVercel: !!process.env.VERCEL,
 };
-

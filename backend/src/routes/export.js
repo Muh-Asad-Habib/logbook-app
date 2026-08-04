@@ -8,6 +8,36 @@ const router = Router();
 router.use(authRequired); // ekspor berisi data milik user yang login
 router.use(hanyaTim); // fasilitator tidak punya data untuk diekspor
 
+/** Tanggal unduh, format "04-08-2026" (zona waktu Asia/Makassar). */
+function tanggalUnduh() {
+  const bagian = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Makassar", day: "2-digit", month: "2-digit", year: "numeric",
+  }).formatToParts(new Date());
+  const ambil = (t) => bagian.find((p) => p.type === t)?.value || "";
+  return `${ambil("day")}-${ambil("month")}-${ambil("year")}`;
+}
+
+/** Buang karakter yang tidak boleh ada di nama berkas (Windows & POSIX). */
+const bersihkanNama = (s) =>
+  String(s || "").replace(/[\\/:*?"<>|\r\n]+/g, " ").replace(/\s+/g, " ").trim() || "Tim";
+
+/**
+ * Pasang header unduhan dengan nama berkas khas tiap tim, mis.
+ * "Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx".
+ * `filename` ASCII dipakai peramban lama, `filename*` (RFC 5987) menjaga
+ * huruf non-ASCII pada nama tim tetap utuh di peramban modern.
+ */
+function kirimBerkas(req, res, buffer, { ekstensi, tipe, akhiran = "Kegiatan & Keuangan" }) {
+  const nama = `Logbook ${bersihkanNama(req.user?.username)} - ${akhiran} (${tanggalUnduh()}).${ekstensi}`;
+  const namaAscii = nama.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
+  res.setHeader("Content-Type", tipe);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${namaAscii}"; filename*=UTF-8''${encodeURIComponent(nama)}`,
+  );
+  res.send(buffer);
+}
+
 /**
  * @openapi
  * /api/export/info:
@@ -39,11 +69,10 @@ router.get("/info", async (req, res, next) => {
 router.get("/docx", async (req, res, next) => {
   try {
     const { buffer } = await buildDocx(req.userId);
-    res.setHeader("Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition",
-      'attachment; filename="LOGBOOK KEGIATAN DAN KEUANGAN - TERISI.docx"');
-    res.send(buffer);
+    kirimBerkas(req, res, buffer, {
+      ekstensi: "docx",
+      tipe: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
   } catch (err) { next(err); }
 });
 
@@ -63,9 +92,7 @@ router.get("/docx", async (req, res, next) => {
 router.get("/pdf", async (req, res, next) => {
   try {
     const buffer = await buildPdf(req.userId);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="LOGBOOK KEGIATAN DAN KEUANGAN.pdf"');
-    res.send(buffer);
+    kirimBerkas(req, res, buffer, { ekstensi: "pdf", tipe: "application/pdf" });
   } catch (err) { next(err); }
 });
 
@@ -85,10 +112,11 @@ router.get("/pdf", async (req, res, next) => {
 router.get("/xlsx", async (req, res, next) => {
   try {
     const buffer = await buildXlsx(req.userId);
-    res.setHeader("Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", 'attachment; filename="REKAP LOGBOOK.xlsx"');
-    res.send(buffer);
+    kirimBerkas(req, res, buffer, {
+      ekstensi: "xlsx",
+      tipe: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      akhiran: "Rekap Kegiatan & Keuangan",
+    });
   } catch (err) { next(err); }
 });
 

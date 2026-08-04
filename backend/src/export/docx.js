@@ -1,5 +1,5 @@
 /**
- * Ekspor DOCX — mengisi template resmi "template-logbook.docx".
+ * Ekspor DOCX — mengisi template resmi "backend/src/assets/template-logbook.docx".
  * Isi lama dipertahankan (tanggalnya diseragamkan menjadi "16 Juni 2026");
  * entri yang sudah ada di dokumen dilewati; entri baru diisikan ke baris kosong
  * beserta fotonya; baris kosong yang tersisa dihapus agar dokumen rapi.

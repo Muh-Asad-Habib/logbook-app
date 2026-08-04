@@ -53,7 +53,7 @@ ke layanan cloud gratis yang memang khusus untuk itu:
 ### 1.3 Buat repo & push kode
 1. Di GitHub klik **➕ → New repository** → nama: `logbook-app` →
    pilih **Private** (kodenya tidak perlu publik) → **Create repository**.
-2. Di PowerShell:
+2. Di PowerShell (ganti `<folder-proyek>` dengan lokasi folder `logbook-app` di komputermu):
    ```powershell
    cd "<folder-proyek>\logbook-app"
    git init
@@ -200,13 +200,14 @@ SELESAI 🎉
 cd "<folder-proyek>\logbook-app"
 git add . ; git commit -m "perubahan" ; git push   # simpan kode
 npm run deploy                                      # kirim ke Vercel (produksi)
-npm run cek:online                                  # pastikan versi online = commit terakhir
+npm run cek:online https://URL-KAMU.vercel.app      # pastikan versi online = commit terakhir
 ```
 `npm run deploy` = `vercel --prod --yes` (butuh login sekali: `npx vercel login`).
 
 `npm run cek:online` membandingkan commit yang **sedang online** (dibaca dari
 `/health`) dengan commit terakhir di laptop, lalu menguji halaman & pagar peran.
-Contoh keluaran sehat:
+Alamatnya bisa diisi lewat argumen seperti di atas, atau disimpan sekali di
+variabel lingkungan `LOGBOOK_URL`. Contoh keluaran sehat:
 ```
 commit live : f4ceeec
 commit lokal: f4ceeec
@@ -214,7 +215,7 @@ status      : ✅ ONLINE = commit terakhir
 ```
 
 **Ingin `git push` otomatis deploy lagi?** Sambungkan repo di dashboard:
-Vercel → proyek **logbook-app** → **Settings → Git → Connect Git Repository**
+Vercel → proyekmu → **Settings → Git → Connect Git Repository**
 → pilih **GitHub** → izinkan akses ke repo `logbook-app` (repo privat perlu
 tombol *Configure GitHub App*). Setelah tersambung, cukup `git push` saja.
 
@@ -231,7 +232,8 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 - [ ] **Tambah kegiatan baru + foto** dari HP → tersimpan & tampil
 - [ ] **Ekspor DOCX / PDF / Excel** → file terunduh, foto ikut di dalamnya
 - [ ] `https://URL-kamu/docs` → dokumentasi API (Swagger) terbuka
-- [ ] panel admin: `https://URL-kamu/pusat-kendali` (atau path custom-mu)
+- [ ] panel admin: `https://URL-kamu/<path-panel-kamu>` (alamatnya dibuat acak
+      saat aplikasi pertama jalan & dicetak sekali ke log — simpan pribadi)
       → login dengan kredensial panel lama
 - [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
       pendamping** di panel → setel kodenya

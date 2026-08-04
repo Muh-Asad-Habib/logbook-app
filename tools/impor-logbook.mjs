@@ -4,9 +4,9 @@
  * Hanya bisa dijalankan pemegang DATABASE_URL (file .env), seperti superuser.mjs.
  *
  * Pakai (dari folder logbook-app):
- *   node tools/impor-logbook.mjs
- *     -> impor "berkas.docx" ke akun "Nama Akun"
  *   node tools/impor-logbook.mjs --file "jalur/berkas.docx" --user "Nama Akun"
+ *
+ * Kedua argumen wajib diisi (tidak ada nilai bawaan).
  *
  * Aman diulang: entri (dan foto) yang sudah ada dilewati, bukan diduplikasi.
  */

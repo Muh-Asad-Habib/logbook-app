@@ -158,6 +158,15 @@ Buka menu **Ekspor**:
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
 
+Nama berkas hasil unduhan dibuat khas untuk tiap tim beserta tanggal unduhnya,
+sehingga tidak tertukar saat dikumpulkan bersama tim lain:
+
+```
+Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx
+Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).pdf
+Logbook Tim Alpha - Rekap Kegiatan & Keuangan (04-08-2026).xlsx
+```
+
 Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan baru dan
 aman diulang berkali-kali.
 
