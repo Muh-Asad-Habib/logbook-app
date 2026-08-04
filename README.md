@@ -1,230 +1,332 @@
-# 📒 Logbook Kegiatan & Keuangan — Sekali Jalan, Bisa Diakses Siapa Saja di Internet
+# 📒 Logbook Kegiatan & Keuangan
 
-> ### 🚀 BARU v3.0 (Juli 2026) — Online 24 jam TANPA laptop menyala
-> Aplikasi kini bisa di-deploy **100% gratis** ke cloud:
-> **Vercel** (hosting + URL permanen) + **Neon** (database Postgres) +
-> **ImageKit** (foto via CDN, gratis 20 GB).
-> 👉 **Ikuti panduan lengkap dari nol di [DEPLOY.md](DEPLOY.md).**
->
-> Mode lokal (`.\start.ps1`) tetap ada untuk pengembangan — bedanya data
-> sekarang tersimpan di Neon & ImageKit (butuh file `.env`, lihat `.env.example`),
-> bukan lagi `data/db.json` + `uploads/`.
+Aplikasi web untuk **mencatat, memantau, dan melaporkan** perjalanan sebuah tim
+proyek — mulai dari kegiatan harian, pengeluaran dana, laporan kemajuan, sampai
+materi presentasi — dalam satu tempat yang rapi dan dapat diakses bersama
+pembimbing.
 
-> ### 🆕 Pembaruan v2.1 (Juli 2026)
-> - **Tampilan baru**: sidebar di desktop, bottom-nav + tombol ➕ melayang di HP, mode gelap 🌙 (ikut sistem / bisa diganti manual), ikon profesional (lucide), notifikasi toast, dialog konfirmasi custom.
-> - **Lightbox foto**: klik foto → terbuka penuh, geser (swipe) kiri/kanan di HP.
-> - **PWA**: buka lewat HP → menu browser → **"Tambahkan ke layar utama"** — jalan seperti aplikasi asli.
-> - **Foto otomatis dikompres** (maks 1600px, ±80% lebih kecil) — galeri jauh lebih ringan.
-> - **Keamanan**: rate-limit login/daftar (anti brute-force), sesi kedaluwarsa 30 hari, header keamanan (helmet), validasi tipe file di server.
-> - **Halaman kegiatan** dikelompokkan per bulan; **tabel keuangan** ada subtotal bulanan; **dashboard** ada sparkline mini; **profil** ada riwayat aktivitas akun.
->
-> Setelah update kode: jalankan `.\start.ps1 -Rebuild` sekali.
+Dibuat untuk kebutuhan nyata tim program kemahasiswaan (PKM, proyek penelitian,
+tugas besar, program pendampingan): setiap catatan harus lengkap dengan **foto
+bukti**, **rekap dana**, dan **pengesahan dosen** — lalu pada akhirnya harus
+bisa dicetak menjadi dokumen laporan.
 
-Tanpa Docker. Tanpa MongoDB. Tanpa MinIO. Tanpa kirim-kirim kode.
-Semua data tersimpan **lokal di komputermu**, dan aplikasi otomatis mendapat
-**URL publik** yang bisa dibuka siapa pun — termasuk yang **beda jaringan**.
+---
 
-```
-Komputermu (host)                          Teman-temanmu (di mana saja)
-┌────────────────────────────┐
-│  start.ps1                 │             📱 💻 buka:
-│  ├─ Server (Express :4000) │   tunnel    https://xxxx.trycloudflare.com
-│  │   ├─ Web (Next.js)      │ ◀────────── (internet, beda jaringan OK)
-│  │   ├─ REST API + Swagger │  Cloudflare
-│  │   └─ Gambar (ImageKit)  │   (gratis)
-│  └─ Data: Neon (Postgres)  │
-└────────────────────────────┘
-```
+## 📌 Daftar isi
 
-## 🚀 Cara pakai (satu perintah)
+- [Apa yang bisa dilakukan aplikasi ini](#-apa-yang-bisa-dilakukan-aplikasi-ini)
+- [Siapa saja penggunanya](#-siapa-saja-penggunanya)
+- [Cara memakai — panduan pengguna](#-cara-memakai--panduan-pengguna)
+- [Panduan untuk pembimbing](#-panduan-untuk-pembimbing-fasilitator--dosen)
+- [Panduan untuk admin](#-panduan-untuk-admin)
+- [Menjalankan aplikasi](#-menjalankan-aplikasi)
+- [Konfigurasi (.env)](#-konfigurasi-env)
+- [Di mana data disimpan](#-di-mana-data-disimpan)
+- [REST API & dokumentasi Swagger](#-rest-api--dokumentasi-swagger)
+- [Struktur proyek](#-struktur-proyek)
+- [Pengujian otomatis](#-pengujian-otomatis)
+- [Keamanan](#-keamanan)
+- [Tanya-jawab](#-tanya-jawab)
 
-> Syarat satu-satunya: [Node.js LTS](https://nodejs.org) terpasang (sudah ada di komputermu ✅).
+---
 
-```powershell
-cd "<folder-proyek>\logbook-app"
-.\start.ps1
-```
+## ✨ Apa yang bisa dilakukan aplikasi ini
 
-Skrip ini otomatis:
-1. Memasang dependensi (hanya pertama kali)
-2. Mem-build frontend (hanya pertama kali)
-3. Menjalankan server di `http://localhost:4000`
-4. Membuka **tunnel Cloudflare gratis** → muncul kotak berisi URL publik:
+| Fitur | Penjelasan |
+|---|---|
+| 🗓️ **Catatan kegiatan** | Tanggal, uraian kegiatan, durasi, tambahan capaian (%), dan beberapa foto sekaligus. Otomatis dikelompokkan per bulan. |
+| 💰 **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan. |
+| 📊 **Dashboard** | Ringkasan capaian, total waktu, dana terpakai & sisa dana, grafik mini, dan kegiatan terbaru. |
+| 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
+| 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. |
+| 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
+| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. |
+| 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
+| 💬 **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
+| ✅ **Pengesahan (ACC)** | Dosen menyetujui atau meminta revisi tiap entri; statusnya terlihat jelas oleh tim. |
+| 🌙 **Nyaman dipakai** | Tampilan terang/gelap, responsif di ponsel, dan bisa dipasang sebagai aplikasi (PWA). |
 
-```
-+--------------------------------------------------------+
-|  Your quick Tunnel has been created! Visit it at:      |
-|  https://contoh-acak-empat-kata.trycloudflare.com      |
-+--------------------------------------------------------+
-```
+---
 
-**Bagikan URL itu** ke teman/pembimbing lewat WA — mereka tinggal klik. Selesai. 🎉
+## 👥 Siapa saja penggunanya
 
-Berhenti: tekan `Ctrl+C` (server ikut berhenti). Kalau ada proses nyangkut: `.\stop.ps1`.
+Aplikasi mengenal empat peran dengan hak akses berbeda:
 
-## 🔐 Login & akun
+| Peran | Bisa melihat | Ubah data | Komentar | ACC / minta revisi |
+|---|---|:--:|:--:|:--:|
+| 👥 **Tim** | logbook miliknya sendiri | ✅ | ✅ (membalas) | — |
+| 🎓 **Fasilitator** | logbook tim yang didampingi | — | ✅ | — |
+| 👨‍🏫 **Dosen Pendamping** | logbook tim yang didampingi | — | ✅ | ✅ |
+| 🛡️ **Admin** | semua akun & data | pengelolaan akun | — | — |
 
-Aplikasi ini dirancang untuk **dibagikan** — setiap akun punya logbook sendiri
-yang **benar-benar terpisah**: kegiatan, keuangan, dana awal, galeri, ekspor,
-dan impornya tidak saling terlihat antar akun.
+Setiap akun tim memiliki logbook yang **benar-benar terpisah** — kegiatan,
+keuangan, dana, galeri, dan dokumennya tidak terlihat oleh tim lain.
 
-- **Masuk**: buka aplikasi → halaman login → isi username & password.
-- **Daftar**: klik tab **✨ Daftar** — akun baru selalu mulai dari **logbook kosong**.
-- **Pengaturan akun**: klik nama akun di kanan atas → **⚙️ Pengaturan akun**
-  untuk mengganti username atau password kapan saja.
-- **Keluar**: klik nama akun → **⏻ Keluar**.
+Pembatasan hak akses ini dijaga di sisi server, bukan sekadar disembunyikan di
+tampilan: permintaan yang tidak berhak selalu ditolak dengan kode **403**.
 
-> - Password disimpan sebagai **hash scrypt** (satu arah, bukan teks asli) — tidak ada
->   siapa pun yang bisa membacanya, termasuk pengelola server.
-> - Semua API (kegiatan, keuangan, statistik, gambar, ekspor, impor) butuh token
->   login — orang yang hanya tahu URL tunnel **tidak bisa melihat/mengubah data**.
-> - Ganti password otomatis **mengeluarkan sesi di perangkat lain**.
-> - **Lupa password?** Pengelola server dapat menyetel ulang password akunmu
->   (tanpa bisa melihat password lama), lalu segera ganti sendiri lewat
->   menu Pengaturan akun.
+---
 
-### 🎓 Peran Fasilitator & 👨‍🏫 Dosen Pendamping
+## 📖 Cara memakai — panduan pengguna
 
-Selain akun **tim** (default), ada dua peran **pendamping** yang memantau
-logbook tim:
+### 1. Membuat akun & masuk
 
-| Peran | Lihat data tim | Komentar | ACC / minta revisi |
-|---|:--:|:--:|:--:|
-| 👥 Tim | logbook sendiri | ✅ (membalas) | — |
-| 🎓 Fasilitator | ✅ | ✅ | — |
-| 👨‍🏫 Dosen Pendamping | ✅ | ✅ | ✅ |
+1. Buka alamat aplikasi, lalu pilih tab **✨ Daftar**.
+2. Pilih peran:
+   - **Tim** — dapat langsung mendaftar.
+   - **Fasilitator** atau **Dosen Pendamping** — memerlukan **kode pendaftaran**
+     dari admin (kode untuk keduanya berbeda).
+3. Isi username & password, lalu daftar. Akun baru selalu dimulai dari logbook
+   kosong.
+4. Untuk kunjungan berikutnya, gunakan tab **Masuk**.
 
-- **Daftar**: di tab Daftar pilih **peran** (Tim / Fasilitator / Dosen
-  Pendamping). Untuk pendamping, masukkan **kode** yang ditetapkan admin di
-  pusat kendali — kode fasilitator dan kode dosen **berbeda**; tanpa kode yang
-  benar pendaftaran ditolak.
-- **🔗 Menghubungkan diri (tanpa admin)**: tiap tim punya **Kode tim** di
-  halaman **Profil** (mis. `ABCD-2345`). Tim menyalin kode itu, mengirimkannya
-  ke fasilitator/dosen, lalu pendamping memasukkannya di **Dashboard →
-  Gabung ke tim dengan kode** → langsung terhubung. Tim bisa **mencetak ulang
-  kode** (kode lama mati) dan **mengeluarkan** pendamping kapan saja; pendamping
-  juga bisa keluar sendiri. Admin tetap dapat menugaskan manual lewat pusat kendali.
-- **Akses**: pendamping hanya bisa **melihat & mengomentari** kegiatan,
-  keuangan, dan laporan kemajuan tim yang **terhubung dengannya** —
-  tidak bisa menambah/mengubah/menghapus data tim (dipagari di server).
-- **Many-to-many**: satu tim boleh punya banyak pendamping, dan satu
-  pendamping boleh mengampu banyak tim (ada pemilih tim di bilah atas).
-- **Komentar 2 arah**: pendamping memulai komentar pada entri; tim membalas,
-  menandai selesai, dan keduanya bisa mengedit (berlabel *"(diedit)"*) atau
-  menghapus komentar miliknya. Ada badge jumlah komentar belum dibaca di menu.
-- **Belum ditugaskan?** Setelah login, pendamping melihat kolom
-  *"Gabung ke tim dengan kode"* — minta kodenya ke tim, atau hubungi admin.
-- **Pusat kendali**: tabel akun bertab **👥 Tim / 🎓 Fasilitator /
-  👨‍🏫 Dosen Pendamping** — kelola kode pendaftaran tiap peran, tetapkan tim
-  per pendamping (multi-pilih), dan lihat laporan kemajuan tiap tim.
+> Username dan password dapat diganti kapan saja melalui nama akun (pojok) →
+> **⚙️ Pengaturan akun**. Mengganti password otomatis mengeluarkan sesi di
+> perangkat lain.
 
-#### ✅ ACC (pengesahan) oleh dosen pendamping
+### 2. Menyiapkan dana awal
 
-Tiap entri kegiatan, entri belanja, dan laporan kemajuan punya satu status:
+Buka **Keuangan** lalu isi **Dana awal** dengan total anggaran tim. Angka ini
+dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil ekspor.
+
+### 3. Mencatat kegiatan
+
+1. Buka menu **Kegiatan** → tombol **Tambah** (di ponsel: tombol **➕** melayang).
+2. Isi bagian berikut:
+   - **Tanggal** kegiatan
+   - **Uraian kegiatan** — tulis sedetail mungkin (tempat, jam, siapa yang hadir)
+   - **Durasi** dalam menit
+   - **Tambahan capaian (%)** — kemajuan dari kegiatan ini; aplikasi
+     menjumlahkannya menjadi capaian total
+   - **Foto** — boleh beberapa sekaligus
+3. Simpan. Entri akan muncul dikelompokkan per bulan, dan foto dapat diklik
+   untuk diperbesar.
+
+> Foto dikecilkan otomatis di perangkat sebelum dikirim, sehingga unggahan tetap
+> cepat meskipun memakai foto ponsel beresolusi tinggi.
+
+### 4. Mencatat pengeluaran
+
+Buka menu **Keuangan** → **Tambah**, lalu isi nama item, harga satuan, jumlah,
+dan satuan (misalnya "per bulan"). Total dihitung otomatis, dan foto nota dapat
+dilampirkan sebagai bukti.
+
+### 5. Laporan kemajuan & presentasi
+
+| Menu | Isi | Catatan |
+|---|---|---|
+| **Laporan Kemajuan** | satu berkas `.docx` | Unggahan baru menggantikan berkas lama. Tampil langsung di aplikasi dan bisa diunduh. |
+| **Presentasi** | satu berkas `.pptx` **dan/atau** satu tautan Canva | Boleh dipakai bersamaan dan dihapus terpisah. `.pptx` bisa diunduh; Canva hanya pratinjau. |
+
+Untuk Canva, salin tautan dari tombol **Bagikan** dan pastikan setelannya
+*"Siapa saja dengan tautan dapat melihat"* agar pratinjaunya dapat dibuka
+pembimbing.
+
+### 6. Mengundang pembimbing
+
+1. Buka menu **Profil** → bagian **Kode tim** (contoh: `ABCD-2345`).
+2. Kirimkan kode tersebut kepada fasilitator atau dosen.
+3. Pembimbing memasukkannya di dashboard mereka melalui **Gabung ke tim dengan
+   kode**.
+
+Kode dapat **dicetak ulang** kapan saja (kode lama langsung tidak berlaku), dan
+pembimbing dapat **dikeluarkan** dari halaman Profil. Satu tim boleh memiliki
+banyak pembimbing, dan satu pembimbing boleh mendampingi banyak tim.
+
+### 7. Komentar & pengesahan (ACC)
+
+Setiap entri kegiatan, entri belanja, laporan, dan presentasi memiliki satu
+status:
 
 | Status | Arti |
 |---|---|
 | ⏳ **Menunggu ACC** | belum ditinjau dosen |
-| ✔ **Disetujui** | sudah di-ACC dosen pendamping |
-| ↺ **Revisi** | dosen minta perbaikan — **wajib disertai catatan** |
+| ✔ **Disetujui** | sudah disahkan dosen pendamping |
+| ↺ **Revisi** | dosen meminta perbaikan — selalu disertai catatan |
 
-- Tombol **ACC / Minta revisi / Batalkan** hanya muncul untuk akun dosen, dan
-  server juga menolak permintaan dari peran lain (`PUT /api/persetujuan`).
-- Tim melihat lencana status + catatan revisi langsung di entrinya, serta
-  rekap **Pengesahan dosen (ACC)** di Dashboard.
-- **Otomatis batal saat data berubah**: kalau tim mengedit entri (atau
-  mengganti berkas laporan), status kembali ke *menunggu* supaya ACC selalu
-  merujuk versi yang benar-benar ditinjau.
+Bila entri diperbaiki (atau berkas laporan/presentasi diganti), statusnya
+otomatis kembali ke **menunggu** supaya pengesahan selalu merujuk versi
+terbaru. Jumlah komentar yang belum dibaca tampil sebagai lencana pada menu.
 
-### Opsi
+### 8. Mengekspor & mengimpor dokumen
+
+Buka menu **Ekspor**:
+
+| Format | Isi |
+|---|---|
+| **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. |
+| **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
+| **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
+
+Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan baru dan
+aman diulang berkali-kali.
+
+**Impor:** pada halaman yang sama, unggah logbook Word lama lalu klik **Impor
+sekarang**. Entri yang belum ada akan ditambahkan lengkap dengan fotonya; entri
+yang sudah ada dilewati sehingga aman diklik berulang. Format tanggal seperti
+`23-Mei-26`, `06 Juni 2026`, `6/5/2026`, durasi `2 jam` atau `1 j 30 mnt`, serta
+harga `Rp 100.000 / bulan` sudah dikenali.
+
+---
+
+## 🎓 Panduan untuk pembimbing (fasilitator & dosen)
+
+1. **Daftar** dengan peran Fasilitator atau Dosen Pendamping memakai kode dari
+   admin.
+2. **Terhubung ke tim** — masukkan kode tim di dashboard, atau minta admin
+   menugaskan secara manual.
+3. **Memantau** — menu Kegiatan, Keuangan, Laporan Kemajuan, dan Presentasi
+   menampilkan data tim yang didampingi (hanya dapat dibaca).
+4. **Berkomentar** — mulai diskusi pada entri mana pun; tim akan membalas.
+5. **Memberi ACC** (khusus dosen) — setujui entri atau minta revisi disertai
+   catatan perbaikan.
+
+Bila mendampingi lebih dari satu tim, gunakan **pemilih tim** pada bilah atas
+untuk berpindah. Pembimbing juga dapat keluar dari sebuah tim kapan saja.
+
+---
+
+## 🛡️ Panduan untuk admin
+
+Panel admin merupakan halaman terpisah dengan login tersendiri. Di dalamnya
+tersedia:
+
+- **Ringkasan** jumlah akun, kegiatan, belanja, sesi aktif, entri ter-ACC, dan
+  laporan.
+- **Daftar akun** bertab **👥 Tim / 🎓 Fasilitator / 👨‍🏫 Dosen Pendamping**
+  lengkap dengan pencarian.
+- **Detail akun** — kegiatan, keuangan, laporan, dan jejak aktivitas satu akun.
+- **Pengelolaan akun** — ganti username, setel ulang password, keluarkan dari
+  semua perangkat, hapus akun.
+- **Kode pendaftaran** untuk fasilitator dan dosen (dapat diganti kapan saja).
+- **Penugasan tim** — hubungkan pembimbing ke tim melalui tombol **🔗 Tim**.
+- **Catatan audit** yang diperbarui langsung.
+
+> Alamat panel admin beserta kredensialnya dibuat otomatis saat aplikasi pertama
+> kali dijalankan dan ditampilkan **satu kali** pada log server — catat baik-baik.
+> Kredensial dapat disetel ulang kapan saja dengan `node tools/superuser.mjs`.
+> Karena alamat tersebut tidak pernah ditautkan dari halaman mana pun, simpanlah
+> secara pribadi.
+
+---
+
+## 🚀 Menjalankan aplikasi
+
+### Pilihan A — Online 24 jam (disarankan)
+
+Aplikasi dirancang untuk berjalan di layanan gratis:
+
+| Bagian | Layanan |
+|---|---|
+| Hosting + alamat tetap | **Vercel** |
+| Database | **Neon** (PostgreSQL) |
+| Penyimpanan gambar & dokumen | **ImageKit** |
+
+Panduan lengkap langkah demi langkah tersedia pada **[DEPLOY.md](DEPLOY.md)**.
+Setelah terpasang, aplikasi dapat diakses siapa pun melalui alamat tetap tanpa
+memerlukan perangkat yang menyala terus-menerus.
+
+### Pilihan B — Menjalankan sendiri (lokal)
+
+**Prasyarat:** [Node.js LTS](https://nodejs.org) terpasang dan berkas `.env`
+sudah diisi (lihat [Konfigurasi](#-konfigurasi-env)).
+
+```powershell
+cd logbook-app
+.\start.ps1
+```
+
+Skrip tersebut memasang dependensi, membangun frontend, menjalankan server pada
+`http://localhost:4000`, lalu membuka terowongan Cloudflare gratis sehingga
+aplikasi memperoleh alamat publik sementara yang dapat dibagikan.
 
 | Perintah | Fungsi |
 |---|---|
-| `.\start.ps1` | Jalankan + URL publik internet |
-| `.\start.ps1 -NoTunnel` | Hanya lokal + LAN (tanpa internet) |
-| `.\start.ps1 -Rebuild` | Build ulang frontend (setelah mengubah kode frontend) |
-| `.\stop.ps1` | Hentikan paksa semua proses |
+| `.\start.ps1` | Jalankan beserta alamat publik sementara |
+| `.\start.ps1 -NoTunnel` | Jalankan hanya di jaringan lokal |
+| `.\start.ps1 -Rebuild` | Bangun ulang frontend (setelah kode frontend berubah) |
+| `.\stop.ps1` | Hentikan seluruh proses terkait |
 
-> ⚠️ Catatan penting:
-> - **URL berganti** setiap kali `start.ps1` dijalankan ulang — kirim URL baru ke teman.
-> - Komputermu harus **tetap menyala** selama orang lain mengakses (komputermu = servernya).
-> - Pertama kali dijalankan, skrip mengunduh `cloudflared.exe` (±50 MB, sekali saja).
+> Alamat terowongan gratis berubah setiap kali dijalankan ulang, dan aplikasi
+> hanya dapat diakses selama server masih berjalan. Untuk pemakaian jangka
+> panjang, gunakan Pilihan A.
 
-## 💾 Di mana data tersimpan?
+### Pilihan C — Mode pengembangan
 
-Sejak v3.0 seluruh data ada di **cloud** (lihat [DEPLOY.md](DEPLOY.md)) — laptop
-boleh dimatikan tanpa kehilangan apa pun:
+```powershell
+cd backend;  npm run dev     # API pada :4000 (muat ulang otomatis)
+cd frontend; npm run dev     # Antarmuka pada :3000 (API → localhost:4000)
+```
 
-| Apa | Lokasi |
+---
+
+## ⚙️ Konfigurasi (.env)
+
+Salin `.env.example` menjadi `.env` di dalam folder `logbook-app`, lalu isi:
+
+| Variabel | Kegunaan |
 |---|---|
-| Akun, peran, kegiatan, keuangan, pengaturan, komentar, status ACC | **Neon** (Postgres) |
-| Foto kegiatan & bukti/nota | **ImageKit** (CDN, signed URL) |
-| Laporan kemajuan `.docx` | **ImageKit** (bukan Neon — kuota Neon 0,5 GB tetap lega) |
-| Kredensial pusat kendali | tabel `meta` di Neon (hash scrypt) |
+| `DATABASE_URL` | Alamat koneksi database Neon (PostgreSQL). |
+| `IMAGEKIT_PUBLIC_KEY` | Kunci publik ImageKit. |
+| `IMAGEKIT_PRIVATE_KEY` | Kunci privat ImageKit — rahasia. |
+| `IMAGEKIT_URL_ENDPOINT` | Endpoint URL ImageKit. |
+| `IMAGEKIT_FOLDER` | Folder penyimpanan (opsional, bawaan `/logbook`). |
 
-> Konfigurasi lewat `.env` (`DATABASE_URL`, `IMAGEKIT_*`) — salin dari `.env.example`.
-> Tabel dibuat otomatis (`CREATE TABLE IF NOT EXISTS`) saat server pertama tersambung.
+Tabel database dibuat otomatis saat server pertama kali tersambung sehingga
+tidak ada langkah migrasi manual. Bila kunci ImageKit dikosongkan, berkas
+disimpan ke folder `uploads/` — praktis untuk pengembangan, namun tidak
+disarankan untuk pemakaian sungguhan.
 
-**Data lama** ikut terbawa: berkas Streamlit (SQLite `data/logbook.db`) → `data/db.json`
-→ Neon + ImageKit lewat `npm run migrate` (sekali jalan). Baris laporan lama yang masih
-base64 di Neon otomatis dipindah ke ImageKit saat pertama kali dibuka.
+---
 
-## 📤 Ekspor DOCX, PDF & Excel
+## 💾 Di mana data disimpan
 
-Buka menu **📤 Ekspor** di web (atau panggil API langsung):
+| Data | Lokasi |
+|---|---|
+| Akun, peran, kegiatan, keuangan, pengaturan, komentar, status ACC | **Neon** (PostgreSQL) |
+| Foto kegiatan & bukti belanja | **ImageKit** (CDN, tautan bertanda tangan) |
+| Laporan kemajuan `.docx` | **ImageKit** |
+| Presentasi `.pptx` | **ImageKit** (tautan Canva disimpan sebagai teks) |
+| Kredensial panel admin | tabel `meta` pada Neon (hash scrypt) |
 
-| Format | Endpoint | Isi |
-|---|---|---|
-| **DOCX** | `/api/export/docx` | Dokumen logbook terisi otomatis — entri + fotonya tersusun di tabel kegiatan & keuangan. Aman diunduh berulang (entri yang sudah ada dilewati). |
-| **PDF** | `/api/export/pdf` | Rekap siap cetak: ringkasan dana, seluruh kegiatan lengkap dengan foto, tabel keuangan bertotal, nomor halaman. |
-| **Excel** | `/api/export/xlsx` | 3 sheet: Kegiatan, Keuangan, Ringkasan. |
+Berkas gambar dan dokumen sengaja tidak disimpan di dalam database agar kuota
+database tetap lega, sekaligus membuat pemuatan foto lebih cepat melalui CDN.
 
-Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan terisi. Entri ditulis
-mengikuti gaya dokumen; baris kosong sisa tabel otomatis dihapus agar rapi.
+---
 
-## 📥 Impor dari Word
+## 📚 REST API & dokumentasi Swagger
 
-Di halaman **📤 Ekspor/Impor**, unggah berkas `.docx` logbook milikmu lalu klik
-**Impor sekarang**:
-
-- Entri kegiatan & belanja yang **belum ada** di aplikasi ditambahkan — **beserta fotonya**
-  (foto diekstrak dari dokumen dan disimpan ke `uploads/`).
-- Entri yang sudah ada dilewati — aman diklik berulang.
-- Mengerti format tanggal `23-Mei-26`, `06 Juni 2026`, `6/5/2026`; waktu `10`, `2 jam`,
-  `1 j 30 mnt`; harga `Rp 100.000 / bulan`.
-- Via API: `POST /api/import/docx` (multipart, field `file` opsional).
-
-## 📚 REST API (Swagger)
-
-Dokumentasi interaktif: buka `/docs` (mis. `http://localhost:4000/docs` atau
-`https://xxxx.trycloudflare.com/docs`). Semua endpoint data butuh **token login**
-(header `Authorization: Bearer <token>` atau query `?token=...`):
+Dokumentasi interaktif tersedia pada `/docs` (misalnya
+`http://localhost:4000/docs`). Seluruh endpoint data memerlukan token login,
+melalui header `Authorization: Bearer <token>` atau query `?token=...`.
 
 ```bash
-# login → dapat token
-curl -X POST https://xxxx.trycloudflare.com/api/auth/login \
+# 1) masuk → memperoleh token
+curl -X POST https://ALAMAT-APLIKASI/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"username-kamu","password":"password-kamu"}'
+  -d '{"username":"USERNAME","password":"PASSWORD"}'
 
-# daftar kegiatan (pakai token)
-curl https://xxxx.trycloudflare.com/api/kegiatan \
-  -H "Authorization: Bearer TOKEN_DARI_LOGIN"
+# 2) mengambil daftar kegiatan
+curl https://ALAMAT-APLIKASI/api/kegiatan \
+  -H "Authorization: Bearer TOKEN"
 
-# tambah kegiatan + foto
-curl -X POST https://xxxx.trycloudflare.com/api/kegiatan \
-  -H "Authorization: Bearer TOKEN_DARI_LOGIN" \
+# 3) menambah kegiatan beserta foto
+curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
+  -H "Authorization: Bearer TOKEN" \
   -F "tanggal=2026-07-11" -F "kegiatan=Rapat tim" \
   -F "capaian_delta=5" -F "waktu_menit=60" -F "foto=@foto.jpg"
 ```
 
+**Akun & data tim**
+
 | Method | Endpoint | Fungsi |
 |---|---|---|
-| POST | `/api/auth/register` | Daftar akun baru (dapat token) |
-| POST | `/api/auth/login` | Login (dapat token) |
-| GET | `/api/auth/me` | Profil yang sedang login |
-| PUT | `/api/auth/username` | Ganti username sendiri (konfirmasi password) |
-| PUT | `/api/auth/password` | Ganti password sendiri (sesi lain keluar) |
-| POST | `/api/auth/logout` | Hapus sesi/token |
+| POST | `/api/auth/register` | Daftar akun baru (memperoleh token) |
+| POST | `/api/auth/login` | Masuk (memperoleh token) |
+| GET | `/api/auth/me` | Profil akun yang sedang masuk |
+| PUT | `/api/auth/username` | Ganti username (konfirmasi password) |
+| PUT | `/api/auth/password` | Ganti password (sesi lain dikeluarkan) |
+| POST | `/api/auth/logout` | Akhiri sesi |
 | GET / POST | `/api/kegiatan` | Daftar / tambah kegiatan (+foto) |
 | PUT / DELETE | `/api/kegiatan/{id}` | Ubah / hapus kegiatan |
 | GET / POST | `/api/keuangan` | Daftar / tambah belanja (+bukti) |
@@ -232,119 +334,143 @@ curl -X POST https://xxxx.trycloudflare.com/api/kegiatan \
 | GET / PUT | `/api/pengaturan/{kunci}` | Pengaturan (mis. `dana_awal`) |
 | GET | `/api/statistik` | Ringkasan dashboard |
 | GET | `/api/files/{key}` | Ambil gambar |
-| GET | `/api/export/docx` | Unduh dokumen logbook terisi (.docx) |
-| GET | `/api/export/pdf` | Unduh rekap PDF |
-| GET | `/api/export/xlsx` | Unduh rekap Excel |
+| GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
 | POST | `/api/import/docx` | Impor entri + foto dari dokumen Word |
-| GET | `/health` | Health check (tanpa login) |
+| GET | `/health` | Pemeriksaan status (tanpa login) |
 
-**📄 Laporan kemajuan (akun tim)**
+**Laporan kemajuan**
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | GET | `/api/laporan/info` | Info berkas laporan (nama, ukuran, waktu unggah) |
-| GET | `/api/laporan/file` | Unduh/tampilkan `.docx` milik sendiri |
+| GET | `/api/laporan/file` | Tampilkan / unduh `.docx` |
 | POST / DELETE | `/api/laporan` | Unggah / hapus laporan (potongan: `/chunk` + `/selesai`) |
-| POST | `/api/laporan/tautan` | Buat tautan publik sementara (penampil Office) |
-| GET | `/api/laporan/publik/{kunci}` | Akses berkas lewat tautan publik (tanpa login) |
+| POST | `/api/laporan/tautan` | Tautan sementara untuk penampil Office |
+| GET | `/api/laporan/publik/{kunci}` | Akses berkas melalui tautan sementara |
 
-**🎓 Pendamping (fasilitator & dosen) — hanya baca**
+**Presentasi**
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
-| GET | `/api/fasilitator/tim` | Daftar tim yang diampu (bisa lebih dari satu) |
-| POST | `/api/fasilitator/gabung` | Gabung ke tim memakai kode yang dibagikan tim |
+| GET | `/api/presentasi/info` | Info berkas `.pptx` dan tautan Canva |
+| GET / DELETE | `/api/presentasi/file` | Unduh / hapus `.pptx` (tautan Canva tetap ada) |
+| POST | `/api/presentasi` | Unggah `.pptx` (potongan: `/chunk` + `/selesai`) |
+| POST / DELETE | `/api/presentasi/canva` | Simpan / hapus tautan Canva |
+| POST | `/api/presentasi/tautan` | Tautan sementara untuk penampil PowerPoint |
+| GET | `/api/presentasi/publik/{kunci}` | Akses berkas melalui tautan sementara |
+
+**Pembimbing (hanya baca)**
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/api/fasilitator/tim` | Daftar tim yang didampingi |
+| POST | `/api/fasilitator/gabung` | Bergabung ke tim memakai kode tim |
 | DELETE | `/api/fasilitator/tim/{id}` | Keluar dari sebuah tim |
-| GET | `/api/fasilitator/tim/{id}/kegiatan` | Kegiatan tim tersebut |
-| GET | `/api/fasilitator/tim/{id}/keuangan` | Belanja tim tersebut |
-| GET | `/api/fasilitator/tim/{id}/statistik` | Ringkasan angka tim |
-| GET | `/api/fasilitator/tim/{id}/ringkasan` | Dashboard: statistik + entri & aktivitas terakhir |
-| GET | `/api/fasilitator/tim/{id}/laporan-info` \| `/laporan-file` | Info / isi laporan kemajuan |
-| POST | `/api/fasilitator/tim/{id}/laporan-tautan` | Tautan penampil Office (tidak mengubah data) |
+| GET | `/api/fasilitator/tim/{id}/kegiatan` \| `/keuangan` \| `/statistik` \| `/ringkasan` | Data tim tersebut |
+| GET | `/api/fasilitator/tim/{id}/laporan-info` \| `/laporan-file` | Laporan kemajuan tim |
+| GET | `/api/fasilitator/tim/{id}/presentasi-info` \| `/presentasi-file` | Presentasi tim |
+| POST | `/api/fasilitator/tim/{id}/laporan-tautan` \| `/presentasi-tautan` | Tautan penampil dokumen |
 
-**👥 Kode tim (akun tim)**
+**Kode tim, komentar & pengesahan**
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
-| GET | `/api/tim/kode` | Kode tim untuk dibagikan ke pendamping |
-| POST | `/api/tim/kode/reset` | Cetak ulang kode (kode lama langsung mati) |
-| GET | `/api/tim/pendamping` | Daftar pendamping yang terhubung |
-| DELETE | `/api/tim/pendamping/{id}` | Keluarkan seorang pendamping |
+| GET | `/api/tim/kode` | Kode tim untuk dibagikan |
+| POST | `/api/tim/kode/reset` | Cetak ulang kode (kode lama tidak berlaku) |
+| GET / DELETE | `/api/tim/pendamping` \| `/{id}` | Lihat / keluarkan pembimbing |
+| GET / POST | `/api/komentar` | Daftar / tambah komentar |
+| PUT / DELETE | `/api/komentar/{id}` | Ubah / hapus komentar sendiri |
+| PUT | `/api/komentar/{id}/selesai` | Tandai komentar selesai |
+| GET | `/api/komentar/jumlah` \| `/belum-dibaca` | Hitungan komentar |
+| POST | `/api/komentar/tandai-dibaca` | Tandai komentar sudah dibaca |
+| GET | `/api/persetujuan` \| `/ringkas` | Status & rekap ACC |
+| PUT | `/api/persetujuan` | Beri ACC / minta revisi (khusus dosen) |
 
-**💬 Komentar & ✅ ACC**
-
-| Method | Endpoint | Fungsi |
-|---|---|---|
-| GET / POST | `/api/komentar` | Daftar / tambah komentar (`?jenis=&target_id=&tim=`) |
-| PUT / DELETE | `/api/komentar/{id}` | Edit (berlabel *"(diedit)"*) / hapus milik sendiri |
-| PUT | `/api/komentar/{id}/selesai` | Tandai selesai (khusus pemilik tim) |
-| GET | `/api/komentar/jumlah` | Jumlah komentar per entri (badge) |
-| GET | `/api/komentar/belum-dibaca` | Hitungan belum dibaca per pengguna |
-| POST | `/api/komentar/tandai-dibaca` | Tandai sejumlah komentar sudah dibaca |
-| GET | `/api/persetujuan` | Peta status ACC entri (`menunggu`/`disetujui`/`revisi`) |
-| GET | `/api/persetujuan/ringkas` | Rekap ACC satu tim |
-| PUT | `/api/persetujuan` | ACC / minta revisi / batalkan — **khusus dosen** |
-
-> Endpoint tulis milik tim (kegiatan, keuangan, pengaturan, ekspor, impor, laporan)
-> menolak akun pendamping dengan **403** — pagar ada di server, bukan sekadar UI.
+---
 
 ## 🗂️ Struktur proyek
 
 ```
 logbook-app/
-├── start.ps1            ← JALANKAN INI (mode lokal)
-├── stop.ps1             ← hentikan paksa
-├── .env                 ← DATABASE_URL + kunci ImageKit (dari .env.example)
-├── api/index.js         ← entry point serverless (Vercel)
-├── tools/               ← cloudflared.exe, migrate-to-cloud.mjs, superuser.mjs
-├── backend/             ← Express: API + Swagger + penyaji frontend (port 4000)
+├── start.ps1            ← menjalankan aplikasi secara lokal
+├── stop.ps1             ← menghentikan proses terkait
+├── .env                 ← konfigurasi database & penyimpanan berkas
+├── api/index.js         ← titik masuk untuk hosting serverless (Vercel)
+├── tools/               ← utilitas: kredensial admin, migrasi data, dsb.
+├── backend/             ← Express: REST API + Swagger + penyaji frontend
 │   └── src/
-│       ├── server.js    ← entry point + pemasangan seluruh route
-│       ├── db.js        ← koneksi Neon + skema (CREATE/ALTER IF NOT EXISTS)
+│       ├── server.js    ← titik masuk & pemasangan seluruh rute
+│       ├── db.js        ← koneksi database + pembuatan skema otomatis
 │       ├── storage.js   ← seluruh akses data (akun, entri, komentar, ACC)
-│       ├── files.js     ← unggah foto & .docx ke ImageKit (+ signed URL)
-│       ├── auth.js      ← sesi + pagar peran (hanyaTim / hanyaFasilitator / hanyaDosen)
-│       ├── admin/       ← pusat kendali (panel.js + routes.js)
-│       └── routes/      ← kegiatan, keuangan, laporan, fasilitator, komentar, persetujuan, …
-└── frontend/            ← Next.js → di-build jadi statis (frontend/out)
-    ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Galeri, Ekspor, Profil
-    └── components/      ← Shell, Komentar, Acc, KartuAcc, DashboardFasilitator, …
+│       ├── files.js     ← unggah foto, .docx & .pptx ke penyimpanan berkas
+│       ├── auth.js      ← sesi login + pembatasan hak akses per peran
+│       ├── admin/       ← panel admin (panel.js + routes.js)
+│       └── routes/      ← kegiatan, keuangan, laporan, presentasi, dst.
+└── frontend/            ← Next.js, dibangun menjadi berkas statis
+    ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
+    │                       Galeri, Ekspor, Profil
+    └── components/      ← Shell, Komentar, Acc, KartuAcc, dsb.
 ```
 
-## 🧑‍💻 Mode pengembangan (opsional)
+---
 
-```powershell
-cd backend;  npm run dev     # API di :4000 (auto-reload)
-cd frontend; npm run dev     # UI di :3000 (hot-reload, API → localhost:4000)
-```
+## 🧪 Pengujian otomatis
 
-Uji otomatis (server harus hidup di `:4000`, butuh `.env`):
+Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 
-| Perintah | Isi uji |
+| Perintah | Yang diuji |
 |---|---|
-| `npm run diag --workspace backend` | Semua rute terdaftar + pagar peran + panel pusat kendali |
-| `npm run diag:peran --workspace backend` | End-to-end peran: daftar pakai kode, pagar tulis 403, assignment, komentar 2 arah, badge belum-dibaca, ACC dosen (revisi → batal otomatis saat entri diubah → disetujui). Akun uji dibuat & dihapus otomatis |
+| `npm run diag --workspace backend` | Seluruh rute terdaftar, pembatasan hak akses per peran, dan keutuhan panel admin |
+| `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
+| `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
 
-Setelah selesai mengubah frontend: `.\start.ps1 -Rebuild`.
+Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
+tidak terganggu.
+
+---
+
+## 🔒 Keamanan
+
+- Password disimpan sebagai **hash scrypt** (satu arah) — tidak dapat dibaca
+  kembali oleh siapa pun, termasuk pengelola aplikasi.
+- Seluruh endpoint data memerlukan token login; pengunjung yang hanya mengetahui
+  alamat aplikasi hanya akan melihat halaman masuk.
+- Pembatasan hak akses per peran diterapkan di server, sehingga akun pembimbing
+  tidak dapat mengubah data tim walaupun permintaannya dibuat secara manual.
+- Sesi kedaluwarsa otomatis setelah 30 hari, dan mengganti password langsung
+  mengakhiri sesi di perangkat lain.
+- Tersedia pembatasan percobaan masuk (anti tebak-tebakan password) serta header
+  keamanan standar.
+- Gambar disajikan melalui tautan bertanda tangan berumur pendek dan hanya dapat
+  diakses pemilik data atau pembimbing yang berhak.
+
+---
 
 ## ❓ Tanya-jawab
 
-**T: Teman saya beda kota/beda WiFi, bisa akses?**
-J: Bisa — itulah fungsi URL `trycloudflare.com`. Selama komputermu menyala
-dan `start.ps1` masih berjalan, siapa pun bisa membuka URL-nya.
+**Apakah data hilang bila perangkat dimatikan?**
+Tidak. Seluruh data tersimpan pada layanan cloud (database dan penyimpanan
+berkas), bukan pada perangkat yang menjalankan aplikasi.
 
-**T: Kenapa URL-nya berubah terus?**
-J: Quick Tunnel Cloudflare gratis memberi URL acak per sesi. Kalau mau URL
-tetap, buat akun Cloudflare (gratis) + domain sendiri → *named tunnel*, atau
-sewa VPS dan jalankan server di sana.
+**Bisakah satu tim didampingi lebih dari satu dosen?**
+Bisa. Hubungan tim dan pembimbing bersifat banyak-ke-banyak: satu tim boleh
+memiliki beberapa pembimbing, dan satu pembimbing boleh mendampingi beberapa
+tim.
 
-**T: Amankah?**
-J: Ya, lebih aman sekarang — semua data **dilindungi login**. Orang yang hanya tahu
-URL tunnel cuma melihat halaman login; tanpa username & password mereka tidak bisa
-melihat atau mengubah apa pun. Password disimpan sebagai hash scrypt.
+**Bagaimana bila lupa password?**
+Admin dapat menyetel ulang password akun melalui panel admin tanpa perlu
+mengetahui password lama. Setelah berhasil masuk, gantilah sendiri melalui menu
+Pengaturan akun.
 
-**T: Data hilang kalau komputer mati?**
-J: Tidak — data ada di **Neon** (Postgres) + **ImageKit**, bukan di laptopmu.
-Mati-nyalakan bebas; kalau di-deploy ke Vercel, aplikasi bahkan tetap online 24 jam.
-Yang berhenti hanya URL tunnel lokal selama `start.ps1` tidak berjalan.
+**Apakah foto memakan banyak kuota internet?**
+Tidak. Foto dikecilkan otomatis di perangkat sebelum diunggah, lalu disajikan
+melalui CDN sehingga pemuatan tetap ringan.
+
+**Apakah hasil ekspor menimpa data?**
+Tidak. Ekspor selalu menghasilkan salinan baru dan tidak pernah mengubah isi
+logbook, jadi aman diunduh berkali-kali.
+
+**Bisakah aplikasi dipasang di ponsel?**
+Bisa. Buka aplikasi pada peramban ponsel lalu pilih **"Tambahkan ke layar
+utama"**; tampilannya akan berjalan layaknya aplikasi biasa.
 
