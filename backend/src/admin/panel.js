@@ -312,7 +312,15 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     padding:0;width:calc(100% - 36px);box-shadow:0 50px 130px rgba(0,0,0,.65);
     margin:auto;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);
   }
-  dialog[open]{animation:pop .24s ease}
+  dialog[open]{
+    /* position:fixed + inset:0 + margin:auto — dialog SELALU melayang di
+       tengah layar dan di atas topbar/sidebar (z-index 90 > .side 60 / .top 50),
+       bahkan bila dialog terjebak dalam keadaan terbuka non-modal (tanpa top
+       layer) — sebelumnya keadaan itu membuat dialog tergambar di alur halaman,
+       tertimpa topbar, dan tombol Tutup tak terjangkau. */
+    position:fixed;inset:0;margin:auto;z-index:90;
+    animation:pop .24s ease;
+  }
   dialog::backdrop{background:rgba(3,5,12,.66);backdrop-filter:blur(6px)}
   dialog.mini{max-width:430px}
   /* Dialog detail memakai TINGGI LAYAR PENUH: kepala tetap di atas, isinya
@@ -1261,7 +1269,11 @@ function bukaDetail(id, tabAwal){
     tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === TAB); });
     renderTab();
     keAtasDetail();
-    $("#d-detail").showModal();
+    // Pulihkan bila dialog terjebak dalam keadaan terbuka (mis. non-modal):
+    // tutup dulu supaya showModal() tidak melempar InvalidStateError.
+    var dlg = $("#d-detail");
+    if (dlg.open) dlg.close();
+    dlg.showModal();
   }).catch(function(e){ toast(e.message, true); });
 }
 function isiKepalaDetail(){
@@ -1617,6 +1629,26 @@ function buatAkun(){
     }).catch(function(e){ toast(e.message, true); });
   });
 }
+
+/* ---------- pintu darurat dialog ----------
+ * Jaring pengaman agar pengguna TIDAK PERNAH terkunci di dalam dialog:
+ * - Esc menutup dialog TERATAS yang terbuka (termasuk dialog yang terjebak
+ *   dalam keadaan non-modal, yang tidak merespons Esc bawaan browser).
+ * - Klik pada area gelap di luar isi dialog juga menutupnya. */
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Escape") return;
+  var buka = document.querySelectorAll("dialog[open]");
+  if (buka.length) { e.preventDefault(); buka[buka.length - 1].close(); }
+});
+document.addEventListener("click", function(e){
+  var d = e.target;
+  if (!(d instanceof HTMLDialogElement) || !d.open) return;
+  // klik tepat pada elemen <dialog> = area backdrop/tepian, bukan isinya
+  var r = d.getBoundingClientRect();
+  var diLuar = e.clientX < r.left || e.clientX > r.right ||
+               e.clientY < r.top || e.clientY > r.bottom;
+  if (diLuar) d.close();
+});
 
 /* ---------- event delegation ---------- */
 document.addEventListener("click", function(ev){
