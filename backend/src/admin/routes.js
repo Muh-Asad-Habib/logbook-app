@@ -1,5 +1,5 @@
 /**
- * Rute panel pemeliharaan (super user).
+ * Rute panel admin (super user).
  *
  * - TIDAK terdaftar di Swagger (folder ini tidak dipindai swagger-jsdoc).
  * - Semua respons: Cache-Control no-store + X-Robots-Tag noindex.

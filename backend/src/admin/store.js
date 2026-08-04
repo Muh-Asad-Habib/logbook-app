@@ -1,5 +1,5 @@
-/**
- * Penyimpanan & keamanan akun super user (pemeliharaan).
+﻿/**
+ * Penyimpanan & keamanan akun super user (admin).
  *
  * PRINSIP KEAMANAN (versi cloud):
  * - Kredensial disimpan di tabel `meta` (Postgres) sebagai HASH scrypt
@@ -63,7 +63,7 @@ export async function loadAdmin(paksa = false) {
   await simpan();
   adminMuatPada = Date.now();
   console.log("=".repeat(64));
-  console.log("[keamanan] Akun pemeliharaan dibuat (CATAT — tampil sekali):");
+  console.log("[keamanan] Akun admin dibuat (CATAT — tampil sekali):");
   console.log(`[keamanan]   Panel    : ${admin.path}`);
   console.log(`[keamanan]   Username : ${username}`);
   console.log(`[keamanan]   Password : ${password}`);

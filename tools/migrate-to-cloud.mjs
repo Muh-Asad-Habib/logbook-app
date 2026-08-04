@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MIGRASI SEKALI JALAN: data lokal ➜ cloud.
  *
  *   data/db.json  ➜ Neon Postgres   (akun, kegiatan, keuangan, pengaturan)
@@ -105,7 +105,7 @@ async function migrasiData() {
 }
 
 async function migrasiAdmin() {
-  judul("2/3  Migrasi kredensial panel pemeliharaan");
+  judul("2/3  Migrasi kredensial panel admin");
   if (!fs.existsSync(ADMIN_FILE)) {
     console.log("- data/admin.json tidak ada — panel akan dibuatkan kredensial baru saat server pertama jalan (lihat log).");
     return;

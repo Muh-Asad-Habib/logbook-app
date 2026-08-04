@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Validasi sintaks JavaScript yang tertanam di dalam PANEL_HTML
- * (pusat kendali). `node --check src/admin/panel.js` hanya memeriksa
+ * (panel admin). `node --check src/admin/panel.js` hanya memeriksa
  * berkas modulnya, bukan isi template string `<script>` di dalamnya.
  *
  * Jalankan: node backend/diag-panel.mjs
