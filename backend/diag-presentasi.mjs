@@ -68,6 +68,15 @@ try {
     r.status === 200 && r.body.url === "https://www.canva.com/design/DAFuji123/tokenUJI_9/view?embed",
     r.body?.url || "");
 
+  r = await jfetch("/api/presentasi/canva", {
+    method: "POST", headers: HJ(tokTim),
+    body: JSON.stringify({ url: "https://canva.link/rdxh2vw7i6qshcp" }),
+  });
+  cek("tim simpan short-link canva.link → embed (butuh internet)",
+    r.status === 200 &&
+      /^https:\/\/www\.canva\.com\/design\/[^/]+\/[^/]+\/view\?embed$/.test(String(r.body?.url || "")),
+    JSON.stringify(r.body));
+
   console.log("\n== Pagar peran ==");
   cek("dosen POST /api/presentasi → 403",
     (await unggahPptx(tokDos, "curang.pptx", pptxPalsu())).status === 403);

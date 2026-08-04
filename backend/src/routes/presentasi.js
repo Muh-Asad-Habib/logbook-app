@@ -225,7 +225,7 @@ router.post("/canva", async (req, res, next) => {
     const hasil = await store.setCanvaPresentasi(req.userId, url);
     if (!hasil) {
       return res.status(400).json({
-        error: "Tautan Canva tidak dikenali — salin dari tombol Bagikan (contoh: https://www.canva.com/design/XXXX/YYYY/view)",
+        error: "Tautan Canva tidak dikenali — salin dari tombol Bagikan (contoh: https://www.canva.com/design/XXXX/YYYY/view atau https://canva.link/xxxx)",
       });
     }
     catatAktivitas(req.userId, "presentasi.canva", { url: hasil.url });
