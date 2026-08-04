@@ -1,12 +1,15 @@
-﻿# 🚀 DEPLOY.md — Online-kan Logbook 24 Jam, 100% Gratis, Laptop Boleh Mati
+# 🚀 DEPLOY.md — Online-kan Logbook 24 Jam, 100% Gratis, Laptop Boleh Mati
 
-> Panduan ini ditulis **dari nol** — ikuti urut dari atas ke bawah, ±30–45 menit.
-> Hasil akhir: aplikasi punya **URL permanen** `https://nama-kamu.vercel.app`
-> yang bisa dibuka siapa saja, kapan saja, **tanpa laptopmu menyala**.
+> Panduan ini ditulis **dari nol** untuk siapa saja yang ingin memakai aplikasi
+> ini — kodenya diambil langsung dari repo
+> **https://github.com/Muh-Asad-Habib/logbook-app**. Ikuti urut dari atas ke
+> bawah, ±30–45 menit. Hasil akhir: aplikasi punya **URL permanen**
+> `https://nama-kamu.vercel.app` yang bisa dibuka siapa saja, kapan saja,
+> **tanpa laptopmu menyala**.
 
 ## 🗺️ Gambaran besar (pahami dulu 2 menit)
 
-Versi lama: semuanya hidup di laptopmu. Versi baru: tiap bagian "dititipkan"
+Aplikasi ini tidak berjalan di laptopmu — tiap bagian "dititipkan"
 ke layanan cloud gratis yang memang khusus untuk itu:
 
 ```
@@ -26,47 +29,54 @@ ke layanan cloud gratis yang memang khusus untuk itu:
 
 | Layanan | Tugas | Kuota gratis | Perlu kartu? |
 |---|---|---|---|
-| **GitHub** | menyimpan kode (Vercel membacanya dari sini) | tak terbatas utk repo | ❌ |
+| **GitHub** | menyimpan salinan kodemu (Vercel membacanya dari sini) | tak terbatas utk repo | ❌ |
 | **Vercel** | hosting web + API, URL permanen | 100 GB bandwidth/bln | ❌ |
-| **Neon** | database Postgres (pengganti `data/db.json`) | 0.5 GB (≈ jutaan entri teks) | ❌ |
-| **ImageKit** | penyimpanan + CDN foto (pengganti `uploads/`) | 20 GB simpan + 20 GB transfer/bln | ❌ |
+| **Neon** | database Postgres (akun, kegiatan, keuangan) | 0.5 GB (≈ jutaan entri teks) | ❌ |
+| **ImageKit** | penyimpanan + CDN foto & dokumen | 20 GB simpan + 20 GB transfer/bln | ❌ |
 
 > 💡 Foto dikompres otomatis jadi ±300 KB → 20 GB ≈ **60.000 foto**. Tenang.
 
 ---
 
-## Bagian 1 — Siapkan Git & GitHub
+## Bagian 1 — Ambil kode dari repo ini
 
 ### 1.1 Buat akun GitHub
 1. Buka **https://github.com/signup**, daftar dengan email (gratis).
 2. Verifikasi email.
 
-### 1.2 Pasang Git di laptop (sekali saja)
-1. Unduh dari **https://git-scm.com/download/win** → install (next-next-finish).
-2. Buka **PowerShell baru**, cek: `git --version` → keluar angka versi = beres.
-3. Kenalkan dirimu ke Git (dipakai sebagai "tanda tangan" commit):
+### 1.2 Pasang Git & Node.js di laptop (sekali saja)
+1. Unduh Git dari **https://git-scm.com/download/win** → install (next-next-finish).
+2. Unduh **Node.js LTS** dari **https://nodejs.org** → install.
+3. Buka **PowerShell baru**, cek keduanya:
+   ```powershell
+   git --version    # keluar angka versi = beres
+   node --version   # minimal v20
+   ```
+4. Kenalkan dirimu ke Git (dipakai sebagai "tanda tangan" commit):
    ```powershell
    git config --global user.name  "Nama Kamu"
    git config --global user.email "email-github-kamu@example.com"
    ```
 
-### 1.3 Buat repo & push kode
-1. Di GitHub klik **➕ → New repository** → nama: `logbook-app` →
-   pilih **Private** (kodenya tidak perlu publik) → **Create repository**.
-2. Di PowerShell (ganti `<folder-proyek>` dengan lokasi folder `logbook-app` di komputermu):
+### 1.3 Fork lalu clone repo
+1. Buka **https://github.com/Muh-Asad-Habib/logbook-app** → klik tombol
+   **Fork** (kanan atas) → **Create fork**. Sekarang kamu punya salinan repo
+   sendiri: `https://github.com/USERNAME-KAMU/logbook-app`.
+2. Clone salinanmu ke laptop — di PowerShell:
    ```powershell
-   cd "<folder-proyek>\logbook-app"
-   git init
-   git add .
-   git commit -m "Logbook v3: Vercel + Neon + ImageKit"
-   git branch -M main
-   git remote add origin https://github.com/USERNAME-KAMU/logbook-app.git
-   git push -u origin main
+   cd "C:\folder\pilihanmu"
+   git clone https://github.com/USERNAME-KAMU/logbook-app.git
+   cd logbook-app
+   npm install
    ```
-   (Saat diminta login, browser terbuka → klik **Authorize**.)
 
-> 🔒 File rahasia (`.env`), data (`data/`), dan foto (`uploads/`) **otomatis
-> TIDAK ikut ter-push** — sudah dikecualikan lewat `.gitignore`.
+> 💡 **Alternatif tanpa fork** (kalau tidak berencana menyimpan perubahanmu di
+> GitHub): langsung `git clone https://github.com/Muh-Asad-Habib/logbook-app.git`
+> juga bisa — deploy-nya lewat Vercel CLI (Bagian 6, cara B).
+
+> 🔒 File rahasia (`.env`), data lokal (`data/`), dan foto (`uploads/`)
+> **otomatis TIDAK ikut ter-push** — sudah dikecualikan lewat `.gitignore`.
+> Kunci-kuncimu tetap milikmu sendiri.
 
 ---
 
@@ -107,18 +117,16 @@ ke layanan cloud gratis yang memang khusus untuk itu:
 > backend cek token login → balas **redirect ke signed URL** ImageKit
 > (berlaku 1 jam) → foto meluncur langsung dari CDN. Cepat & tetap privat.
 
-> 📄 **Laporan kemajuan (.docx) juga tersimpan di ImageKit** — bukan di Neon.
-> Kuota Neon (0,5 GB) tetap lega walau tiap tim mengunggah laporan puluhan MB;
-> ImageKit menampung sampai 20 GB. Baris laporan lama (base64 di Neon) otomatis
-> **dimigrasikan** ke ImageKit saat pertama kali diakses — tanpa langkah manual.
+> 📄 **Laporan kemajuan (.docx) & presentasi (.pptx) juga tersimpan di ImageKit** —
+> bukan di Neon. Kuota Neon (0,5 GB) tetap lega walau tiap tim mengunggah
+> dokumen puluhan MB; ImageKit menampung sampai 20 GB.
 
 ---
 
 ## Bagian 4 — Isi file `.env` di laptop
 
-1. Di folder `logbook-app`, **salin** `.env.example` menjadi `.env`:
+1. Di folder hasil clone, **salin** `.env.example` menjadi `.env`:
    ```powershell
-   cd "<folder-proyek>\logbook-app"
    Copy-Item .env.example .env
    notepad .env
    ```
@@ -130,22 +138,24 @@ ke layanan cloud gratis yang memang khusus untuk itu:
    IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/logbookmu
    IMAGEKIT_FOLDER=/logbook
    ```
-3. Simpan. (File ini hanya ada di laptopmu — dipakai untuk migrasi & mode lokal.)
+3. Simpan. (File ini hanya ada di laptopmu — tidak pernah ikut ter-push.)
 
 ---
 
-## Bagian 5 — Pindahkan data lama ke cloud (sekali saja)
+## Bagian 5 — (Opsional) Impor data lama
 
-Semua akun, kegiatan, keuangan, kredensial panel, dan **seluruh foto** di
-`data/` + `uploads/` dipindahkan oleh satu perintah:
+**Mulai dari nol? Lewati bagian ini** — akun dan seluruh tabel dibuat otomatis
+saat aplikasi pertama tersambung ke database.
+
+Punya data dari instalasi lama aplikasi ini (folder `data/` + `uploads/`)?
+Taruh kedua folder itu di root proyek, lalu:
 
 ```powershell
-cd "<folder-proyek>\logbook-app"
-npm install
 npm run migrate
 ```
 
-Contoh keluaran yang benar:
+Semua akun, kegiatan, keuangan, kredensial panel, dan seluruh foto dipindahkan
+ke Neon + ImageKit. Contoh keluaran yang benar:
 
 ```
 1/3  Migrasi data ke Neon Postgres
@@ -154,20 +164,23 @@ Contoh keluaran yang benar:
 - keuangan      : 3 baru dari 3
 ...
 3/3  Unggah foto ke ImageKit
-  ✓ keg_2026-05-23_image1.jpeg
-  ...
 SELESAI 🎉
 ```
 
 > Aman dijalankan berulang — yang sudah pernah masuk otomatis dilewati.
 > Data lokalmu **tidak dihapus** (jadi cadangan).
 
+Punya logbook lama berbentuk **dokumen Word**? Nanti setelah online, buka menu
+**Ekspor → Impor dari Word (.docx)** di aplikasi — entri & foto diambil otomatis.
+
 ---
 
 ## Bagian 6 — Deploy ke Vercel
 
+### Cara A — lewat dashboard (disarankan, `git push` = otomatis deploy)
+
 1. Buka **https://vercel.com/signup** → **Continue with GitHub** → izinkan.
-2. Di dashboard klik **Add New… → Project** → cari repo **logbook-app** → **Import**.
+2. Di dashboard klik **Add New… → Project** → pilih **fork `logbook-app`-mu** → **Import**.
 3. Pengaturan build **biarkan apa adanya** (semuanya sudah diatur oleh file
    `vercel.json` di repo — Framework "Other", build & output otomatis).
 4. Buka bagian **Environment Variables**, tambahkan **5 baris yang sama persis
@@ -186,22 +199,31 @@ SELESAI 🎉
    https://logbook-app-xxxx.vercel.app
    ```
 6. **Bagikan URL itu** ke teman/pembimbing. Selesai — laptop boleh dimatikan
-   selamanya; URL tidak pernah berubah.
+   selamanya; URL tidak pernah berubah. Setiap `git push` ke fork-mu otomatis
+   men-deploy versi terbaru.
+
+### Cara B — lewat Vercel CLI (tanpa fork/dashboard)
+
+```powershell
+npx vercel login          # login sekali (browser terbuka)
+npx vercel                # buat proyek + deploy preview
+npx vercel env add DATABASE_URL           # ulangi untuk 4 variabel lainnya
+npm run deploy            # deploy produksi
+```
+
+> Dengan cara B, `git push` **tidak** otomatis deploy — tiap update jalankan
+> `npm run deploy` lagi. Bisa disambungkan belakangan: Vercel → proyekmu →
+> **Settings → Git → Connect Git Repository** → pilih **GitHub** → izinkan akses
+> ke repo `logbook-app` (repo privat perlu tombol *Configure GitHub App*).
 
 ### Update aplikasi di kemudian hari
 
-> ⚠️ **Penting:** proyek ini **belum tersambung ke GitHub** di sisi Vercel
-> (dibuat lewat Vercel CLI, bukan tombol *Import Git Repository*). Artinya
-> `git push` **TIDAK** otomatis men-deploy — kode di GitHub bisa lebih baru
-> daripada yang online.
-
-**Cara update (dipakai sekarang) — deploy manual dari laptop:**
 ```powershell
-cd "<folder-proyek>\logbook-app"
-git add . ; git commit -m "perubahan" ; git push   # simpan kode
-npm run deploy                                      # kirim ke Vercel (produksi)
+git add . ; git commit -m "perubahan" ; git push   # simpan kode (cara A: otomatis deploy)
+npm run deploy                                      # hanya perlu untuk cara B
 npm run cek:online https://URL-KAMU.vercel.app      # pastikan versi online = commit terakhir
 ```
+
 `npm run deploy` = `npx vercel --prod --yes` (butuh login sekali: `npx vercel login`).
 
 `npm run cek:online` membandingkan commit yang **sedang online** (dibaca dari
@@ -214,10 +236,8 @@ commit lokal: f4ceeec
 status      : ✅ ONLINE = commit terakhir
 ```
 
-**Ingin `git push` otomatis deploy lagi?** Sambungkan repo di dashboard:
-Vercel → proyekmu → **Settings → Git → Connect Git Repository**
-→ pilih **GitHub** → izinkan akses ke repo `logbook-app` (repo privat perlu
-tombol *Configure GitHub App*). Setelah tersambung, cukup `git push` saja.
+Ingin ikut menerima perbaikan terbaru dari repo asal? Di fork-mu klik
+**Sync fork** di GitHub, lalu `git pull` dan deploy ulang.
 
 ---
 
@@ -226,15 +246,16 @@ tombol *Configure GitHub App*). Setelah tersambung, cukup `git push` saja.
 Buka URL vercel.app-mu, lalu centang satu per satu:
 
 - [ ] Halaman login terbuka
-- [ ] **Login** dengan akun lama (username & password TIDAK berubah)
-- [ ] Dashboard menampilkan angka yang sama seperti dulu
-- [ ] Halaman **Kegiatan**: foto-foto lama tampil (dimuat dari CDN ImageKit)
+- [ ] **Daftar akun tim baru** di tab ✨ Daftar → login berhasil
+- [ ] Dashboard terbuka; isi **Dana awal** di menu Keuangan
 - [ ] **Tambah kegiatan baru + foto** dari HP → tersimpan & tampil
-- [ ] **Ekspor DOCX / PDF / Excel** → file terunduh, foto ikut di dalamnya
+- [ ] **Ekspor DOCX / PDF / Excel** → berkas terunduh dengan nama khas akunmu
+      (mis. `Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx`),
+      foto ikut di dalamnya
 - [ ] `https://URL-kamu/docs` → dokumentasi API (Swagger) terbuka
-- [ ] panel admin: `https://URL-kamu/<path-panel-kamu>` (alamatnya dibuat acak
-      saat aplikasi pertama jalan & dicetak sekali ke log — simpan pribadi)
-      → login dengan kredensial panel lama
+- [ ] panel admin: `https://URL-kamu/<path-panel-kamu>` — alamat & kredensialnya
+      dibuat acak saat aplikasi pertama jalan dan **dicetak sekali ke log**:
+      buka proyek di Vercel → tab **Logs** → cari baris `[keamanan]` (simpan pribadi)
 - [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
       pendamping** di panel → setel kodenya
 - [ ] Daftar akun pendamping memakai kode itu → hubungkan ke tim: **Profil tim →
@@ -268,35 +289,35 @@ Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
 > dan tiap permintaan pendamping dicek terhadap daftar tim yang ditugaskan —
 > keamanan tidak bergantung pada tampilan frontend.
 >
-> 🗄️ Tabel baru (`fasilitator_tim`, `komentar`, `komentar_baca`, `persetujuan`)
-> dan kolom baru (`users.role`, `laporan_docx.file_key`) dibuat otomatis saat
-> server jalan — **tidak ada langkah migrasi manual**.
+> 🗄️ Seluruh tabel & kolom (termasuk `fasilitator_tim`, `komentar`,
+> `komentar_baca`, `persetujuan`) dibuat otomatis saat server jalan —
+> **tidak ada langkah migrasi manual**.
 
 ---
 
 ## Bagian 8 — Hal yang perlu diketahui
 
-**Kredensial panel admin.** Ikut termigrasi dari `data/admin.json`
-(username/password panel lama tetap berlaku). Bila dulu belum pernah ada,
-kredensial acak dibuat otomatis dan **dicetak sekali ke log**: buka proyek di
-Vercel → tab **Logs** → cari baris `[keamanan]`. Lupa password panel?
-Jalankan di laptop: `node tools/superuser.mjs -u namabaru -p sandibaru`.
+**Kredensial panel admin.** Dibuat acak otomatis saat aplikasi pertama jalan
+dan **dicetak sekali ke log**: buka proyek di Vercel → tab **Logs** → cari
+baris `[keamanan]`. Lupa password panel? Jalankan di laptop (butuh `.env`):
+`node tools/superuser.mjs -u namabaru -p sandibaru`.
 
 **Batas ukuran upload ±4 MB per request** (batas platform Vercel).
 Foto HP biasanya lolos (dan tetap dikompres server jadi ±300 KB), tapi
-**impor .docx raksasa** (>4 MB, banyak foto) bisa ditolak — impor dokumen
-besar cukup dilakukan sekali lewat `npm run migrate` dari laptop.
+**impor .docx raksasa** (>4 MB, banyak foto) bisa ditolak — dokumen sebesar itu
+diimpor dari laptop dengan:
+`node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"`.
 
 **"Tidur" singkat.** Bila tak ada pengunjung ±5 menit, database Neon ikut
 tidur; request pertama berikutnya butuh ±1–3 detik ekstra. Normal untuk
 paket gratis, request berikutnya cepat lagi.
 
-**Mode lokal masih bisa** (untuk pengembangan): `.\start.ps1` tetap jalan —
-bedanya sekarang data dibaca/ditulis ke Neon & ImageKit (butuh internet +
-`.env`), bukan lagi file lokal.
+**Mode lokal masih bisa** (untuk pengembangan): `.\start.ps1` menjalankan
+aplikasi di `http://localhost:4000` — data tetap dibaca/ditulis ke Neon &
+ImageKit (butuh internet + `.env`).
 
-**Cadangan data.** Folder `data/` + `uploads/` lama = cadangan terakhir kondisi
-sebelum migrasi. Neon juga punya fitur *point-in-time restore* di dashboard.
+**Cadangan data.** Neon punya fitur *point-in-time restore* di dashboard-nya;
+foto & dokumen tersimpan permanen di ImageKit.
 
 **Kuota gratis.** Perkiraan pemakaian logbook (beberapa pengguna, ratusan
 entri): Neon terpakai <1%, ImageKit <1%, Vercel <5%/bulan. Sangat longgar.
@@ -305,9 +326,9 @@ entri): Neon terpakai <1%, ImageKit <1%, Vercel <5%/bulan. Sangat longgar.
 
 | Gejala | Penyebab & solusi |
 |---|---|
-| Build Vercel gagal: `DATABASE_URL belum diisi` | Env vars belum ditambahkan di proyek Vercel (Bagian 6.4), lalu **Redeploy** |
-| Login gagal padahal password benar | Migrasi belum dijalankan (`npm run migrate`) atau `DATABASE_URL` di Vercel beda dengan yang dipakai migrasi |
-| Foto lama tidak muncul | Bagian 3/3 migrasi dilewati (kunci ImageKit belum diisi saat itu) → isi `.env`, jalankan `npm run migrate` lagi |
+| Build Vercel gagal: `DATABASE_URL belum diisi` | Env vars belum ditambahkan di proyek Vercel (Bagian 6 langkah 4), lalu **Redeploy** |
+| Login gagal padahal password benar | `DATABASE_URL` di Vercel beda dengan yang dipakai saat daftar/migrasi |
+| Foto tidak muncul | Kunci ImageKit salah/belum diisi di env Vercel → perbaiki lalu **Redeploy** |
 | Foto tampil sebentar lalu rusak setelah 1 jam | Normal — signed URL kedaluwarsa; aplikasi otomatis minta URL baru saat halaman dimuat ulang |
 | `Upload ke ImageKit gagal (401)` | `IMAGEKIT_PRIVATE_KEY` salah/tertukar dengan public key |
 | Ekspor PDF timeout | Entri berfoto sangat banyak; coba lagi (cache CDN membantu) — batas fungsi 60 detik |
