@@ -60,7 +60,9 @@ try {
 // Halaman & pagar peran — memastikan build frontend + API benar-benar hidup
 const cek = [
   ["/", 200], ["/login", 200], ["/kegiatan", 200], ["/laporan", 200],
+  ["/presentasi", 200],
   ["/openapi.json", 200], ["/api/fasilitator/tim", 401], ["/api/komentar/belum-dibaca", 401],
+  ["/api/presentasi/info", 401],
 ];
 console.log("");
 for (const [path, harap] of cek) {
