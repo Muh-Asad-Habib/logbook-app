@@ -314,13 +314,21 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   }
   dialog[open]{
     /* position:fixed + inset:0 + margin:auto — dialog SELALU melayang di
-       tengah layar dan di atas topbar/sidebar (z-index 90 > .side 60 / .top 50),
-       bahkan bila dialog terjebak dalam keadaan terbuka non-modal (tanpa top
-       layer) — sebelumnya keadaan itu membuat dialog tergambar di alur halaman,
-       tertimpa topbar, dan tombol Tutup tak terjangkau. */
-    position:fixed;inset:0;margin:auto;z-index:90;
+       tengah layar dan di ATAS apa pun (sidebar z-60, topbar z-50), bahkan
+       bila dialog terjebak dalam keadaan terbuka non-modal (tanpa top layer)
+       — sebelumnya keadaan itu membuat dialog tertimpa topbar/sidebar
+       sehingga tombol Tutup tak terjangkau. */
+    position:fixed;inset:0;margin:auto;z-index:2147483001;
     animation:pop .24s ease;
   }
+  /* Backdrop cadangan: dipasang HANYA bila dialog ternyata tidak masuk top
+     layer (non-modal) sehingga ::backdrop tidak digambar browser. */
+  .dlg-bg{position:fixed;inset:0;z-index:2147483000;
+    background:rgba(3,5,12,.66);backdrop-filter:blur(6px)}
+  /* Selama ada dialog terbuka: halaman tidak ikut ter-scroll dan navigasi
+     tidak mungkin menutupi/mencuri klik dari dialog. */
+  html.dlg-on{overflow:hidden}
+  html.dlg-on .side,html.dlg-on .top{z-index:1}
   dialog::backdrop{background:rgba(3,5,12,.66);backdrop-filter:blur(6px)}
   dialog.mini{max-width:430px}
   /* Dialog detail memakai TINGGI LAYAR PENUH: kepala tetap di atas, isinya
@@ -1032,6 +1040,7 @@ function lihatLogin(){
   if (ES) { ES.close(); ES = null; }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   setLive(false);
+  tutupSemuaDialog(); // jangan tinggalkan dialog menggantung saat sesi berakhir
   $("#v-app").classList.add("hide");
   $("#v-login").classList.remove("hide");
 }
@@ -1269,11 +1278,7 @@ function bukaDetail(id, tabAwal){
     tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === TAB); });
     renderTab();
     keAtasDetail();
-    // Pulihkan bila dialog terjebak dalam keadaan terbuka (mis. non-modal):
-    // tutup dulu supaya showModal() tidak melempar InvalidStateError.
-    var dlg = $("#d-detail");
-    if (dlg.open) dlg.close();
-    dlg.showModal();
+    bukaDialog($("#d-detail"));
   }).catch(function(e){ toast(e.message, true); });
 }
 function isiKepalaDetail(){
@@ -1492,7 +1497,7 @@ function gantiUsername(id){
   $("#d-un-sub").textContent = "Akun: " + u.username;
   $("#d-un-val").value = u.username;
   var dlg = $("#d-un");
-  dlg.showModal();
+  bukaDialog(dlg);
   dlg.addEventListener("close", function h(){
     dlg.removeEventListener("close", h);
     if (dlg.returnValue !== "ok") return;
@@ -1508,7 +1513,7 @@ function resetPassword(id){
     " — password lama tidak bisa dilihat (hash satu arah), hanya bisa diganti.";
   $("#d-pw-val").value = "";
   var dlg = $("#d-pw");
-  dlg.showModal();
+  bukaDialog(dlg);
   dlg.addEventListener("close", function h(){
     dlg.removeEventListener("close", h);
     if (dlg.returnValue !== "ok") return;
@@ -1551,7 +1556,7 @@ function assignTim(id){
         esc((t.username || "?").charAt(0).toUpperCase()) + '</span> ' + esc(t.username) + '</label>';
     }).join("") : '<div class="mut">Belum ada akun tim.</div>';
     var dlg = $("#d-tim");
-    dlg.showModal();
+    bukaDialog(dlg);
     dlg.addEventListener("close", function h(){
       dlg.removeEventListener("close", h);
       if (dlg.returnValue !== "ok") return;
@@ -1586,7 +1591,7 @@ function assignFasilitator(id){
         ' <span class="badge ' + (role === "dosen" ? "c" : "y") + '">' + labelPeran(role) + '</span></label>';
     }).join("") : '<div class="mut">Belum ada akun pendamping. Set kode pendaftaran fasilitator/dosen lalu bagikan.</div>';
     var dlg = $("#d-fas");
-    dlg.showModal();
+    bukaDialog(dlg);
     dlg.addEventListener("close", function h(){
       dlg.removeEventListener("close", h);
       if (dlg.returnValue !== "ok") return;
@@ -1608,7 +1613,7 @@ function buatAkun(){
   $("#d-baru-p").value = "";
   $("#d-baru-r").value = "tim";
   var dlg = $("#d-baru");
-  dlg.showModal();
+  bukaDialog(dlg);
   dlg.addEventListener("close", function h(){
     dlg.removeEventListener("close", h);
     if (dlg.returnValue !== "ok") return;
@@ -1630,24 +1635,70 @@ function buatAkun(){
   });
 }
 
-/* ---------- pintu darurat dialog ----------
- * Jaring pengaman agar pengguna TIDAK PERNAH terkunci di dalam dialog:
- * - Esc menutup dialog TERATAS yang terbuka (termasuk dialog yang terjebak
- *   dalam keadaan non-modal, yang tidak merespons Esc bawaan browser).
- * - Klik pada area gelap di luar isi dialog juga menutupnya. */
+/* ---------- pengelola dialog (anti-nyangkut) ----------
+ * Dialog HTML normalnya masuk "top layer" lewat showModal(): tergambar di atas
+ * segalanya dan Esc menutupnya. Bila karena satu dan lain hal dialog berakhir
+ * dalam keadaan terbuka NON-modal, ia kehilangan semua itu — tertimpa topbar,
+ * tanpa backdrop, Esc tidak berfungsi — pengguna terkunci di dalamnya.
+ *
+ * Helper di bawah membuat keadaan itu tidak mungkin lagi:
+ *   - buka  : selalu coba showModal(); bila gagal → show() + backdrop manual.
+ *   - tutup : close(), lalu PAKSA cabut atribut open bila masih membandel.
+ *   - Esc, klik backdrop, dan klik di luar isi dialog selalu menutup.
+ */
+function pasangBackdrop(){
+  if (document.querySelector(".dlg-bg")) return;
+  var bg = document.createElement("div");
+  bg.className = "dlg-bg";
+  bg.addEventListener("click", tutupSemuaDialog);
+  document.body.appendChild(bg);
+}
+function bersihkanDialog(){
+  if (document.querySelector("dialog[open]")) return; // masih ada yang terbuka
+  var bg = document.querySelector(".dlg-bg");
+  if (bg) bg.remove();
+  document.documentElement.classList.remove("dlg-on");
+}
+function bukaDialog(dlg){
+  if (!dlg) return;
+  try { if (dlg.open) dlg.close(); } catch(e){}
+  try { dlg.showModal(); }
+  catch(e){ try { dlg.show(); } catch(e2){ dlg.setAttribute("open", ""); } }
+  // :modal true = benar-benar di top layer (backdrop digambar browser)
+  var modal = true;
+  try { modal = dlg.matches(":modal"); } catch(e){}
+  if (!modal) pasangBackdrop();
+  document.documentElement.classList.add("dlg-on");
+}
+function tutupDialog(dlg){
+  if (!dlg) return;
+  try { dlg.close(); } catch(e){}
+  if (dlg.open) dlg.removeAttribute("open"); // pintu darurat terakhir
+  bersihkanDialog();
+}
+function tutupSemuaDialog(){
+  var buka = document.querySelectorAll("dialog[open]");
+  for (var i = 0; i < buka.length; i++) tutupDialog(buka[i]);
+  bersihkanDialog();
+}
+// Dialog mini ditutup oleh <form method="dialog"> tanpa lewat tutupDialog —
+// bersihkan backdrop & kunci scroll lewat event close bawaan.
+document.querySelectorAll("dialog").forEach(function(d){
+  d.addEventListener("close", bersihkanDialog);
+});
+// Esc menutup dialog teratas, termasuk yang terjebak non-modal
 document.addEventListener("keydown", function(e){
   if (e.key !== "Escape") return;
   var buka = document.querySelectorAll("dialog[open]");
-  if (buka.length) { e.preventDefault(); buka[buka.length - 1].close(); }
+  if (buka.length) { e.preventDefault(); tutupDialog(buka[buka.length - 1]); }
 });
+// Klik pada tepian/luar isi dialog juga menutup
 document.addEventListener("click", function(e){
   var d = e.target;
   if (!(d instanceof HTMLDialogElement) || !d.open) return;
-  // klik tepat pada elemen <dialog> = area backdrop/tepian, bukan isinya
   var r = d.getBoundingClientRect();
-  var diLuar = e.clientX < r.left || e.clientX > r.right ||
-               e.clientY < r.top || e.clientY > r.bottom;
-  if (diLuar) d.close();
+  if (e.clientX < r.left || e.clientX > r.right ||
+      e.clientY < r.top || e.clientY > r.bottom) tutupDialog(d);
 });
 
 /* ---------- event delegation ---------- */
@@ -1685,7 +1736,7 @@ document.addEventListener("click", function(ev){
     case "hapus": hapusUser(el.dataset.id); break;
     case "tim": assignTim(el.dataset.id); break;
     case "fas": assignFasilitator(el.dataset.id); break;
-    case "tutup-detail": $("#d-detail").close(); break;
+    case "tutup-detail": tutupDialog($("#d-detail")); break;
     case "foto": window.open(fotoUrl(el.dataset.key), "_blank"); break;
   }
 });
