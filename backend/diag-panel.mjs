@@ -44,7 +44,12 @@ const wajib = [
   "user.buat",
   "punya_presentasi",
   // pintu darurat dialog (anti-nyangkut)
-  "position:fixed;inset:0;margin:auto;z-index:90",
+  "z-index:2147483001",
+  "function bukaDialog",
+  "function tutupDialog",
+  "tutupSemuaDialog",
+  '.matches(":modal")',
+  "dlg-bg",
   'e.key !== "Escape"',
 ];
 const hilang = wajib.filter((k) => !PANEL_HTML.includes(k));
