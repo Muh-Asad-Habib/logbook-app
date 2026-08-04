@@ -186,7 +186,7 @@ const isHeaderRow = (tr) => {
 };
 
 /**
- * Kosongkan isi lama tabel template (dipakai akun selain "pemilik template"):
+ * Kosongkan isi lama tabel template (dipakai akun selain pemilik template):
  * baris judul & baris kosong (slot pengisian) dipertahankan, baris data lama dibuang —
  * sehingga dokumen hasil ekspor hanya berisi data milik akun itu sendiri.
  */
