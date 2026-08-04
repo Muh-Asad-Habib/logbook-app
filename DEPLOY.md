@@ -202,7 +202,7 @@ git add . ; git commit -m "perubahan" ; git push   # simpan kode
 npm run deploy                                      # kirim ke Vercel (produksi)
 npm run cek:online https://URL-KAMU.vercel.app      # pastikan versi online = commit terakhir
 ```
-`npm run deploy` = `vercel --prod --yes` (butuh login sekali: `npx vercel login`).
+`npm run deploy` = `npx vercel --prod --yes` (butuh login sekali: `npx vercel login`).
 
 `npm run cek:online` membandingkan commit yang **sedang online** (dibaca dari
 `/health`) dengan commit terakhir di laptop, lalu menguji halaman & pagar peran.
