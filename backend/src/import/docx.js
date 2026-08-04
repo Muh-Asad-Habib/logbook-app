@@ -15,7 +15,9 @@ const BULAN_MAP = {
   jul: 7, agu: 8, sep: 9, okt: 10, nov: 11, des: 12,
 };
 
-const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 40);
+// Kunci dedup entri — 80 huruf pertama agar entri mirip (beda di bagian
+// belakang, mis. jam pelaksanaan) tetap dikenali sebagai entri berbeda.
+const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 80);
 
 const unesc = (s) => String(s)
   .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
@@ -128,84 +130,132 @@ export async function importDocx(buffer, userId) {
   }
 
   const tables = docXml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [];
-  if (tables.length < 2) throw new Error("Dokumen tidak dikenali (butuh 2 tabel logbook)");
+  if (!tables.length) throw new Error("Dokumen tidak dikenali (tidak ada tabel logbook)");
 
   const warnings = [];
   const kegAda = new Set((await store.listKegiatan(userId)).map((e) => norm(e.kegiatan)));
   const keuAda = new Set((await store.listKeuangan(userId)).map((e) => norm(e.item)));
 
-  // ---------- Tabel 1: kegiatan ----------
-  let kegBaru = 0, kegLewat = 0, prevCum = 0, lastTglKeg = null;
-  for (const tr of rowsOf(tables[0])) {
-    const cells = cellsOf(tr);
-    if (cells.length < 5) continue;
-    const teks = cells.map(cellText);
-    const semua = teks.join(" ").toLowerCase();
-    if (!semua.trim()) continue;
-    if (semua.includes("tanggal") && semua.includes("kegiatan")) continue; // header
-
-    const tanggal = parseTanggal(teks[0]) || lastTglKeg;
-    if (parseTanggal(teks[0])) lastTglKeg = parseTanggal(teks[0]);
-    const kegiatan = teks[1].trim();
-    if (!tanggal || !kegiatan) {
-      if (warnings.length < 8) {
-        warnings.push(`Baris kegiatan dilewati (tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
-      }
-      continue;
+  /**
+   * Tentukan jenis sebuah tabel: 'kegiatan' | 'keuangan' | null.
+   * 1. Dari baris header (bila ada): "kegiatan"+"capaian/waktu" vs "item/harga".
+   * 2. Tanpa header (tabel terpotong halaman): dari pola isi — kolom ke-3
+   *    berupa persen → kegiatan; berisi "Rp" → keuangan.
+   * 3. Masih tak dikenal → dianggap lanjutan tabel sebelumnya.
+   */
+  function jenisTabel(tbl, sebelumnya) {
+    const rows = rowsOf(tbl);
+    const kepala = rows.slice(0, 2)
+      .map((tr) => cellsOf(tr).map(cellText).join(" ").toLowerCase()).join(" ");
+    if (kepala.includes("harga") && (kepala.includes("item") || kepala.includes("jumlah"))) {
+      return "keuangan";
     }
-    const cum = parseAngka(teks[2]);
-    const delta = Math.max(0, cum - prevCum);
-    prevCum = Math.max(prevCum, cum);
-    if (kegAda.has(norm(kegiatan))) { kegLewat += 1; continue; }
-
-    const fotoKeys = [];
-    for (const rid of cellImageIds(cells[4])) {
-      const k = await saveImage(zip, relMap, rid, `keg_${tanggal}`);
-      if (k) fotoKeys.push(k);
+    if (kepala.includes("kegiatan") && (kepala.includes("capaian") || kepala.includes("waktu"))) {
+      return "kegiatan";
     }
-    await store.addKegiatan(userId, {
-      tanggal, kegiatan, capaian_delta: delta,
-      waktu_menit: parseWaktu(teks[3]), foto_keys: fotoKeys,
-    });
-    kegAda.add(norm(kegiatan));
-    kegBaru += 1;
+    for (const tr of rows.slice(0, 5)) {
+      const teks = cellsOf(tr).map(cellText);
+      if (/^\d+\s*%$/.test((teks[2] || "").trim())) return "kegiatan";
+      if (/rp\s*[\d.]/i.test(teks[2] || "")) return "keuangan";
+    }
+    return sebelumnya;
   }
 
-  // ---------- Tabel 2: keuangan ----------
-  let keuBaru = 0, keuLewat = 0, lastTglKeu = null;
-  for (const tr of rowsOf(tables[1])) {
-    const cells = cellsOf(tr);
-    if (cells.length < 6) continue;
-    const teks = cells.map(cellText);
-    const semua = teks.join(" ").toLowerCase();
-    if (!semua.trim()) continue;
-    if (semua.includes("item") && semua.includes("harga")) continue; // header
+  // ---------- Baris kegiatan ----------
+  let kegBaru = 0, kegLewat = 0, prevCum = 0, lastTglKeg = null;
+  async function prosesKegiatan(tbl) {
+    for (const tr of rowsOf(tbl)) {
+      const cells = cellsOf(tr);
+      if (cells.length < 5) continue;
+      const teks = cells.map(cellText);
+      const semua = teks.join(" ").toLowerCase();
+      if (!semua.trim()) continue;
+      if (semua.includes("tanggal") && semua.includes("kegiatan")) continue; // header
 
-    const tanggal = parseTanggal(teks[0]) || lastTglKeu;
-    if (parseTanggal(teks[0])) lastTglKeu = parseTanggal(teks[0]);
-    const item = teks[1].trim();
-    if (!item) continue;
-    if (keuAda.has(norm(item))) { keuLewat += 1; continue; }
-    if (!tanggal) {
-      if (warnings.length < 8) {
-        warnings.push(`Baris belanja dilewati (tanggal tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
+      const tanggal = parseTanggal(teks[0]) || lastTglKeg;
+      if (parseTanggal(teks[0])) lastTglKeg = parseTanggal(teks[0]);
+      const kegiatan = teks[1].trim();
+      if (!tanggal || !kegiatan) {
+        if (warnings.length < 8) {
+          warnings.push(`Baris kegiatan dilewati (tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
+        }
+        continue;
       }
-      continue;
+      const cum = parseAngka(teks[2]);
+      const delta = Math.max(0, cum - prevCum);
+      prevCum = Math.max(prevCum, cum);
+      if (kegAda.has(norm(kegiatan))) { kegLewat += 1; continue; }
+
+      // Foto bisa diletakkan pengguna di sel mana pun (kolom Berkas, kolom
+      // Kegiatan, bahkan kolom Tanggal/Validasi) — sisir seluruh sel baris.
+      const fotoKeys = [];
+      for (const tc of cells) {
+        for (const rid of cellImageIds(tc)) {
+          const k = await saveImage(zip, relMap, rid, `keg_${tanggal}`);
+          if (k) fotoKeys.push(k);
+        }
+      }
+      await store.addKegiatan(userId, {
+        tanggal, kegiatan, capaian_delta: delta,
+        waktu_menit: parseWaktu(teks[3]), foto_keys: fotoKeys,
+      });
+      kegAda.add(norm(kegiatan));
+      kegBaru += 1;
     }
+  }
 
-    let buktiKey = "";
-    const ids = cellImageIds(cells[5]);
-    if (ids.length) buktiKey = (await saveImage(zip, relMap, ids[0], `keu_${tanggal}`)) || "";
+  // ---------- Baris keuangan ----------
+  let keuBaru = 0, keuLewat = 0, lastTglKeu = null;
+  async function prosesKeuangan(tbl) {
+    for (const tr of rowsOf(tbl)) {
+      const cells = cellsOf(tr);
+      if (cells.length < 6) continue;
+      const teks = cells.map(cellText);
+      const semua = teks.join(" ").toLowerCase();
+      if (!semua.trim()) continue;
+      if (semua.includes("item") && semua.includes("harga")) continue; // header
 
-    await store.addKeuangan(userId, {
-      tanggal, item,
-      harga_satuan: parseRupiah(teks[2]),
-      satuan_suffix: parseSuffix(teks[2]),
-      jumlah: parseAngka(teks[3], 1) || 1,
-      bukti_key: buktiKey,
-    });
-    keuAda.add(norm(item));
-    keuBaru += 1;
+      const tanggal = parseTanggal(teks[0]) || lastTglKeu;
+      if (parseTanggal(teks[0])) lastTglKeu = parseTanggal(teks[0]);
+      const item = teks[1].trim();
+      if (!item) continue;
+      if (keuAda.has(norm(item))) { keuLewat += 1; continue; }
+      if (!tanggal) {
+        if (warnings.length < 8) {
+          warnings.push(`Baris belanja dilewati (tanggal tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
+        }
+        continue;
+      }
+
+      let buktiKey = "";
+      // Utamakan kolom Bukti (ke-6), tetapi terima juga bila foto diletakkan
+      // di sel lain pada baris yang sama.
+      const ids = [...cellImageIds(cells[5]), ...cells.filter((_, c) => c !== 5).flatMap(cellImageIds)];
+      if (ids.length) buktiKey = (await saveImage(zip, relMap, ids[0], `keu_${tanggal}`)) || "";
+
+      await store.addKeuangan(userId, {
+        tanggal, item,
+        harga_satuan: parseRupiah(teks[2]),
+        satuan_suffix: parseSuffix(teks[2]),
+        jumlah: parseAngka(teks[3], 1) || 1,
+        bukti_key: buktiKey,
+      });
+      keuAda.add(norm(item));
+      keuBaru += 1;
+    }
+  }
+
+  // Proses setiap tabel sesuai jenisnya. Tabel pertama tanpa ciri apa pun
+  // dianggap kegiatan (kompatibel dengan template resmi: tabel 1 = kegiatan).
+  let jenisSebelumnya = null;
+  for (let i = 0; i < tables.length; i++) {
+    const jenis = jenisTabel(tables[i], jenisSebelumnya) || (i === 0 ? "kegiatan" : null);
+    if (jenis === "kegiatan") await prosesKegiatan(tables[i]);
+    else if (jenis === "keuangan") await prosesKeuangan(tables[i]);
+    else if (warnings.length < 8) {
+      warnings.push(`Tabel ke-${i + 1} dilewati (bukan tabel kegiatan/keuangan yang dikenali)`);
+    }
+    jenisSebelumnya = jenis;
   }
 
   return { keg_baru: kegBaru, keg_lewat: kegLewat, keu_baru: keuBaru, keu_lewat: keuLewat, warnings };

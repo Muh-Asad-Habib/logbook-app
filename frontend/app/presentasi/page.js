@@ -454,14 +454,15 @@ function PresentasiTim() {
               Tautan presentasi Canva
             </div>
             <div className="muted">
-              Salin dari tombol <b>Bagikan</b> di Canva. Hanya untuk <b>pratinjau</b> —
-              tidak ada unduhan.
+              Salin dari tombol <b>Bagikan</b> di Canva — tautan{" "}
+              <b>canva.com/design/…</b> maupun short-link <b>canva.link/…</b>{" "}
+              diterima. Hanya untuk <b>pratinjau</b> — tidak ada unduhan.
             </div>
           </div>
         </div>
         <div className="row">
           <input
-            type="url" inputMode="url" placeholder="https://www.canva.com/design/…/view"
+            type="url" inputMode="url" placeholder="https://www.canva.com/design/…/view atau https://canva.link/…"
             value={linkCanva}
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setLinkCanva(e.target.value)}

@@ -602,6 +602,46 @@ export function normalisasiCanva(url) {
   return `https://www.canva.com/design/${id.design}/${id.token}/view?embed`;
 }
 
+/** Apakah URL adalah short-link resmi Canva (https://canva.link/xxxx)? */
+function adalahCanvaLink(url) {
+  const bersih = String(url || "").trim();
+  if (!bersih) return null;
+  try {
+    const u = new URL(bersih.startsWith("http") ? bersih : `https://${bersih}`);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return /(^|\.)canva\.link$/i.test(u.hostname) ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolusi tautan Canva APA PUN → bentuk embed `/view?embed`.
+ * - Tautan canva.com/design/… → normalisasi langsung (tanpa jaringan).
+ * - Short-link canva.link/… → ikuti redirect server-side (timeout 8 dtk),
+ *   lalu normalisasi URL tujuan. Mengembalikan "" bila bukan Canva yang sah
+ *   atau redirect gagal (mis. offline).
+ */
+export async function resolveCanva(url) {
+  const langsung = normalisasiCanva(url);
+  if (langsung) return langsung;
+  const u = adalahCanvaLink(url);
+  if (!u) return "";
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 8000);
+    // redirect: "follow" — res.url berisi URL final setelah seluruh redirect
+    const res = await fetch(u.href, {
+      redirect: "follow",
+      signal: ctl.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (LogbookApp; +presentasi)" },
+    }).finally(() => clearTimeout(timer));
+    return normalisasiCanva(res.url || "");
+  } catch {
+    return "";
+  }
+}
+
 async function barisPresentasi(userId) {
   const rows = await q("SELECT * FROM presentasi WHERE user_id = $1", [userId]);
   return rows[0] || null;
@@ -673,9 +713,9 @@ export async function deletePresentasiFile(userId) {
   return true;
 }
 
-/** Simpan tautan Canva (sudah dinormalisasi ke bentuk embed). */
+/** Simpan tautan Canva (canva.com/design/… atau short-link canva.link/…). */
 export async function setCanvaPresentasi(userId, url) {
-  const embed = normalisasiCanva(url);
+  const embed = await resolveCanva(url);
   if (!embed) return null;
   const ts = nowIso();
   await q(
