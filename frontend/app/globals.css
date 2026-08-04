@@ -104,7 +104,14 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 @keyframes lbIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lbImg { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 
-.stagger > * { animation: fadeUp 0.42s ease both; }
+/* Animasi "masuk" HANYA untuk 7 kartu pertama.
+   Penting: `animation-fill-mode: both` menahan elemen pada keadaan awal
+   (opacity 0) sampai animasinya benar-benar dijalankan. Pada daftar panjang
+   (puluhan kartu) browser menunda animasi elemen yang berada di luar layar,
+   sehingga saat di-scroll cepat kartu bisa muncul KOSONG (hanya ruang putih)
+   sebelum akhirnya tampil. Karena itu kartu ke-8 dan seterusnya tidak
+   dianimasikan sama sekali — selalu langsung terlihat. */
+.stagger > *:nth-child(-n+7) { animation: fadeUp 0.42s ease both; }
 .stagger > *:nth-child(2) { animation-delay: 0.05s; }
 .stagger > *:nth-child(3) { animation-delay: 0.1s; }
 .stagger > *:nth-child(4) { animation-delay: 0.15s; }
@@ -112,6 +119,12 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .stagger > *:nth-child(6) { animation-delay: 0.25s; }
 .stagger > *:nth-child(7) { animation-delay: 0.3s; }
 .stagger > *:nth-child(8) { animation-delay: 0.35s; }
+
+/* Hormati setelan sistem "kurangi gerakan" + jaring pengaman: konten daftar
+   tidak boleh bergantung pada animasi untuk bisa terlihat. */
+@media (prefers-reduced-motion: reduce) {
+  .stagger > *, .tl-item { animation: none !important; }
+}
 
 /* ============================================================
    LAYOUT: sidebar (desktop) + bottom-nav (mobile)
@@ -302,7 +315,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   backdrop-filter: blur(18px) saturate(1.5);
   border-top: 1px solid var(--line);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-  /* Satu baris berapa pun jumlah menunya (4 utk fasilitator, 6 utk tim) */
+  /* Satu baris berapa pun jumlah menunya (5 utk pendamping, 7 utk tim) */
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   box-shadow: 0 -8px 28px -10px rgba(18, 20, 46, 0.18);
@@ -669,6 +682,9 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 .foto-row img {
   width: 88px; height: 88px; object-fit: cover; border-radius: 12px;
   border: 1px solid var(--line); cursor: zoom-in;
+  /* Kotak selalu punya ukuran & latar tetap: saat foto masih dimuat (lazy)
+     atau gagal dimuat, tata letak kartu tidak berubah & tidak ada area kosong. */
+  display: block; flex: 0 0 auto; background: var(--soft);
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 .foto-row img:hover { transform: scale(1.06) rotate(-1deg); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22); }
@@ -731,7 +747,11 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
   content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px; width: 3px;
   background: linear-gradient(180deg, var(--p1), var(--p3)); border-radius: 2px; opacity: 0.3;
 }
-.tl-item { position: relative; margin-bottom: 12px; animation: fadeUp 0.45s ease both; }
+/* Animasi masuk hanya 5 item pertama — item selanjutnya langsung terlihat
+   (lihat catatan pada .stagger: fill-mode `both` bisa menahan item di luar
+   layar dalam keadaan tak terlihat saat daftar di-scroll). */
+.tl-item { position: relative; margin-bottom: 12px; }
+.tl-item:nth-child(-n+5) { animation: fadeUp 0.45s ease both; }
 .tl-item:nth-child(2) { animation-delay: 0.06s; }
 .tl-item:nth-child(3) { animation-delay: 0.12s; }
 .tl-item:nth-child(4) { animation-delay: 0.18s; }
