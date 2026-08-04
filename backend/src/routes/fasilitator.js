@@ -166,9 +166,10 @@ router.get("/tim/:timId/statistik", pastikanAkses, async (req, res, next) => {
 router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
   try {
     const { _kegiatan, ...statistik } = await hitungStatistik(req.tim.id);
-    const [aktivitas, laporan, belumDibaca, persetujuan] = await Promise.all([
+    const [aktivitas, laporan, presentasi, belumDibaca, persetujuan] = await Promise.all([
       bacaAktivitas(req.tim.id, 10),
       store.infoLaporan(req.tim.id),
+      store.infoPresentasi(req.tim.id),
       store.hitungBelumDibaca(req.user.id, req.user.role),
       store.ringkasPersetujuan(req.tim.id),
     ]);
@@ -178,6 +179,7 @@ router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
       kegiatan_terakhir: _kegiatan.slice(-5).reverse(),
       aktivitas,
       laporan,
+      presentasi,
       komentar_belum_dibaca: belumDibaca,
       persetujuan,
     });
@@ -258,11 +260,94 @@ router.post("/tim/:timId/laporan-tautan", pastikanAkses, async (req, res, next) 
     // Tautan milik TIM (user_id = tim) — route publik /api/laporan/publik/:kunci
     // yang sudah ada langsung bisa menyajikannya tanpa perubahan apa pun.
     await q("DELETE FROM laporan_links WHERE exp < $1", [Date.now()]);
-    await q("INSERT INTO laporan_links (kunci, user_id, exp) VALUES ($1, $2, $3)",
+    await q("INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'laporan')",
       [kunci, req.tim.id, exp]);
     const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
     const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
     res.json({ url: `${proto}://${host}/api/laporan/publik/${kunci}`, exp });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/tim/{timId}/presentasi-info:
+ *   get:
+ *     tags: [Fasilitator]
+ *     summary: Info presentasi tim (berkas .pptx & tautan Canva)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ ada, file: {…}, canva: {…} }" }
+ */
+router.get("/tim/:timId/presentasi-info", pastikanAkses, async (req, res, next) => {
+  try {
+    res.json(await store.infoPresentasi(req.tim.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/tim/{timId}/presentasi-file:
+ *   get:
+ *     tags: [Fasilitator]
+ *     summary: Ambil/unduh berkas presentasi tim (.pptx)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Berkas .pptx }
+ *       404: { description: Tim belum mengunggah presentasi }
+ */
+router.get("/tim/:timId/presentasi-file", pastikanAkses, async (req, res, next) => {
+  try {
+    const p = await store.getPresentasi(req.tim.id);
+    if (!p) return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
+    res.setHeader("Content-Type",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+    const unduh = req.query.unduh ? "attachment" : "inline";
+    res.setHeader("Content-Disposition",
+      `${unduh}; filename="${encodeURIComponent(p.nama)}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(p.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/tim/{timId}/presentasi-tautan:
+ *   post:
+ *     tags: [Fasilitator]
+ *     summary: Buat tautan publik 30 menit untuk penampil Office (presentasi)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ url, exp }" }
+ *       404: { description: Tim belum mengunggah berkas presentasi }
+ */
+router.post("/tim/:timId/presentasi-tautan", pastikanAkses, async (req, res, next) => {
+  try {
+    const info = await store.infoPresentasi(req.tim.id);
+    if (!info.file.ada) {
+      return res.status(404).json({ error: "Tim belum mengunggah berkas presentasi" });
+    }
+    const kunci = crypto.randomBytes(24).toString("hex");
+    const exp = Date.now() + UMUR_TAUTAN_MS;
+    await q("DELETE FROM laporan_links WHERE exp < $1", [Date.now()]);
+    await q(
+      "INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'presentasi')",
+      [kunci, req.tim.id, exp]
+    );
+    const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
+    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+    res.json({ url: `${proto}://${host}/api/presentasi/publik/${kunci}`, exp });
   } catch (err) {
     next(err);
   }

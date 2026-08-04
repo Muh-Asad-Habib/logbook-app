@@ -19,7 +19,7 @@ import { rateLimit } from "../ratelimit.js";
 const router = Router();
 router.use(authRequired);
 
-const JENIS_VALID = new Set(["kegiatan", "keuangan", "laporan"]);
+const JENIS_VALID = new Set(["kegiatan", "keuangan", "laporan", "presentasi"]);
 
 const komentarLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -211,6 +211,12 @@ router.post("/", komentarLimiter, async (req, res, next) => {
       } else if (jenis === "keuangan") {
         if (!(await store.getKeuangan(timId, targetId))) {
           return res.status(404).json({ error: "Entri belanja tidak ditemukan" });
+        }
+      } else if (jenis === "presentasi") {
+        // presentasi: target = id tim (satu presentasi per tim)
+        targetId = timId;
+        if (!(await store.infoPresentasi(timId)).ada) {
+          return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
         }
       } else {
         // laporan: target = id tim (satu laporan per tim)

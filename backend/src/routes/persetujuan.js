@@ -21,7 +21,7 @@ import { catatAktivitas } from "../aktivitas.js";
 const router = Router();
 router.use(authRequired);
 
-const JENIS_VALID = new Set(["kegiatan", "keuangan", "laporan"]);
+const JENIS_VALID = new Set(["kegiatan", "keuangan", "laporan", "presentasi"]);
 const STATUS_VALID = new Set(["disetujui", "revisi", "menunggu"]);
 
 /** Tim yang sah untuk request ini (tim = dirinya; pendamping = ?tim= ter-assign). */
@@ -58,7 +58,7 @@ router.get("/", async (req, res, next) => {
   try {
     const jenis = req.query.jenis ? String(req.query.jenis) : "";
     if (jenis && !JENIS_VALID.has(jenis)) {
-      return res.status(400).json({ error: "jenis harus kegiatan/keuangan/laporan" });
+      return res.status(400).json({ error: "jenis harus kegiatan/keuangan/laporan/presentasi" });
     }
     const timId = await timUntukRequest(req, res);
     if (!timId) return;
@@ -119,7 +119,7 @@ router.put("/", hanyaDosen, async (req, res, next) => {
   try {
     const jenis = String(req.body?.jenis || "");
     if (!JENIS_VALID.has(jenis)) {
-      return res.status(400).json({ error: "jenis harus kegiatan/keuangan/laporan" });
+      return res.status(400).json({ error: "jenis harus kegiatan/keuangan/laporan/presentasi" });
     }
     const status = String(req.body?.status || "");
     if (!STATUS_VALID.has(status)) {
@@ -141,6 +141,11 @@ router.put("/", hanyaDosen, async (req, res, next) => {
     } else if (jenis === "keuangan") {
       if (!(await store.getKeuangan(timId, targetId))) {
         return res.status(404).json({ error: "Entri belanja tidak ditemukan" });
+      }
+    } else if (jenis === "presentasi") {
+      targetId = timId; // satu presentasi per tim (pptx + Canva)
+      if (!(await store.infoPresentasi(timId)).ada) {
+        return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
       }
     } else {
       targetId = timId; // satu laporan per tim

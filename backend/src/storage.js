@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Penyimpanan data di Neon Postgres (menggantikan data/db.json).
  *
  * Semua fungsi di sini ASINKRON (mengembalikan Promise) karena data kini
@@ -115,7 +115,7 @@ export async function createUser(username, password, role = "tim") {
   return u;
 }
 
-/** Ganti username (dipakai halaman profil & panel pemeliharaan). */
+/** Ganti username (dipakai halaman profil & panel admin). */
 export async function updateUsername(userId, usernameBaru) {
   const username = String(usernameBaru).trim();
   const rows = await q(
@@ -195,7 +195,7 @@ export async function listUsersWithStats() {
   }));
 }
 
-/** Detail lengkap satu akun untuk panel pemeliharaan (tanpa hash password). */
+/** Detail lengkap satu akun untuk panel admin (tanpa hash password). */
 export async function getUserDetail(userId) {
   const u = await getUserById(userId);
   if (!u) return null;
@@ -226,6 +226,7 @@ export async function getUserDetail(userId) {
     kegiatan,
     keuangan,
     laporan: await infoLaporan(userId),
+    presentasi: await infoPresentasi(userId),
     ringkasan: {
       dana_awal: danaAwal,
       pengeluaran,
@@ -259,12 +260,19 @@ export async function deleteUser(userId) {
   )) {
     fileKeys.push(r.file_key);
   }
+  // Presentasi .pptx di ImageKit ikut dihapus lewat fileKeys
+  for (const r of await q(
+    "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''", [userId]
+  )) {
+    fileKeys.push(r.file_key);
+  }
   await q("DELETE FROM kegiatan   WHERE user_id = $1", [userId]);
   await q("DELETE FROM keuangan   WHERE user_id = $1", [userId]);
   await q("DELETE FROM pengaturan WHERE user_id = $1", [userId]);
   await q("DELETE FROM sessions   WHERE user_id = $1", [userId]);
   await q("DELETE FROM laporan_docx  WHERE user_id = $1", [userId]);
   await q("DELETE FROM laporan_links WHERE user_id = $1", [userId]);
+  await q("DELETE FROM presentasi    WHERE user_id = $1", [userId]);
   await q("DELETE FROM fasilitator_tim WHERE fasilitator_id = $1 OR tim_user_id = $1", [userId]);
   await q(
     `DELETE FROM komentar_baca WHERE user_id = $1
@@ -334,6 +342,8 @@ export async function fileDimilikiOleh(key, userIds) {
      SELECT 1 FROM keuangan WHERE user_id = ANY($1::text[]) AND bukti_key = $2::text
      UNION ALL
      SELECT 1 FROM laporan_docx WHERE user_id = ANY($1::text[]) AND file_key = $2::text
+     UNION ALL
+     SELECT 1 FROM presentasi WHERE user_id = ANY($1::text[]) AND file_key = $2::text
      LIMIT 1`,
     [ids, key]
   );
@@ -556,6 +566,141 @@ export async function deleteLaporan(userId) {
   return rows.length > 0;
 }
 
+/* ---------- Presentasi (.pptx + tautan Canva — SATU set per user) ----------
+ * Berbeda dengan laporan, satu tim boleh punya DUA item sekaligus:
+ *   1. berkas .pptx (disimpan di ImageKit, kolom file_key), dan
+ *   2. tautan Canva (kolom canva_url) — hanya pratinjau, tanpa unduh.
+ * Keduanya berbagi satu baris (PK user_id) dan bisa dihapus sendiri-sendiri.
+ * Perubahan pada salah satunya mengembalikan status ACC ke "menunggu". */
+
+/** Ambil id desain Canva dari bentuk tautan apa pun yang dibagikan pengguna. */
+function idDesainCanva(url) {
+  const m = String(url || "").match(
+    /canva\.com\/design\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)/
+  );
+  return m ? { design: m[1], token: m[2] } : null;
+}
+
+/**
+ * Normalisasi tautan Canva → bentuk embed `/view?embed`.
+ * Menerima link share biasa (…/view?utm_content=…), link edit, atau link
+ * yang sudah embed. Mengembalikan "" bila bukan tautan Canva yang sah.
+ */
+export function normalisasiCanva(url) {
+  const bersih = String(url || "").trim();
+  if (!bersih) return "";
+  let u;
+  try {
+    u = new URL(bersih.startsWith("http") ? bersih : `https://${bersih}`);
+  } catch {
+    return "";
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+  if (!/(^|\.)canva\.com$/i.test(u.hostname)) return "";
+  const id = idDesainCanva(u.href);
+  if (!id) return "";
+  return `https://www.canva.com/design/${id.design}/${id.token}/view?embed`;
+}
+
+async function barisPresentasi(userId) {
+  const rows = await q("SELECT * FROM presentasi WHERE user_id = $1", [userId]);
+  return rows[0] || null;
+}
+
+/** Hapus baris presentasi bila file & tautan sama-sama sudah kosong. */
+async function rapikanPresentasi(userId) {
+  await q(
+    "DELETE FROM presentasi WHERE user_id = $1 AND file_key = '' AND canva_url = ''",
+    [userId]
+  );
+}
+
+export async function savePresentasi(userId, nama, buffer) {
+  const lama = await q(
+    "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''", [userId]
+  );
+  const key = await putFileRaw(nama, buffer, "ppt");
+  const ts = nowIso();
+  await q(
+    `INSERT INTO presentasi (user_id, nama, ukuran, file_key, file_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $5)
+     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
+       ukuran = EXCLUDED.ukuran, file_key = EXCLUDED.file_key,
+       file_at = EXCLUDED.file_at, updated_at = EXCLUDED.updated_at`,
+    [userId, nama, buffer.length, key, ts]
+  );
+  if (lama[0]?.file_key) await removeFiles([lama[0].file_key]);
+  await hapusPersetujuan("presentasi", userId);
+  return { nama, ukuran: buffer.length };
+}
+
+/** Info gabungan: { file: {ada,…}, canva: {ada, url}, ada } */
+export async function infoPresentasi(userId) {
+  const r = await barisPresentasi(userId);
+  const file = r?.file_key
+    ? {
+        ada: true,
+        nama: r.nama,
+        ukuran: Number(r.ukuran) || 0,
+        updated_at: r.file_at || r.updated_at,
+      }
+    : { ada: false };
+  const canva = r?.canva_url
+    ? { ada: true, url: r.canva_url, updated_at: r.canva_at || r.updated_at }
+    : { ada: false };
+  return { ada: file.ada || canva.ada, file, canva, updated_at: r?.updated_at || "" };
+}
+
+export async function getPresentasi(userId) {
+  const r = await barisPresentasi(userId);
+  if (!r?.file_key) return null;
+  const buffer = await getFileBuffer(r.file_key);
+  if (!buffer) return null;
+  return { nama: r.nama, buffer };
+}
+
+export async function deletePresentasiFile(userId) {
+  const rows = await q(
+    `UPDATE presentasi SET nama = '', ukuran = 0, file_key = '', file_at = '',
+            updated_at = $2
+       WHERE user_id = $1 AND file_key <> '' RETURNING file_key`,
+    [userId, nowIso()]
+  );
+  if (!rows.length) return false;
+  if (rows[0].file_key) await removeFiles([rows[0].file_key]);
+  await rapikanPresentasi(userId);
+  await hapusPersetujuan("presentasi", userId);
+  return true;
+}
+
+/** Simpan tautan Canva (sudah dinormalisasi ke bentuk embed). */
+export async function setCanvaPresentasi(userId, url) {
+  const embed = normalisasiCanva(url);
+  if (!embed) return null;
+  const ts = nowIso();
+  await q(
+    `INSERT INTO presentasi (user_id, canva_url, canva_at, updated_at)
+     VALUES ($1, $2, $3, $3)
+     ON CONFLICT (user_id) DO UPDATE SET canva_url = EXCLUDED.canva_url,
+       canva_at = EXCLUDED.canva_at, updated_at = EXCLUDED.updated_at`,
+    [userId, embed, ts]
+  );
+  await hapusPersetujuan("presentasi", userId);
+  return { url: embed, updated_at: ts };
+}
+
+export async function deleteCanvaPresentasi(userId) {
+  const rows = await q(
+    `UPDATE presentasi SET canva_url = '', canva_at = '', updated_at = $2
+       WHERE user_id = $1 AND canva_url <> '' RETURNING user_id`,
+    [userId, nowIso()]
+  );
+  if (!rows.length) return false;
+  await rapikanPresentasi(userId);
+  await hapusPersetujuan("presentasi", userId);
+  return true;
+}
+
 /* ---------- Pendamping (fasilitator & dosen) ↔ Tim (assignment many-to-many) ----------
  * 1 tim boleh diampu banyak pendamping; 1 pendamping boleh mengampu
  * banyak tim. Assignment dibuat lewat kode tim (mandiri) atau oleh admin.
@@ -774,7 +919,7 @@ export async function hitungBelumDibaca(userId, role) {
       GROUP BY k.jenis`,
     [userId]
   );
-  const hasil = { kegiatan: 0, keuangan: 0, laporan: 0, total: 0 };
+  const hasil = { kegiatan: 0, keuangan: 0, laporan: 0, presentasi: 0, total: 0 };
   for (const r of rows) {
     hasil[r.jenis] = angka(r.n);
     hasil.total += angka(r.n);
@@ -873,10 +1018,11 @@ export async function listPersetujuan(timUserId, jenis) {
  * { kegiatan: {total, disetujui, revisi, menunggu}, keuangan: {…}, laporan: {…}, total_revisi }
  */
 export async function ringkasPersetujuan(timUserId) {
-  const [kegRows, keuRows, lap, accRows] = await Promise.all([
+  const [kegRows, keuRows, lap, pres, accRows] = await Promise.all([
     q("SELECT COUNT(*) AS n FROM kegiatan WHERE user_id = $1", [timUserId]),
     q("SELECT COUNT(*) AS n FROM keuangan WHERE user_id = $1", [timUserId]),
     infoLaporan(timUserId),
+    infoPresentasi(timUserId),
     q(`SELECT jenis, status, COUNT(*) AS n FROM persetujuan
         WHERE tim_user_id = $1 GROUP BY jenis, status`, [timUserId]),
   ]);
@@ -884,9 +1030,11 @@ export async function ringkasPersetujuan(timUserId) {
     kegiatan: angka(kegRows[0]?.n),
     keuangan: angka(keuRows[0]?.n),
     laporan: lap.ada ? 1 : 0,
+    presentasi: pres.ada ? 1 : 0,
   };
   const hasil = {};
-  for (const jenis of ["kegiatan", "keuangan", "laporan"]) {
+  const SEMUA_JENIS = ["kegiatan", "keuangan", "laporan", "presentasi"];
+  for (const jenis of SEMUA_JENIS) {
     hasil[jenis] = { total: jml[jenis], disetujui: 0, revisi: 0, menunggu: 0 };
   }
   for (const r of accRows) {
@@ -895,7 +1043,7 @@ export async function ringkasPersetujuan(timUserId) {
   }
   let totalRevisi = 0;
   let totalDisetujui = 0;
-  for (const jenis of ["kegiatan", "keuangan", "laporan"]) {
+  for (const jenis of SEMUA_JENIS) {
     const b = hasil[jenis];
     b.menunggu = Math.max(0, b.total - b.disetujui - b.revisi);
     totalRevisi += b.revisi;

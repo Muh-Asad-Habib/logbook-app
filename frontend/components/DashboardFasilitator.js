@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Trophy, CalendarCheck, CalendarDays, Hourglass, Receipt, Coins, Phone,
-  History, NotebookPen, FileText, Wallet, MessageCircle,
+  History, NotebookPen, FileText, Wallet, MessageCircle, Presentation,
 } from "lucide-react";
 import {
   api, useApi, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, getTimAktif, isDosen,
@@ -93,6 +93,7 @@ export default function DashboardFasilitator() {
   const s = ringkas.statistik;
   const terbaru = ringkas.kegiatan_terakhir || [];
   const lap = ringkas.laporan || { ada: false };
+  const pres = ringkas.presentasi || { ada: false, file: { ada: false }, canva: { ada: false } };
   const badge = ringkas.komentar_belum_dibaca || { total: 0 };
 
   return (
@@ -192,11 +193,31 @@ export default function DashboardFasilitator() {
             <p className="muted mts">Tim belum mengunggah laporan kemajuan.</p>
           )}
 
+          <h3 className="mt"><Presentation className="lucide" /> Presentasi</h3>
+          {pres.ada ? (
+            <>
+              {pres.file?.ada && (
+                <p className="mts"><b>{pres.file.nama}</b>
+                  <span className="muted"> · {(pres.file.ukuran / 1024 / 1024).toFixed(1)} MB</span>
+                </p>
+              )}
+              {pres.canva?.ada && (
+                <p className="muted mts">🎨 Tautan Canva tersedia (pratinjau)</p>
+              )}
+              <Link href="/presentasi" className="btn primary mt" style={{ width: "100%" }}>
+                <Presentation className="lucide" /> Lihat &amp; komentari presentasi
+              </Link>
+            </>
+          ) : (
+            <p className="muted mts">Tim belum mengunggah presentasi (.pptx) atau tautan Canva.</p>
+          )}
+
           <h3 className="mt"><MessageCircle className="lucide" /> Pintasan</h3>
           <div className="row mts">
             <Link href="/kegiatan" className="btn sm"><CalendarDays className="lucide" /> Kegiatan</Link>
             <Link href="/keuangan" className="btn sm"><Wallet className="lucide" /> Keuangan</Link>
             <Link href="/laporan" className="btn sm"><FileText className="lucide" /> Laporan</Link>
+            <Link href="/presentasi" className="btn sm"><Presentation className="lucide" /> Presentasi</Link>
           </div>
         </div>
       </div>

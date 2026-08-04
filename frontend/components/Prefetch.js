@@ -14,7 +14,8 @@ export default function Prefetch() {
       const paths = isPendamping()
         ? ["/api/fasilitator/tim", "/api/komentar/belum-dibaca"]
         : ["/api/statistik", "/api/kegiatan", "/api/keuangan", "/api/export/info",
-           "/api/laporan/info", "/api/tunnel", "/api/komentar/belum-dibaca"];
+           "/api/laporan/info", "/api/presentasi/info", "/api/tunnel",
+           "/api/komentar/belum-dibaca"];
       paths.forEach(preload);
     }, 250);
     return () => clearTimeout(t);

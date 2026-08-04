@@ -16,6 +16,7 @@ const target = [
   ["/api/export", "./src/routes/export.js", "hanyaTim"],
   ["/api/import", "./src/routes/import.js", "hanyaTim"],
   ["/api/laporan", "./src/routes/laporan.js", "hanyaTim"],
+  ["/api/presentasi", "./src/routes/presentasi.js", "hanyaTim"],
   ["/api/tim", "./src/routes/tim.js", "hanyaTim"],
   ["/api/fasilitator", "./src/routes/fasilitator.js", "hanyaPendamping"],
   ["/api/komentar", "./src/routes/komentar.js", null],
@@ -25,6 +26,7 @@ const target = [
 // Route tulis yang SAH di /api/fasilitator — tidak satu pun mengubah data tim
 const TULIS_DIIZINKAN = new Set([
   "POST /tim/:timId/laporan-tautan", // tautan penampil Office (read-only)
+  "POST /tim/:timId/presentasi-tautan", // tautan penampil PowerPoint (read-only)
   "POST /gabung", // gabung tim memakai kode milik tim
   "DELETE /tim/:timId", // keluar dari tim (melepas assignment sendiri)
 ]);

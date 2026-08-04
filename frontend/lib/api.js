@@ -307,6 +307,28 @@ export const api = {
     return res.arrayBuffer();
   },
 
+  // ---- Presentasi (.pptx + tautan Canva — boleh keduanya, hapus terpisah) ----
+  presentasiInfo: () => aFetch("/api/presentasi/info", { cache: "no-store" }),
+  uploadPresentasi: async (file, onProgress) => {
+    if (file.size <= LANGSUNG_MAKS) {
+      const fd = new FormData();
+      fd.append("file", file);
+      return aFetch("/api/presentasi", { method: "POST", body: fd });
+    }
+    return uploadChunked("/api/presentasi", file, onProgress, { nama: file.name });
+  },
+  deletePresentasiFile: () => aFetch("/api/presentasi/file", { method: "DELETE" }),
+  /** Tautan publik sementara (30 mnt) — dipakai penampil Microsoft Office. */
+  presentasiTautan: () => aFetch("/api/presentasi/tautan", { method: "POST" }),
+  /** Simpan tautan Canva (dinormalisasi server ke bentuk embed). */
+  setCanva: (url) =>
+    aFetch("/api/presentasi/canva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }),
+  deleteCanva: () => aFetch("/api/presentasi/canva", { method: "DELETE" }),
+
   // ---- Kode tim (akun tim) — hubungkan pendamping tanpa bantuan admin ----
   tim: {
     /** Kode milik tim yang login: { kode, kode_tampil }. */
@@ -348,6 +370,10 @@ export const api = {
       }
       return res.arrayBuffer();
     },
+    presentasiInfo: (timId) =>
+      aFetch(`/api/fasilitator/tim/${timId}/presentasi-info`, { cache: "no-store" }),
+    presentasiTautan: (timId) =>
+      aFetch(`/api/fasilitator/tim/${timId}/presentasi-tautan`, { method: "POST" }),
   },
 
   // ---- Komentar (fasilitator ↔ tim, 2 arah) ----

@@ -21,6 +21,7 @@ const JENIS = [
   { id: "kegiatan", label: "Kegiatan", href: "/kegiatan" },
   { id: "keuangan", label: "Belanja", href: "/keuangan" },
   { id: "laporan", label: "Laporan", href: "/laporan" },
+  { id: "presentasi", label: "Presentasi", href: "/presentasi" },
 ];
 
 function Baris({ jenis, data }) {

@@ -27,6 +27,7 @@ export const swaggerSpec = swaggerJsdoc({
       { name: "Export", description: "Unduh DOCX, PDF, dan Excel" },
       { name: "Import", description: "Impor entri + foto dari dokumen Word" },
       { name: "Laporan", description: "Laporan kemajuan .docx (satu per tim, tersimpan di ImageKit)" },
+      { name: "Presentasi", description: "Presentasi tim: berkas .pptx + tautan Canva (pratinjau)" },
       { name: "Fasilitator", description: "Akses baca tim yang diampu — fasilitator & dosen pendamping (terhubung lewat kode tim atau ditetapkan admin)" },
       { name: "Komentar", description: "Komentar 2 arah pendamping ↔ tim pada kegiatan/keuangan/laporan" },
       { name: "Persetujuan", description: "ACC / minta revisi entri logbook oleh dosen pendamping" },

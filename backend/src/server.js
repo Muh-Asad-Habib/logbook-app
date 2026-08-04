@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
@@ -17,6 +17,7 @@ import filesRouter from "./routes/files.js";
 import exportRouter from "./routes/export.js";
 import importRouter from "./routes/import.js";
 import laporanRouter from "./routes/laporan.js";
+import presentasiRouter from "./routes/presentasi.js";
 import fasilitatorRouter from "./routes/fasilitator.js";
 import komentarRouter from "./routes/komentar.js";
 import persetujuanRouter from "./routes/persetujuan.js";
@@ -42,7 +43,7 @@ app.use(express.json({ limit: "4mb" }));
 /**
  * Inisialisasi asinkron SEKALI per proses:
  * - pastikan skema database Neon siap (storage.load)
- * - muat kredensial panel pemeliharaan (dibuat otomatis bila belum ada)
+ * - muat kredensial panel admin (dibuat otomatis bila belum ada)
  * Middleware di bawah menunggu inisialisasi selesai sebelum melayani request —
  * pola yang aman untuk serverless (cold start) maupun server lokal.
  */
@@ -98,13 +99,14 @@ app.use("/api/files", filesRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/import", importRouter);
 app.use("/api/laporan", laporanRouter);
+app.use("/api/presentasi", presentasiRouter);
 app.use("/api/fasilitator", fasilitatorRouter);
 app.use("/api/komentar", komentarRouter);
 app.use("/api/persetujuan", persetujuanRouter);
 app.use("/api/tim", timRouter);
 app.use("/api/tunnel", tunnelRouter);
 
-// Panel pemeliharaan — path diambil dari database saat request masuk,
+// panel admin — path diambil dari database saat request masuk,
 // jadi bisa diganti tanpa restart. Tidak ada referensi apa pun di frontend.
 app.use((req, res, next) => {
   const base = panelPath();

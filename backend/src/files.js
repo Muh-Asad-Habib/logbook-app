@@ -172,13 +172,18 @@ export async function putFile(originalName, buffer, prefix = "img") {
 
 /**
  * Simpan berkas NON-gambar apa adanya (tanpa kompresi sharp) — dipakai untuk
- * laporan kemajuan .docx. Whitelist ketat: hanya .docx yang diterima.
+ * laporan kemajuan .docx dan presentasi .pptx. Whitelist ketat: hanya kedua
+ * ekstensi itu yang diterima.
  * Cloud: upload ke ImageKit + catat fileId di tabel `files` (jalur sama
  * dengan foto). Lokal: tulis ke folder uploads/.
  */
+const EXT_DOKUMEN = new Set([".docx", ".pptx"]);
+
 export async function putFileRaw(originalName, buffer, prefix = "lap") {
   const ext = path.extname(originalName || "").toLowerCase();
-  if (ext !== ".docx") throw new Error("Hanya berkas .docx yang diizinkan");
+  if (!EXT_DOKUMEN.has(ext)) {
+    throw new Error("Hanya berkas .docx atau .pptx yang diizinkan");
+  }
   const key = buatKey(prefix, ext);
 
   if (pakaiCloud()) {
