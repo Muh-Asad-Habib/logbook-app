@@ -231,17 +231,22 @@ Aplikasi dirancang untuk berjalan di layanan gratis:
 | Database | **Neon** (PostgreSQL) |
 | Penyimpanan gambar & dokumen | **ImageKit** |
 
-Panduan lengkap langkah demi langkah tersedia pada **[DEPLOY.md](DEPLOY.md)**.
+Panduan lengkap langkah demi langkah tersedia pada **[DEPLOY.md](DEPLOY.md)** —
+mulai dari mem-*fork* repo ini sampai aplikasi hidup di alamat tetap.
 Setelah terpasang, aplikasi dapat diakses siapa pun melalui alamat tetap tanpa
 memerlukan perangkat yang menyala terus-menerus.
 
 ### Pilihan B — Menjalankan sendiri (lokal)
 
-**Prasyarat:** [Node.js LTS](https://nodejs.org) terpasang dan berkas `.env`
-sudah diisi (lihat [Konfigurasi](#-konfigurasi-env)).
+**Prasyarat:** [Git](https://git-scm.com) dan [Node.js LTS](https://nodejs.org)
+terpasang, lalu ambil kodenya dan isi berkas `.env`
+(lihat [Konfigurasi](#-konfigurasi-env)).
 
 ```powershell
+git clone https://github.com/Muh-Asad-Habib/logbook-app.git
 cd logbook-app
+npm install
+Copy-Item .env.example .env   # lalu isi nilainya
 .\start.ps1
 ```
 
