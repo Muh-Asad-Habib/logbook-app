@@ -91,7 +91,7 @@ router.get("/docx", async (req, res, next) => {
  */
 router.get("/pdf", async (req, res, next) => {
   try {
-    const buffer = await buildPdf(req.userId);
+    const buffer = await buildPdf(req.userId, bersihkanNama(req.user?.username));
     kirimBerkas(req, res, buffer, { ekstensi: "pdf", tipe: "application/pdf" });
   } catch (err) { next(err); }
 });
@@ -111,7 +111,7 @@ router.get("/pdf", async (req, res, next) => {
  */
 router.get("/xlsx", async (req, res, next) => {
   try {
-    const buffer = await buildXlsx(req.userId);
+    const buffer = await buildXlsx(req.userId, bersihkanNama(req.user?.username));
     kirimBerkas(req, res, buffer, {
       ekstensi: "xlsx",
       tipe: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

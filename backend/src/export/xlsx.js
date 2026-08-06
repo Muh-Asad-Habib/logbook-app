@@ -9,21 +9,71 @@ const fmtTgl = (iso) => {
   return `${d} ${BULAN[m - 1]} ${y}`;
 };
 
-const HEAD_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
-const HEAD_FONT = { bold: true, color: { argb: "FFFFFFFF" } };
+// Palet warna — selaras dengan UI aplikasi
+const C = {
+  indigo: "FF4F46E5",
+  indigoDark: "FF3730A3",
+  indigoBg: "FFEEF2FF",
+  zebra: "FFF8FAFC",
+  white: "FFFFFFFF",
+  ink: "FF0F172A",
+  muted: "FF64748B",
+  line: "FFE2E8F0",
+  green: "FF059669",
+  greenBg: "FFECFDF5",
+  rose: "FFE11D48",
+  roseBg: "FFFFF1F2",
+  amberBg: "FFFFFBEB",
+};
 
-function styleHeader(row) {
-  row.eachCell((c) => {
-    c.fill = HEAD_FILL;
-    c.font = HEAD_FONT;
-    c.alignment = { vertical: "middle", horizontal: "center" };
-  });
-  row.height = 20;
+const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+const tipis = { style: "thin", color: { argb: C.line } };
+const BORDER = { top: tipis, left: tipis, bottom: tipis, right: tipis };
+
+/** Baris judul besar di atas tabel (merge sel + banner indigo). */
+function judulSheet(ws, teks, sub, lebar) {
+  ws.mergeCells(1, 1, 1, lebar);
+  const j = ws.getCell(1, 1);
+  j.value = teks;
+  j.font = { bold: true, size: 15, color: { argb: C.white } };
+  j.fill = fill(C.indigo);
+  j.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(1).height = 30;
+  ws.mergeCells(2, 1, 2, lebar);
+  const s = ws.getCell(2, 1);
+  s.value = sub;
+  s.font = { size: 9, color: { argb: C.white } };
+  s.fill = fill(C.indigoDark);
+  s.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+  ws.getRow(2).height = 16;
+  ws.addRow([]); // jarak
 }
 
-export async function buildXlsx(userId) {
+/** Style baris header tabel. */
+function styleHeader(row) {
+  row.eachCell((c) => {
+    c.fill = fill(C.indigo);
+    c.font = { bold: true, size: 10, color: { argb: C.white } };
+    c.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    c.border = BORDER;
+  });
+  row.height = 24;
+}
+
+/** Zebra stripe + border untuk baris data. */
+function styleData(row, genap) {
+  row.eachCell({ includeEmpty: true }, (c) => {
+    c.border = BORDER;
+    if (genap) c.fill = fill(C.zebra);
+    if (!c.alignment) c.alignment = { vertical: "middle" };
+  });
+  if (!row.height || row.height < 18) row.height = 18;
+}
+
+export async function buildXlsx(userId, namaTim = "") {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Logbook";
+  wb.creator = "Logbook Amerta Sign";
+  wb.created = new Date();
 
   const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
     store.listKegiatan(userId),
@@ -32,69 +82,129 @@ export async function buildXlsx(userId) {
   ]);
   const danaAwal = Number(danaAwalStr) || 0;
   const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
-
-  // ---- Sheet Kegiatan ----
-  const s1 = wb.addWorksheet("Kegiatan");
-  s1.columns = [
-    { header: "No", key: "no", width: 5 },
-    { header: "Tanggal", key: "tgl", width: 18 },
-    { header: "Kegiatan", key: "keg", width: 70 },
-    { header: "Capaian entri (%)", key: "cd", width: 16 },
-    { header: "Capaian total (%)", key: "ct", width: 16 },
-    { header: "Waktu (menit)", key: "wm", width: 14 },
-    { header: "Jumlah foto", key: "jf", width: 12 },
-  ];
-  styleHeader(s1.getRow(1));
-  kegiatan.forEach((e, i) => {
-    s1.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), keg: e.kegiatan,
-      cd: e.capaian_delta, ct: e.capaian_total, wm: e.waktu_menit,
-      jf: e.foto_keys.length });
-  });
-  s1.getColumn("keg").alignment = { wrapText: true, vertical: "top" };
-
-  // ---- Sheet Keuangan ----
-  const s2 = wb.addWorksheet("Keuangan");
-  s2.columns = [
-    { header: "No", key: "no", width: 5 },
-    { header: "Tanggal", key: "tgl", width: 18 },
-    { header: "Item", key: "item", width: 46 },
-    { header: "Harga satuan (Rp)", key: "hs", width: 18 },
-    { header: "Satuan", key: "sf", width: 12 },
-    { header: "Jumlah", key: "jml", width: 9 },
-    { header: "Total (Rp)", key: "tot", width: 16 },
-    { header: "Ada bukti", key: "bk", width: 10 },
-  ];
-  styleHeader(s2.getRow(1));
-  keuangan.forEach((e, i) => {
-    s2.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), item: e.item,
-      hs: e.harga_satuan, sf: e.satuan_suffix || "", jml: e.jumlah,
-      tot: e.total, bk: e.bukti_key ? "Ya" : "-" });
-  });
-  ["hs", "tot"].forEach((k) => { s2.getColumn(k).numFmt = "#,##0"; });
-  const totRow = s2.addRow({ item: "TOTAL PENGELUARAN", tot: pengeluaran });
-  totRow.font = { bold: true };
-
-  // ---- Sheet Ringkasan ----
-  const s3 = wb.addWorksheet("Ringkasan");
-  s3.columns = [{ width: 28 }, { width: 24 }];
   const capaian = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0;
   const totalMenit = kegiatan.reduce((s, e) => s + e.waktu_menit, 0);
-  const rows = [
-    ["Capaian total", `${capaian}%`],
-    ["Jumlah kegiatan", kegiatan.length],
-    ["Total waktu (menit)", totalMenit],
-    ["Jumlah transaksi belanja", keuangan.length],
-    ["Total pengeluaran (Rp)", pengeluaran],
-    ["Dana awal (Rp)", danaAwal],
-    ["Sisa dana (Rp)", danaAwal - pengeluaran],
-  ];
-  s3.addRow(["RINGKASAN LOGBOOK", ""]);
-  s3.getRow(1).font = { bold: true, size: 13 };
-  rows.forEach(([k, v]) => {
-    const r = s3.addRow([k, v]);
-    r.getCell(1).font = { bold: true };
+  const sisaDana = danaAwal - pengeluaran;
+  const tglEkspor = new Date().toLocaleDateString("id-ID",
+    { day: "numeric", month: "long", year: "numeric" });
+  const sub = `${namaTim ? `Tim ${namaTim} · ` : ""}Diekspor otomatis · ${tglEkspor}`;
+
+  // ================= Sheet 1: Ringkasan (dashboard mini) =================
+  const s0 = wb.addWorksheet("Ringkasan", {
+    properties: { tabColor: { argb: C.indigo } },
+    views: [{ showGridLines: false }],
   });
+  s0.columns = [{ width: 3 }, { width: 30 }, { width: 26 }, { width: 3 }];
+  judulSheet(s0, "RINGKASAN LOGBOOK", sub, 4);
+
+  const metrik = [
+    ["Capaian total", `${capaian}%`, C.indigoBg, C.indigoDark],
+    ["Jumlah kegiatan", `${kegiatan.length} entri`, C.indigoBg, C.indigoDark],
+    ["Total waktu", totalMenit >= 60
+      ? `${Math.floor(totalMenit / 60)} jam ${totalMenit % 60} menit` : `${totalMenit} menit`,
+      C.amberBg, C.ink],
+    ["Jumlah transaksi belanja", `${keuangan.length} transaksi`, C.amberBg, C.ink],
+    ["Dana awal", danaAwal, C.zebra, C.ink],
+    ["Total pengeluaran", pengeluaran, C.roseBg, C.rose],
+    ["Sisa dana", sisaDana, sisaDana >= 0 ? C.greenBg : C.roseBg,
+      sisaDana >= 0 ? C.green : C.rose],
+  ];
+  metrik.forEach(([label, nilai, bg, warna]) => {
+    const r = s0.addRow(["", label, nilai, ""]);
+    const cl = r.getCell(2), cv = r.getCell(3);
+    cl.font = { bold: true, size: 10, color: { argb: C.muted } };
+    cv.font = { bold: true, size: 12, color: { argb: warna } };
+    cl.fill = fill(bg); cv.fill = fill(bg);
+    cl.border = BORDER; cv.border = BORDER;
+    cl.alignment = { vertical: "middle", indent: 1 };
+    cv.alignment = { vertical: "middle", horizontal: "right", indent: 1 };
+    if (typeof nilai === "number") cv.numFmt = '"Rp"#,##0';
+    r.height = 26;
+  });
+
+  // ================= Sheet 2: Kegiatan =================
+  const s1 = wb.addWorksheet("Kegiatan", {
+    properties: { tabColor: { argb: "FF0369A1" } },
+    views: [{ state: "frozen", ySplit: 4 }],
+  });
+  s1.columns = [
+    { key: "no", width: 5 },
+    { key: "tgl", width: 18 },
+    { key: "keg", width: 64 },
+    { key: "cd", width: 15 },
+    { key: "ct", width: 15 },
+    { key: "wm", width: 14 },
+    { key: "jf", width: 12 },
+  ];
+  judulSheet(s1, "LOGBOOK KEGIATAN", sub, 7);
+  const h1 = s1.addRow(["No", "Tanggal", "Kegiatan", "Capaian entri (%)",
+    "Capaian total (%)", "Waktu (menit)", "Jumlah foto"]);
+  styleHeader(h1);
+  kegiatan.forEach((e, i) => {
+    const r = s1.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), keg: e.kegiatan,
+      cd: e.capaian_delta, ct: e.capaian_total, wm: e.waktu_menit,
+      jf: e.foto_keys.length });
+    styleData(r, i % 2 === 1);
+    r.getCell("no").alignment = { vertical: "middle", horizontal: "center" };
+    r.getCell("keg").alignment = { wrapText: true, vertical: "top" };
+    ["cd", "ct", "wm", "jf"].forEach((k) =>
+      { r.getCell(k).alignment = { vertical: "middle", horizontal: "center" }; });
+  });
+  s1.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + kegiatan.length, column: 7 } };
+
+  // ================= Sheet 3: Keuangan =================
+  const s2 = wb.addWorksheet("Keuangan", {
+    properties: { tabColor: { argb: C.rose } },
+    views: [{ state: "frozen", ySplit: 4 }],
+  });
+  s2.columns = [
+    { key: "no", width: 5 },
+    { key: "tgl", width: 18 },
+    { key: "item", width: 42 },
+    { key: "hs", width: 18 },
+    { key: "sf", width: 12 },
+    { key: "jml", width: 9 },
+    { key: "tot", width: 17 },
+    { key: "bk", width: 10 },
+  ];
+  judulSheet(s2, "LOGBOOK KEUANGAN", sub, 8);
+  const h2 = s2.addRow(["No", "Tanggal", "Item", "Harga satuan", "Satuan",
+    "Jumlah", "Total", "Ada bukti"]);
+  styleHeader(h2);
+  keuangan.forEach((e, i) => {
+    const r = s2.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), item: e.item,
+      hs: e.harga_satuan, sf: e.satuan_suffix || "", jml: e.jumlah,
+      tot: e.total, bk: e.bukti_key ? "Ya" : "-" });
+    styleData(r, i % 2 === 1);
+    r.getCell("no").alignment = { vertical: "middle", horizontal: "center" };
+    r.getCell("item").alignment = { wrapText: true, vertical: "middle" };
+    ["jml", "bk", "sf"].forEach((k) =>
+      { r.getCell(k).alignment = { vertical: "middle", horizontal: "center" }; });
+    ["hs", "tot"].forEach((k) => { r.getCell(k).numFmt = '"Rp"#,##0'; });
+    if (e.bukti_key) r.getCell("bk").font = { color: { argb: C.green }, bold: true };
+  });
+  s2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + keuangan.length, column: 8 } };
+
+  // baris total menonjol
+  const totRow = s2.addRow({ item: "TOTAL PENGELUARAN", tot: pengeluaran });
+  totRow.eachCell({ includeEmpty: true }, (c) => {
+    c.fill = fill(C.indigoBg);
+    c.border = BORDER;
+  });
+  totRow.getCell("item").font = { bold: true, size: 11, color: { argb: C.indigoDark } };
+  totRow.getCell("tot").font = { bold: true, size: 11, color: { argb: C.indigoDark } };
+  totRow.getCell("tot").numFmt = '"Rp"#,##0';
+  totRow.height = 24;
+  const sisaRow = s2.addRow({ item: "SISA DANA (dana awal − pengeluaran)", tot: sisaDana });
+  sisaRow.eachCell({ includeEmpty: true }, (c) => {
+    c.fill = fill(sisaDana >= 0 ? C.greenBg : C.roseBg);
+    c.border = BORDER;
+  });
+  const warnaSisa = sisaDana >= 0 ? C.green : C.rose;
+  sisaRow.getCell("item").font = { bold: true, size: 11, color: { argb: warnaSisa } };
+  sisaRow.getCell("tot").font = { bold: true, size: 11, color: { argb: warnaSisa } };
+  sisaRow.getCell("tot").numFmt = '"Rp"#,##0';
+  sisaRow.height = 24;
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
-
