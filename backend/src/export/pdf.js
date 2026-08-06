@@ -1,4 +1,4 @@
- /** Ekspor PDF — rekap logbook siap cetak (pdfkit, tanpa dependensi native). */
+/** Ekspor PDF — rekap logbook siap cetak (pdfkit, tanpa dependensi native). */
 import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
@@ -13,12 +13,20 @@ const fmtTgl = (iso) => {
 const fmtRp = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
 const fmtDur = (m) => (m >= 60 ? `${Math.floor(m / 60)} j ${m % 60} mnt` : `${m} mnt`);
 
+// Palet warna — selaras dengan UI aplikasi (indigo) + warna aksen per metrik
 const INDIGO = "#4f46e5";
+const INDIGO_DARK = "#3730a3";
+const INDIGO_BG = "#eef2ff";
 const INK = "#0f172a";
 const MUTED = "#64748b";
 const LINE = "#e2e8f0";
+const ZEBRA = "#f8fafc";
+const GREEN = "#059669";
+const AMBER = "#d97706";
+const ROSE = "#e11d48";
+const SKY = "#0369a1";
 
-export async function buildPdf(userId) {
+export async function buildPdf(userId, namaTim = "") {
   // Ambil data + seluruh foto (dari cloud/lokal) lebih dulu, baru menggambar
   const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
     store.listKegiatan(userId),
@@ -55,160 +63,213 @@ export async function buildPdf(userId) {
     const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
     const capaian = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0;
     const totalMenit = kegiatan.reduce((s, e) => s + e.waktu_menit, 0);
+    const sisaDana = danaAwal - pengeluaran;
 
     const pastikanRuang = (butuh) => {
-      if (doc.y + butuh > doc.page.height - 60) doc.addPage();
+      if (doc.y + butuh > doc.page.height - 64) doc.addPage();
     };
 
-    // ================= Header =================
-    doc.rect(0, 0, doc.page.width, 118).fill(INDIGO);
-    doc.fill("#ffffff").font("Helvetica-Bold").fontSize(19)
-      .text("LOGBOOK KEGIATAN DAN KEUANGAN", X, 34);
-    doc.font("Helvetica").fontSize(10.5).opacity(0.85)
-      .text("Rekap kegiatan & keuangan tim", X, 62);
-    doc.opacity(1).fontSize(8.5)
-      .text(`Diekspor otomatis · ${new Date().toLocaleDateString("id-ID",
-        { day: "numeric", month: "long", year: "numeric" })}`, X, 80);
-    doc.y = 140;
+    // ================= Header (banner indigo dua lapis) =================
+    doc.rect(0, 0, doc.page.width, 124).fill(INDIGO);
+    doc.rect(0, 118, doc.page.width, 6).fill(INDIGO_DARK);
+    // lingkaran dekoratif transparan di kanan atas
+    doc.save().opacity(0.08).circle(doc.page.width - 60, 20, 70).fill("#ffffff")
+      .circle(doc.page.width - 130, 95, 40).fill("#ffffff").restore();
 
-    // ================= Ringkasan =================
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(20)
+      .text("LOGBOOK KEGIATAN & KEUANGAN", X, 30);
+    doc.font("Helvetica").fontSize(11).opacity(0.92)
+      .text(namaTim ? `Tim ${namaTim} · Rekap kegiatan & keuangan` : "Rekap kegiatan & keuangan tim",
+        X, 58);
+    // pill tanggal ekspor
+    const tglStr = `Diekspor ${new Date().toLocaleDateString("id-ID",
+      { day: "numeric", month: "long", year: "numeric" })}`;
+    doc.opacity(1).fontSize(8.5);
+    const pillW = doc.widthOfString(tglStr) + 20;
+    doc.roundedRect(X, 82, pillW, 18, 9).fillOpacity(0.18).fill("#ffffff").fillOpacity(1);
+    doc.fillColor("#ffffff").text(tglStr, X + 10, 87);
+    doc.y = 146;
+
+    // ================= Kartu ringkasan (aksen warna per metrik) =================
     const boks = [
-      ["Capaian total", `${capaian}%`],
-      ["Kegiatan", `${kegiatan.length} entri`],
-      ["Total waktu", fmtDur(totalMenit)],
-      ["Pengeluaran", fmtRp(pengeluaran)],
-      ["Dana awal", fmtRp(danaAwal)],
-      ["Sisa dana", fmtRp(danaAwal - pengeluaran)],
+      ["CAPAIAN TOTAL", `${capaian}%`, INDIGO],
+      ["KEGIATAN", `${kegiatan.length} entri`, SKY],
+      ["TOTAL WAKTU", fmtDur(totalMenit), AMBER],
+      ["PENGELUARAN", fmtRp(pengeluaran), ROSE],
+      ["DANA AWAL", fmtRp(danaAwal), MUTED],
+      ["SISA DANA", fmtRp(sisaDana), sisaDana >= 0 ? GREEN : ROSE],
     ];
     const bw = (W - 20) / 3;
-    boks.forEach(([label, nilai], i) => {
+    const topY = doc.y;
+    boks.forEach(([label, nilai, warna], i) => {
       const bx = X + (i % 3) * (bw + 10);
-      const by = doc.y + Math.floor(i / 3) * 58;
-      doc.roundedRect(bx, by, bw, 48, 8).lineWidth(0.8).stroke(LINE);
-      doc.fill(MUTED).font("Helvetica").fontSize(7.5)
-        .text(label.toUpperCase(), bx + 12, by + 10);
-      doc.fill(INK).font("Helvetica-Bold").fontSize(13)
-        .text(nilai, bx + 12, by + 22, { width: bw - 24 });
+      const by = topY + Math.floor(i / 3) * 60;
+      doc.roundedRect(bx, by, bw, 50, 8).fill(ZEBRA);
+      doc.roundedRect(bx, by, bw, 50, 8).lineWidth(0.8).stroke(LINE);
+      // aksen batang kiri berwarna
+      doc.roundedRect(bx, by + 8, 3.5, 34, 2).fill(warna);
+      doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+        .text(label, bx + 14, by + 11);
+      doc.fillColor(warna).font("Helvetica-Bold").fontSize(14)
+        .text(nilai, bx + 14, by + 24, { width: bw - 26 });
     });
-    doc.y += 2 * 58 + 8;
+    doc.y = topY + 2 * 60 + 10;
+
+    // ================= Judul bagian (badge nomor + garis) =================
+    const judulBagian = (nomor, teks) => {
+      pastikanRuang(46);
+      const jy = doc.y + 4;
+      doc.roundedRect(X, jy, 22, 22, 6).fill(INDIGO);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(11)
+        .text(nomor, X, jy + 6, { width: 22, align: "center" });
+      doc.fillColor(INDIGO_DARK).font("Helvetica-Bold").fontSize(13)
+        .text(teks, X + 30, jy + 5);
+      doc.moveTo(X, jy + 28).lineTo(X + W, jy + 28).lineWidth(1.4).stroke(INDIGO);
+      doc.y = jy + 38;
+    };
 
     // ================= Bagian 1: Kegiatan =================
-    doc.fill(INDIGO).font("Helvetica-Bold").fontSize(13)
-      .text("1. LOGBOOK KEGIATAN", X, doc.y);
-    doc.moveTo(X, doc.y + 4).lineTo(X + W, doc.y + 4).lineWidth(1.2).stroke(INDIGO);
-    doc.y += 16;
+    judulBagian("1", "LOGBOOK KEGIATAN");
 
     for (const [i, e] of kegiatan.entries()) {
-      pastikanRuang(80);
+      pastikanRuang(84);
       const y0 = doc.y;
-      doc.fill(INDIGO).font("Helvetica-Bold").fontSize(10)
-        .text(`${i + 1}. ${fmtTgl(e.tanggal)}`, X, y0);
-      doc.fill(MUTED).font("Helvetica").fontSize(8.5)
-        .text(`+${e.capaian_delta}%  ·  total ${e.capaian_total}%  ·  ${fmtDur(e.waktu_menit)}`,
-          X + 150, y0 + 1);
-      doc.y = y0 + 15;
-      doc.fill(INK).font("Helvetica").fontSize(9.5)
-        .text(e.kegiatan, X, doc.y, { width: W, lineGap: 1.5 });
-      doc.y += 6;
+      // badge nomor entri
+      doc.circle(X + 8, y0 + 7, 8).fill(INDIGO_BG);
+      doc.fillColor(INDIGO).font("Helvetica-Bold").fontSize(8)
+        .text(String(i + 1), X, y0 + 3.5, { width: 16, align: "center" });
+      doc.fillColor(INK).font("Helvetica-Bold").fontSize(10.5)
+        .text(fmtTgl(e.tanggal), X + 22, y0 + 1);
+      // chip meta di kanan
+      const meta = `+${e.capaian_delta}%  ·  total ${e.capaian_total}%  ·  ${fmtDur(e.waktu_menit)}`;
+      doc.font("Helvetica").fontSize(8.5);
+      const mw = doc.widthOfString(meta) + 16;
+      doc.roundedRect(X + W - mw, y0 - 1, mw, 16, 8).fill(INDIGO_BG);
+      doc.fillColor(INDIGO_DARK).text(meta, X + W - mw + 8, y0 + 3);
+      doc.y = y0 + 20;
+
+      doc.fillColor(INK).font("Helvetica").fontSize(9.5)
+        .text(e.kegiatan, X + 22, doc.y, { width: W - 22, lineGap: 1.6 });
+      doc.y += 7;
 
       // foto (maks 4 per baris)
-      const fotos = e.foto_keys.slice(0, 8);
+      const fotos = (e.foto_keys || []).slice(0, 8);
       if (fotos.length) {
         const fw = 88, fh = 66, gap = 8;
-        let fx = X, fy = doc.y;
+        let fx = X + 22, fy = doc.y;
         pastikanRuang(fh + 14);
         fy = doc.y;
         for (const k of fotos) {
           try {
             const buf = bufferMap.get(k);
             if (!buf) continue;
-            if (fx + fw > X + W) { fx = X; fy += fh + gap; pastikanRuang(fh + 14); if (doc.y > fy) fy = doc.y; }
+            if (fx + fw > X + W) { fx = X + 22; fy += fh + gap; pastikanRuang(fh + 14); if (doc.y > fy) fy = doc.y; }
             doc.image(buf, fx, fy, { fit: [fw, fh], align: "center", valign: "center" });
-            doc.roundedRect(fx, fy, fw, fh, 4).lineWidth(0.6).stroke(LINE);
+            doc.roundedRect(fx, fy, fw, fh, 4).lineWidth(0.8).stroke(LINE);
             fx += fw + gap;
           } catch {}
         }
         doc.y = fy + fh + 10;
       }
       doc.moveTo(X, doc.y).lineTo(X + W, doc.y).lineWidth(0.5).stroke(LINE);
-      doc.y += 10;
+      doc.y += 12;
     }
     if (kegiatan.length === 0) {
-      doc.fill(MUTED).fontSize(9.5).text("Belum ada kegiatan.", X, doc.y);
+      doc.fillColor(MUTED).fontSize(9.5).text("Belum ada kegiatan.", X, doc.y);
       doc.y += 18;
     }
 
     // ================= Bagian 2: Keuangan =================
-    pastikanRuang(120);
-    doc.fill(INDIGO).font("Helvetica-Bold").fontSize(13)
-      .text("2. LOGBOOK KEUANGAN", X, doc.y + 6);
-    doc.moveTo(X, doc.y + 4).lineTo(X + W, doc.y + 4).lineWidth(1.2).stroke(INDIGO);
-    doc.y += 16;
+    pastikanRuang(130);
+    judulBagian("2", "LOGBOOK KEUANGAN");
 
-    // header tabel
     const cols = [
-      { t: "Tanggal", w: 0.16 }, { t: "Item", w: 0.34 }, { t: "Harga satuan", w: 0.18 },
-      { t: "Jml", w: 0.07 }, { t: "Total", w: 0.15 }, { t: "Bukti", w: 0.10 },
+      { t: "Tanggal", w: 0.16 }, { t: "Item", w: 0.34 },
+      { t: "Harga satuan", w: 0.18, kanan: true }, { t: "Jml", w: 0.07, kanan: true },
+      { t: "Total", w: 0.15, kanan: true }, { t: "Bukti", w: 0.10 },
     ];
     const drawHeader = () => {
       const hy = doc.y;
-      doc.rect(X, hy, W, 20).fill("#eef2ff");
+      doc.roundedRect(X, hy, W, 22, 4).fill(INDIGO);
       let cx = X;
-      doc.fill(INDIGO).font("Helvetica-Bold").fontSize(8);
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
       for (const c of cols) {
-        doc.text(c.t.toUpperCase(), cx + 6, hy + 6, { width: c.w * W - 10 });
+        doc.text(c.t.toUpperCase(), cx + 6, hy + 7,
+          { width: c.w * W - 12, align: c.kanan ? "right" : "left" });
         cx += c.w * W;
       }
-      doc.y = hy + 24;
+      doc.y = hy + 26;
     };
     drawHeader();
 
+    let genap = false;
     for (const e of keuangan) {
       pastikanRuang(46);
       if (doc.y < 70) drawHeader(); // halaman baru → ulangi header
       const ry = doc.y;
       const vals = [fmtTgl(e.tanggal), e.item,
         `${fmtRp(e.harga_satuan)}${e.satuan_suffix || ""}`, String(e.jumlah), fmtRp(e.total)];
-      let cx = X;
-      doc.fill(INK).font("Helvetica").fontSize(8.5);
+      // ukur tinggi baris dulu untuk zebra stripe
+      doc.font("Helvetica").fontSize(8.5);
       let maxH = 12;
       vals.forEach((v, vi) => {
-        const cw = cols[vi].w * W - 10;
-        const h = doc.heightOfString(v, { width: cw });
+        const h = doc.heightOfString(v, { width: cols[vi].w * W - 12 });
         maxH = Math.max(maxH, h);
-        doc.text(v, cx + 6, ry + 4, { width: cw });
+      });
+      const adaBukti = e.bukti_key && bufferMap.get(e.bukti_key);
+      if (adaBukti) maxH = Math.max(maxH, 32);
+      if (genap) doc.rect(X, ry - 1, W, maxH + 9).fill(ZEBRA);
+      genap = !genap;
+
+      let cx = X;
+      doc.fillColor(INK).font("Helvetica").fontSize(8.5);
+      vals.forEach((v, vi) => {
+        if (vi === 4) doc.font("Helvetica-Bold"); // kolom Total ditebalkan
+        doc.text(v, cx + 6, ry + 4,
+          { width: cols[vi].w * W - 12, align: cols[vi].kanan ? "right" : "left" });
+        if (vi === 4) doc.font("Helvetica");
         cx += cols[vi].w * W;
       });
       // bukti thumbnail
       try {
-        if (e.bukti_key) {
-          const buf = bufferMap.get(e.bukti_key);
-          if (buf) {
-            doc.image(buf, cx + 4, ry + 3, { fit: [cols[5].w * W - 12, 30] });
-            maxH = Math.max(maxH, 32);
-          }
+        if (adaBukti) {
+          doc.image(bufferMap.get(e.bukti_key), cx + 4, ry + 3, { fit: [cols[5].w * W - 12, 30] });
         }
       } catch {}
       doc.y = ry + maxH + 8;
       doc.moveTo(X, doc.y - 3).lineTo(X + W, doc.y - 3).lineWidth(0.4).stroke(LINE);
     }
+    if (keuangan.length === 0) {
+      doc.fillColor(MUTED).fontSize(9.5).text("Belum ada transaksi.", X + 6, doc.y + 2);
+      doc.y += 20;
+    }
 
-    pastikanRuang(30);
-    doc.font("Helvetica-Bold").fontSize(9.5).fill(INK)
-      .text(`TOTAL PENGELUARAN: ${fmtRp(pengeluaran)}`, X, doc.y + 4, { width: W, align: "right" });
-    doc.font("Helvetica").fontSize(8.5).fill(MUTED)
-      .text(`Dana awal ${fmtRp(danaAwal)}  ·  Sisa dana ${fmtRp(danaAwal - pengeluaran)}`,
-        X, doc.y + 4, { width: W, align: "right" });
+    // ================= Kotak total pengeluaran =================
+    pastikanRuang(64);
+    const ty = doc.y + 8;
+    const tw = 250;
+    doc.roundedRect(X + W - tw, ty, tw, 52, 8).fill(INDIGO_BG);
+    doc.roundedRect(X + W - tw, ty, tw, 52, 8).lineWidth(0.8).stroke(INDIGO);
+    doc.fillColor(INDIGO_DARK).font("Helvetica").fontSize(8)
+      .text("TOTAL PENGELUARAN", X + W - tw + 14, ty + 9);
+    doc.fillColor(INDIGO_DARK).font("Helvetica-Bold").fontSize(14)
+      .text(fmtRp(pengeluaran), X + W - tw + 14, ty + 20);
+    doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+      .text(`Dana awal ${fmtRp(danaAwal)}  ·  Sisa dana ${fmtRp(sisaDana)}`,
+        X + W - tw + 14, ty + 38);
+    doc.y = ty + 60;
 
-    // nomor halaman
+    // ================= Footer setiap halaman =================
     const range = doc.bufferedPageRange();
     for (let p = 0; p < range.count; p++) {
       doc.switchToPage(p);
-      doc.fill(MUTED).font("Helvetica").fontSize(7.5)
-        .text(`Halaman ${p + 1} dari ${range.count}`, X, doc.page.height - 36,
-          { width: W, align: "center" });
+      const fy = doc.page.height - 40;
+      doc.moveTo(X, fy - 6).lineTo(X + W, fy - 6).lineWidth(0.5).stroke(LINE);
+      doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+        .text(namaTim ? `Logbook ${namaTim}` : "Logbook", X, fy, { width: W / 3, align: "left" });
+      doc.text(`Halaman ${p + 1} dari ${range.count}`, X, fy, { width: W, align: "center" });
+      doc.text(new Date().toLocaleDateString("id-ID"), X, fy, { width: W, align: "right" });
     }
     doc.end();
   });
 }
-
