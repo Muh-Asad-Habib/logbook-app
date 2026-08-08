@@ -241,6 +241,51 @@ Ingin ikut menerima perbaikan terbaru dari repo asal? Di fork-mu klik
 
 ---
 
+## Bagian 6b — (Opsional) Canva Connect: konversi langsung dari tautan
+
+Fitur **Canva → PPTX sama persis** (menu Presentasi) punya dua jalur:
+
+| Jalur | Perlu bagian ini? |
+|---|---|
+| Unggah berkas `.pptx` hasil unduhan Canva | ❌ langsung jalan |
+| **Satu klik dari tautan Canva** (aplikasi mengekspor sendiri dari Canva) | ✅ ikuti langkah di bawah |
+
+Penyiapan sekali saja, ±15 menit — gratis:
+
+1. Buka **https://www.canva.com/developers/integrations** → login dengan akun
+   Canva-mu → **Create an integration**.
+2. Isi nama bebas (mis. `Logbook Konversi`), jenis **Public** tidak perlu —
+   **Private** cukup untuk pemakaian sendiri/tim.
+3. Di bagian **Scopes**, centang: `design:content:read`.
+4. Di bagian **Authentication → Redirect URLs**, tambahkan:
+   ```
+   https://URL-KAMU.vercel.app/api/presentasi/canva-connect/callback
+   ```
+   (ganti `URL-KAMU.vercel.app` dengan domain aplikasimu; untuk uji lokal
+   lewat tunnel, daftarkan juga URL tunnel-nya.)
+5. Salin **Client ID** dan **Client Secret** (klik *Generate secret*).
+6. Tambahkan keduanya sebagai environment variable — sama seperti Bagian 6
+   langkah 4 (dashboard Vercel → proyekmu → **Settings → Environment
+   Variables**), dan/atau di file `.env` lokal:
+
+   | Name | Value |
+   |---|---|
+   | `CANVA_CLIENT_ID` | `OC-xxxx…` |
+   | `CANVA_CLIENT_SECRET` | `cnvca…` ← **rahasia!** |
+
+7. **Redeploy**. Selesai — di menu Presentasi kini muncul tombol
+   **Hubungkan akun Canva**; tiap pengguna cukup menghubungkan sekali, lalu
+   tombol **Konversi dari tautan Canva** bekerja penuh otomatis.
+
+> 🔒 Client Secret hanya hidup di environment variable (Vercel/`.env`) —
+> `.env` sudah masuk `.gitignore`, jadi **tidak akan pernah ikut ter-push**
+> ke GitHub. Jangan tulis nilainya di file lain mana pun.
+>
+> ℹ️ Desain yang dikonversi harus milik (atau dibagikan ke) akun Canva yang
+> dihubungkan pengguna tersebut.
+
+---
+
 ## Bagian 7 — Uji coba (checklist 5 menit)
 
 Buka URL vercel.app-mu, lalu centang satu per satu:

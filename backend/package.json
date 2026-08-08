@@ -12,6 +12,7 @@
     "diag:panel-api": "node diag-panel-api.mjs",
     "diag:peran": "node diag-fasilitator.mjs",
     "diag:presentasi": "node diag-presentasi.mjs",
+    "diag:konversi": "node diag-konversi.mjs",
     "diag": "npm run diag:rute && npm run diag:panel"
   },
   "dependencies": {

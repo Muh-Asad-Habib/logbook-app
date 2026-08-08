@@ -186,7 +186,7 @@ export function useApi(path) {
  * (base64) lalu dirakit kembali di server. Dipakai impor DOCX & laporan. */
 const CHUNK = 2 * 1024 * 1024;
 
-async function uploadChunked(basePath, file, onProgress, extra = {}) {
+async function uploadChunked(basePath, file, onProgress, extra = {}, selesai = "selesai") {
   const id = `up-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const total = Math.ceil(file.size / CHUNK);
   for (let i = 0; i < total; i++) {
@@ -204,7 +204,7 @@ async function uploadChunked(basePath, file, onProgress, extra = {}) {
     });
     onProgress?.(Math.round(((i + 1) / (total + 1)) * 100));
   }
-  return aFetch(`${basePath}/selesai`, {
+  return aFetch(`${basePath}/${selesai}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, total, ...extra }),
@@ -328,6 +328,30 @@ export const api = {
       body: JSON.stringify({ url }),
     }),
   deleteCanva: () => aFetch("/api/presentasi/canva", { method: "DELETE" }),
+
+  // ---- Konversi Canva → PPTX "sama persis" (font Google ditanam otomatis) ----
+  /**
+   * Unggah PPTX ekspor Canva untuk dikonversi (font ditanam). File besar
+   * otomatis dipotong ±2 MB (endpoint chunk yang sama dengan unggah biasa,
+   * perakitnya /konversi-selesai). Hasil tersimpan sebagai presentasi tim.
+   */
+  konversiPptx: async (file, onProgress) => {
+    if (file.size <= LANGSUNG_MAKS) {
+      const fd = new FormData();
+      fd.append("file", file);
+      return aFetch("/api/presentasi/konversi", { method: "POST", body: fd });
+    }
+    return uploadChunked("/api/presentasi", file, onProgress,
+      { nama: file.name }, "konversi-selesai");
+  },
+  /** Ekspor otomatis dari tautan Canva tersimpan lalu konversi (butuh akun terhubung). */
+  konversiLink: () => aFetch("/api/presentasi/konversi-link", { method: "POST" }),
+  canvaConnect: {
+    status: () => aFetch("/api/presentasi/canva-connect/status", { cache: "no-store" }),
+    /** { url } — arahkan browser ke URL persetujuan Canva. */
+    mulai: () => aFetch("/api/presentasi/canva-connect/mulai", { cache: "no-store" }),
+    putus: () => aFetch("/api/presentasi/canva-connect", { method: "DELETE" }),
+  },
 
   // ---- Kode tim (akun tim) — hubungkan pendamping tanpa bantuan admin ----
   tim: {
