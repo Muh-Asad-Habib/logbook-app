@@ -21,7 +21,7 @@ import {
   eksporPptx, idDesainDariUrl,
 } from "../canva.js";
 
-const MAKS_UKURAN = 40 * 1024 * 1024; // 40 MB — slide berfoto banyak pun cukup
+const MAKS_UKURAN = 60 * 1024 * 1024; // 60 MB — deck Canva berfoto resolusi tinggi pun muat
 
 const MIME_PPTX =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -156,7 +156,7 @@ async function simpan(req, res, nama, buffer) {
     return res.status(400).json({ error: "Berkas bukan PowerPoint (.pptx) yang valid" });
   }
   if (buffer.length > MAKS_UKURAN) {
-    return res.status(400).json({ error: "Berkas terlalu besar (maks. 40 MB)" });
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 60 MB)" });
   }
   const hasil = await store.savePresentasi(req.userId, bersihkanNama(nama), buffer);
   catatAktivitas(req.userId, "presentasi.unggah", { nama: hasil.nama, ukuran: hasil.ukuran });
@@ -284,12 +284,12 @@ async function konversiDanSimpan(req, res, namaAsal, buffer) {
     return res.status(400).json({ error: "Berkas bukan PowerPoint (.pptx) yang valid" });
   }
   if (buffer.length > MAKS_UKURAN) {
-    return res.status(400).json({ error: "Berkas terlalu besar (maks. 40 MB)" });
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 60 MB)" });
   }
   const { buffer: hasil, laporan } = await prosesPptxCanva(buffer);
   if (hasil.length > MAKS_UKURAN) {
     return res.status(400).json({
-      error: "Hasil konversi melebihi 40 MB — kurangi jumlah font/isi desain",
+      error: "Hasil konversi melebihi 60 MB — kurangi jumlah font/isi desain",
     });
   }
   const nama = bersihkanNama(
