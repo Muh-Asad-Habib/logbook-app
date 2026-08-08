@@ -215,6 +215,43 @@ export async function putFileRaw(originalName, buffer, prefix = "lap") {
   return key;
 }
 
+/**
+ * Simpan BLOB sementara dengan kunci yang ditentukan pemanggil — dipakai
+ * POTONGAN unggahan berkas besar (presentasi). Binernya ke ImageKit (kuota
+ * 20 GB), Neon hanya menyimpan kuncinya — menghindari batas respons query
+ * Neon 64 MB sekaligus menghemat kuota database 0,5 GB.
+ * Kunci deterministik + useUniqueFileName=false → unggah ulang potongan yang
+ * sama menimpa berkas lama (idempoten, tanpa sampah).
+ */
+export async function putBlob(key, buffer) {
+  if (pakaiCloud()) {
+    const form = new FormData();
+    form.append("file", buffer.toString("base64"));
+    form.append("fileName", key);
+    form.append("folder", IK.folder);
+    form.append("useUniqueFileName", "false");
+    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: { Authorization: authHeader() },
+      body: form,
+    });
+    if (!res.ok) {
+      const pesan = await res.text().catch(() => "");
+      throw new Error(`Upload potongan ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
+    }
+    const info = await res.json();
+    await q(
+      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
+       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
+      [key, info.fileId || "", info.url || ""]
+    );
+    return key;
+  }
+  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  fs.writeFileSync(safePath(key), buffer);
+  return key;
+}
+
 /** Hapus banyak berkas (abaikan yang sudah tidak ada / gagal). */
 export async function removeFiles(keys) {
   for (const k of keys || []) {
