@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Presentation, Upload, Download, Trash2, Info, TriangleAlert,
-  Loader, RefreshCw, Link2, ExternalLink, WifiOff,
+  Loader, RefreshCw, Link2, ExternalLink, WifiOff, Sparkles, Plug, Unplug,
 } from "lucide-react";
 import {
   api, exportUrl, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
@@ -479,6 +479,9 @@ function PresentasiTim() {
         </p>
       </div>
 
+      {/* ===== Konversi Canva → PPTX (font tertanam, tampilan sama persis) ===== */}
+      <KonversiCanvaCard punyaTautan={!!info?.canva?.ada} unduhUrl={unduhUrl} />
+
       {(err || pptx.err || infoErr) && (
         <div className="error-box mt">
           <TriangleAlert className="lucide" />{" "}
@@ -587,6 +590,221 @@ function KomentarPresentasiTim() {
         <KomentarPanel jenis="presentasi" targetId={idKu} />
       </div>
     </>
+  );
+}
+
+/* ===================== KONVERSI CANVA → PPTX (font tertanam) =====================
+ * Masalah yang diselesaikan: PPTX unduhan Canva tampil beda di PowerPoint
+ * karena fontnya tidak ter-install. Server menanam font Google langsung ke
+ * dalam file → tampilan sama persis di komputer mana pun, semua teks & grup
+ * tetap bisa diedit/digeser. Dua jalur: otomatis dari tautan Canva tersimpan
+ * (akun Canva terhubung sekali), atau unggah PPTX hasil unduhan Canva. */
+function KonversiCanvaCard({ punyaTautan, unduhUrl }) {
+  const [status, setStatus] = useState(null); // { terhubung, siap }
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState("");       // "" | "link" | "file" | "oauth"
+  const [progres, setProgres] = useState(0);
+  const [laporan, setLaporan] = useState(null);
+  const [err, setErr] = useState("");
+  const inputRef = useRef(null);
+
+  const muatStatus = useCallback(() => {
+    api.canvaConnect.status().then(setStatus).catch(() => setStatus({ terhubung: false, siap: false }));
+  }, []);
+  useEffect(() => { muatStatus(); }, [muatStatus]);
+
+  /* Balikan dari halaman izin Canva: /presentasi?canva=terhubung|gagal */
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const hasil = p.get("canva");
+    if (!hasil) return;
+    if (hasil === "terhubung") toast.ok("Akun Canva terhubung — tinggal klik Konversi");
+    else toast.err(`Gagal menghubungkan Canva: ${p.get("pesan") || "dibatalkan"}`);
+    window.history.replaceState({}, "", window.location.pathname);
+    muatStatus();
+  }, [muatStatus]);
+
+  const hubungkan = async () => {
+    setBusy("oauth");
+    setErr("");
+    try {
+      const { url } = await api.canvaConnect.mulai();
+      window.location.href = url; // → halaman izin Canva → callback → kembali ke sini
+    } catch (e) {
+      setErr(e.message);
+      setBusy("");
+    }
+  };
+
+  const putuskan = async () => {
+    try {
+      await api.canvaConnect.putus();
+      toast.ok("Akun Canva diputuskan");
+      muatStatus();
+    } catch (e) { toast.err(e.message); }
+  };
+
+  const selesaiKonversi = (r) => {
+    setLaporan(r.laporan || null);
+    toast.ok("Konversi selesai — font ditanam, berkas presentasi diperbarui");
+    revalidate("/api/presentasi/info").catch(() => {});
+  };
+
+  const konversiDariLink = async () => {
+    setBusy("link");
+    setErr("");
+    setLaporan(null);
+    try {
+      selesaiKonversi(await api.konversiLink());
+    } catch (e) {
+      setErr(`Gagal konversi dari tautan: ${e.message}`);
+    } finally { setBusy(""); }
+  };
+
+  const konversiDariFile = async () => {
+    if (!file) { toast.err("Pilih berkas .pptx hasil unduhan Canva dahulu"); return; }
+    if (!file.name.toLowerCase().endsWith(".pptx")) {
+      toast.err("Berkas harus berformat .pptx"); return;
+    }
+    setBusy("file");
+    setProgres(0);
+    setErr("");
+    setLaporan(null);
+    try {
+      selesaiKonversi(await api.konversiPptx(file, setProgres));
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+    } catch (e) {
+      setErr(`Gagal konversi: ${e.message}`);
+    } finally {
+      setBusy("");
+      setProgres(0);
+    }
+  };
+
+  return (
+    <div className="card mt">
+      <div className="metric" style={{ marginBottom: 10 }}>
+        <div className="metric-ic v3"><Sparkles className="lucide" /></div>
+        <div>
+          <div className="metric-value" style={{ fontSize: "1.02rem" }}>
+            Canva → PPTX sama persis (font ditanam)
+          </div>
+          <div className="muted">
+            PPTX unduhan Canva sering <b>berubah tampilannya</b> di PowerPoint karena
+            fontnya tidak ter-install. Fitur ini <b>menanam font Google ke dalam file</b> —
+            tampilan jadi identik, semua teks & grup <b>tetap bisa diedit/digeser</b>,
+            siap diberi animasi PowerPoint.
+          </div>
+        </div>
+      </div>
+
+      {/* --- Jalur 1: otomatis dari tautan Canva tersimpan --- */}
+      {status?.siap && (
+        <div className="row" style={{ alignItems: "center" }}>
+          {status.terhubung ? (
+            <>
+              <button className="btn primary" onClick={konversiDariLink}
+                      disabled={!!busy || !punyaTautan}
+                      title={punyaTautan ? "" : "Simpan tautan Canva dahulu di kartu atas"}>
+                {busy === "link"
+                  ? "Mengekspor dari Canva… (±30 dtk)"
+                  : <><Sparkles className="lucide" /> Konversi dari tautan Canva</>}
+              </button>
+              <button className="btn sm" onClick={putuskan} title="Putuskan akun Canva">
+                <Unplug className="lucide" /> Putuskan Canva
+              </button>
+            </>
+          ) : (
+            <button className="btn" onClick={hubungkan} disabled={!!busy}>
+              {busy === "oauth"
+                ? "Membuka Canva…"
+                : <><Plug className="lucide" /> Hubungkan akun Canva (sekali saja)</>}
+            </button>
+          )}
+          {!punyaTautan && status.terhubung && (
+            <span className="muted" style={{ fontSize: ".78rem" }}>
+              simpan tautan Canva dahulu di kartu di atas
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* --- Jalur 2: unggah PPTX hasil unduhan Canva --- */}
+      <div className="row" style={{ marginTop: status?.siap ? 10 : 0 }}>
+        <input
+          ref={inputRef} type="file" accept=".pptx"
+          style={{ flex: "1 1 260px", marginTop: 0 }}
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+        />
+        <button className="btn primary" onClick={konversiDariFile} disabled={!!busy}>
+          {busy === "file"
+            ? (progres > 0 ? `Memproses… ${progres}%` : "Menanam font…")
+            : <><Upload className="lucide" /> Konversi berkas Canva</>}
+        </button>
+      </div>
+      <p className="muted mts" style={{ fontSize: ".78rem" }}>
+        <Info className="lucide" /> Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint
+        (.pptx)</b>, lalu unggah di sini. Hasil konversi otomatis tersimpan sebagai
+        berkas presentasi tim (menggantikan yang lama).
+      </p>
+
+      {err && (
+        <div className="error-box mt"><TriangleAlert className="lucide" /> {err}</div>
+      )}
+      {laporan && <LaporanKonversi laporan={laporan} unduhUrl={unduhUrl} />}
+    </div>
+  );
+}
+
+/** Hasil konversi: status tiap font + slide yang memuat elemen rasterisasi. */
+function LaporanKonversi({ laporan, unduhUrl }) {
+  const tertanam = laporan.fonts.filter((f) => f.status === "tertanam");
+  const sistem = laporan.fonts.filter((f) => f.status === "sistem");
+  const manual = laporan.fonts.filter((f) => f.status === "manual");
+  return (
+    <div className="mt" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
+      <b>📋 Laporan konversi</b>
+      <p className="muted mts" style={{ fontSize: ".8rem" }}>
+        {laporan.totalSlide} slide diproses
+        {laporan.sudahTertanam ? " · file sumber sudah memiliki font tertanam" : ""}
+      </p>
+      {tertanam.length > 0 && (
+        <p className="mts" style={{ fontSize: ".85rem" }}>
+          ✅ <b>Font ditanam ke dalam file</b> (tampil sama di komputer mana pun):{" "}
+          {tertanam.map((f) => f.nama).join(", ")}
+        </p>
+      )}
+      {sistem.length > 0 && (
+        <p className="mts muted" style={{ fontSize: ".8rem" }}>
+          ℹ️ Font bawaan Windows/Office (tidak perlu ditanam): {sistem.map((f) => f.nama).join(", ")}
+        </p>
+      )}
+      {manual.length > 0 && (
+        <div className="mts" style={{ fontSize: ".85rem" }}>
+          ⚠️ <b>Font premium Canva — tidak tersedia di Google Fonts.</b> Agar tampil
+          persis, unduh & install manual (atau ganti fontnya di Canva):
+          <ul style={{ margin: "4px 0 0 18px" }}>
+            {manual.map((f) => (
+              <li key={f.nama}>
+                {f.nama}{" "}
+                <a href={f.url} target="_blank" rel="noreferrer">cari font ↗</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {laporan.raster.length > 0 && (
+        <p className="mts muted" style={{ fontSize: ".8rem" }}>
+          🖼 Slide {laporan.raster.map((r) => r.slide).join(", ")} memuat gambar/elemen
+          yang dirasterisasi Canva (mis. teks melengkung/efek khusus) — tetap bisa
+          digeser & diberi animasi, tapi isinya tidak bisa diketik ulang.
+        </p>
+      )}
+      <a className="btn primary mt" style={{ textDecoration: "none" }} href={unduhUrl}>
+        <Download className="lucide" /> Unduh PPTX hasil konversi
+      </a>
+    </div>
   );
 }
 

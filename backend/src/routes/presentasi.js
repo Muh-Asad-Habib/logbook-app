@@ -15,6 +15,11 @@ import * as store from "../storage.js";
 import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
+import { prosesPptxCanva } from "../export/pptx-canva.js";
+import {
+  canvaSiap, mulaiOAuth, selesaikanOAuth, statusKoneksi, putuskanKoneksi,
+  eksporPptx, idDesainDariUrl,
+} from "../canva.js";
 
 const MAKS_UKURAN = 40 * 1024 * 1024; // 40 MB — slide berfoto banyak pun cukup
 
@@ -58,6 +63,31 @@ router.get("/publik/:kunci", async (req, res, next) => {
     res.setHeader("Cache-Control", "private, no-store");
     res.send(p.buffer);
   } catch (err) { next(err); }
+});
+
+/** URL dasar aplikasi dilihat dari request (dukung proxy/tunnel/Vercel). */
+function urlDasar(req) {
+  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+  return `${proto}://${host}`;
+}
+const redirectUriCanva = (req) => `${urlDasar(req)}/api/presentasi/canva-connect/callback`;
+
+/* ---- Callback OAuth Canva — DIPANGGIL BROWSER dari halaman izin Canva,
+ *      tidak membawa token login → didaftarkan SEBELUM authRequired.
+ *      Identitas pengguna diikat lewat `state` acak yang tersimpan di DB. ---- */
+router.get("/canva-connect/callback", async (req, res) => {
+  const kembali = (qs) => res.redirect(`/presentasi?${qs}`);
+  try {
+    const { code, state, error } = req.query;
+    if (error) return kembali(`canva=gagal&pesan=${encodeURIComponent(String(error))}`);
+    if (!code || !state) return kembali("canva=gagal&pesan=parameter%20kurang");
+    const userId = await selesaikanOAuth(String(state), String(code), redirectUriCanva(req));
+    catatAktivitas(userId, "presentasi.canva-connect", {});
+    return kembali("canva=terhubung");
+  } catch (err) {
+    return kembali(`canva=gagal&pesan=${encodeURIComponent(err.message || "gagal")}`);
+  }
 });
 
 router.use(authRequired);
@@ -238,6 +268,152 @@ router.delete("/canva", async (req, res, next) => {
     const ada = await store.deleteCanvaPresentasi(req.userId);
     if (!ada) return res.status(404).json({ error: "Belum ada tautan Canva" });
     catatAktivitas(req.userId, "presentasi.hapus-canva", {});
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+/* ============ Konversi Canva → PPTX "sama persis" (font tertanam) ============
+ * Pipeline: PPTX ekspor Canva → pindai font → unduh dari Google Fonts →
+ * TANAM ke dalam file → simpan sebagai presentasi tim + laporan hasil.
+ * Semua teks/grup tetap bisa diedit; hanya font yang ditambahkan.
+ * Dua jalur masuk: unggah berkas PPTX, atau otomatis dari tautan Canva
+ * tersimpan (butuh akun Canva terhubung — lihat /canva-connect). */
+
+async function konversiDanSimpan(req, res, namaAsal, buffer) {
+  if (!validPptx(buffer)) {
+    return res.status(400).json({ error: "Berkas bukan PowerPoint (.pptx) yang valid" });
+  }
+  if (buffer.length > MAKS_UKURAN) {
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 40 MB)" });
+  }
+  const { buffer: hasil, laporan } = await prosesPptxCanva(buffer);
+  if (hasil.length > MAKS_UKURAN) {
+    return res.status(400).json({
+      error: "Hasil konversi melebihi 40 MB — kurangi jumlah font/isi desain",
+    });
+  }
+  const nama = bersihkanNama(
+    String(namaAsal || "presentasi").replace(/\.pptx$/i, "") + " (font tertanam).pptx"
+  );
+  const tersimpan = await store.savePresentasi(req.userId, nama, hasil);
+  catatAktivitas(req.userId, "presentasi.konversi", {
+    nama, ukuran: hasil.length,
+    fontTertanam: laporan.fonts.filter((f) => f.status === "tertanam").length,
+  });
+  res.json({
+    ok: true, ...tersimpan, laporan,
+    catatan: "Hasil konversi tersimpan sebagai berkas presentasi (menggantikan yang lama)",
+  });
+}
+
+/**
+ * @openapi
+ * /api/presentasi/konversi:
+ *   post:
+ *     tags: [Presentasi]
+ *     summary: Konversi PPTX ekspor Canva → font Google ditanam agar tampil sama persis
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200: { description: "{ ok, nama, ukuran, laporan: { fonts, raster, … } }" }
+ *       400: { description: Berkas tidak valid }
+ */
+router.post("/konversi", upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file?.buffer) return res.status(400).json({ error: "Pilih berkas .pptx dahulu" });
+    await konversiDanSimpan(req, res, req.file.originalname, req.file.buffer);
+  } catch (err) { next(err); }
+});
+
+/** Perakit potongan untuk berkas konversi > ±3 MB (tabel import_chunks). */
+router.post("/konversi-selesai", async (req, res, next) => {
+  const id = String(req.body?.id || "");
+  try {
+    const total = Number(req.body?.total);
+    if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
+      return res.status(400).json({ error: "id/total tidak valid" });
+    }
+    const rows = await q(
+      "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
+      [id, req.userId]
+    );
+    if (rows.length !== total) {
+      return res.status(400).json({
+        error: `Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`,
+      });
+    }
+    const buffer = Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
+    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId]);
+    await konversiDanSimpan(req, res, req.body?.nama, buffer);
+  } catch (err) {
+    q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId])
+      .catch(() => {});
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/presentasi/konversi-link:
+ *   post:
+ *     tags: [Presentasi]
+ *     summary: Ekspor desain dari tautan Canva tersimpan lalu konversi (font tertanam)
+ *     responses:
+ *       200: { description: "{ ok, nama, ukuran, laporan }" }
+ *       401: { description: Akun Canva belum terhubung }
+ *       404: { description: Belum ada tautan Canva tersimpan }
+ */
+router.post("/konversi-link", async (req, res, next) => {
+  try {
+    if (!canvaSiap()) {
+      return res.status(503).json({
+        error: "Integrasi Canva belum disetel di server (CANVA_CLIENT_ID/SECRET) — pakai jalur unggah .pptx",
+      });
+    }
+    // tautan dari body ATAU tautan Canva yang sudah tersimpan
+    const info = await store.infoPresentasi(req.userId);
+    const url = String(req.body?.url || "") || (info.canva.ada ? info.canva.url : "");
+    const designId = idDesainDariUrl(url);
+    if (!designId) {
+      return res.status(404).json({
+        error: "Belum ada tautan Canva tersimpan — simpan tautan desain dahulu",
+      });
+    }
+    const buffer = await eksporPptx(req.userId, designId);
+    await konversiDanSimpan(req, res, `canva-${designId}`, buffer);
+  } catch (err) { next(err); }
+});
+
+/* ---- Hubungkan / putuskan akun Canva (OAuth Connect API) ---- */
+router.get("/canva-connect/status", async (req, res, next) => {
+  try {
+    res.json(await statusKoneksi(req.userId));
+  } catch (err) { next(err); }
+});
+
+router.get("/canva-connect/mulai", async (req, res, next) => {
+  try {
+    if (!canvaSiap()) {
+      return res.status(503).json({
+        error: "Integrasi Canva belum disetel di server — lihat README bagian Canva Connect",
+      });
+    }
+    res.json({ url: await mulaiOAuth(req.userId, redirectUriCanva(req)) });
+  } catch (err) { next(err); }
+});
+
+router.delete("/canva-connect", async (req, res, next) => {
+  try {
+    const ada = await putuskanKoneksi(req.userId);
+    if (!ada) return res.status(404).json({ error: "Akun Canva belum terhubung" });
+    catatAktivitas(req.userId, "presentasi.canva-disconnect", {});
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

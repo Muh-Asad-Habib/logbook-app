@@ -127,6 +127,28 @@ Untuk Canva, salin tautan dari tombol **Bagikan** dan pastikan setelannya
 *"Siapa saja dengan tautan dapat melihat"* agar pratinjaunya dapat dibuka
 pembimbing.
 
+#### ✨ Canva → PPTX sama persis (font ditanam)
+
+PPTX unduhan Canva sering tampil beda di PowerPoint karena fontnya tidak
+ter-install. Kartu **Canva → PPTX sama persis** di menu Presentasi
+memperbaikinya secara otomatis:
+
+| | |
+|---|---|
+| 🔍 | Memindai semua font yang dipakai desain |
+| ⬇️ | Mengunduh berkas fontnya dari Google Fonts |
+| 📌 | **Menanam font ke dalam PPTX** — tampil identik di komputer mana pun |
+| ✏️ | Teks & grup **tetap bisa diedit/digeser**, siap diberi animasi PowerPoint |
+| 📋 | Laporan hasil: font tertanam, font premium (perlu diunduh manual), dan slide berisi elemen rasterisasi Canva |
+
+Cara pakai paling cepat: di Canva pilih **Bagikan → Unduh → Microsoft
+PowerPoint (.pptx)**, lalu unggah berkasnya di kartu konversi. Hasilnya
+tersimpan sebagai berkas presentasi tim dan bisa langsung diunduh.
+
+> 💡 Ada juga jalur **satu klik dari tautan Canva** (tanpa unduh manual) —
+> perlu penyiapan sekali oleh admin, lihat [DEPLOY.md — Canva Connect](DEPLOY.md#bagian-6b--opsional-canva-connect-konversi-langsung-dari-tautan).
+
+
 ### 6. Mengundang pembimbing
 
 1. Buka menu **Profil** → bagian **Kode tim** (contoh: `ABCD-2345`).
@@ -409,6 +431,10 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | POST / DELETE | `/api/presentasi/canva` | Simpan / hapus tautan Canva |
 | POST | `/api/presentasi/tautan` | Tautan sementara untuk penampil PowerPoint |
 | GET | `/api/presentasi/publik/{kunci}` | Akses berkas melalui tautan sementara |
+| POST | `/api/presentasi/konversi` | Konversi PPTX Canva → font ditanam (potongan: `/chunk` + `/konversi-selesai`) |
+| POST | `/api/presentasi/konversi-link` | Ekspor dari tautan Canva lalu konversi (perlu Canva Connect) |
+| GET / DELETE | `/api/presentasi/canva-connect/status` · `/canva-connect` | Status / putuskan koneksi akun Canva |
+| GET | `/api/presentasi/canva-connect/mulai` · `/callback` | Alur OAuth menghubungkan akun Canva |
 
 **Pembimbing (hanya baca)**
 
@@ -484,6 +510,7 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:panel-api --workspace backend` | Endpoint panel admin: validasi input, pengelolaan akun, audit |
 | `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
+| `npm run diag:konversi --workspace backend` | Konversi Canva → PPTX: pemindaian font, unduhan Google Fonts, penanaman ke berkas, laporan, dan penolakan berkas tak valid (tanpa server; butuh internet) |
 
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
 tidak terganggu.
