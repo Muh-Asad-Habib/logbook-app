@@ -254,8 +254,13 @@ Penyiapan sekali saja, ±15 menit — gratis:
 
 1. Buka **https://www.canva.com/developers/integrations** → login dengan akun
    Canva-mu → **Create an integration**.
-2. Isi nama bebas (mis. `Logbook Konversi`), jenis **Public** tidak perlu —
-   **Private** cukup untuk pemakaian sendiri/tim.
+   (Syarat Canva: akun harus mengaktifkan **MFA/verifikasi 2 langkah** dahulu.)
+2. Isi nama bebas (mis. `Logbook Konversi`), dan pilih jenis **Public** ⚠️ —
+   **JANGAN pilih Private**: integrasi Private hanya berfungsi untuk tim
+   berpaket *Canva Enterprise*; di akun biasa/Education/Pro dia akan selalu
+   ditolak dengan pesan "The client ID is invalid". Integrasi Public **tidak
+   perlu dikirim untuk review** selama hanya dipakai oleh akun pembuatnya —
+   cukup dibiarkan berstatus development.
 3. Di bagian **Scopes**, centang: `design:content:read`.
 4. Di bagian **Authentication → Redirect URLs**, tambahkan:
    ```
