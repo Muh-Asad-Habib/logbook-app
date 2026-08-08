@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Presentation, Upload, Download, Trash2, Info, TriangleAlert,
-  Loader, RefreshCw, Link2, ExternalLink, WifiOff, Sparkles, Plug, Unplug,
+  Loader, RefreshCw, Link2, ExternalLink, WifiOff, Sparkles,
 } from "lucide-react";
 import {
   api, exportUrl, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
@@ -480,7 +480,7 @@ function PresentasiTim() {
       </div>
 
       {/* ===== Konversi Canva → PPTX (font tertanam, tampilan sama persis) ===== */}
-      <KonversiCanvaCard punyaTautan={!!info?.canva?.ada} unduhUrl={unduhUrl} />
+      <KonversiCanvaCard unduhUrl={unduhUrl} />
 
       {(err || pptx.err || infoErr) && (
         <div className="error-box mt">
@@ -597,87 +597,35 @@ function KomentarPresentasiTim() {
  * Masalah yang diselesaikan: PPTX unduhan Canva tampil beda di PowerPoint
  * karena fontnya tidak ter-install. Server menanam font Google langsung ke
  * dalam file → tampilan sama persis di komputer mana pun, semua teks & grup
- * tetap bisa diedit/digeser. Dua jalur: otomatis dari tautan Canva tersimpan
- * (akun Canva terhubung sekali), atau unggah PPTX hasil unduhan Canva. */
-function KonversiCanvaCard({ punyaTautan, unduhUrl }) {
-  const [status, setStatus] = useState(null); // { terhubung, siap }
+ * tetap bisa diedit/digeser. Alur: unduh .pptx dari Canva → unggah → konversi. */
+function KonversiCanvaCard({ unduhUrl }) {
   const [file, setFile] = useState(null);
-  const [busy, setBusy] = useState("");       // "" | "link" | "file" | "oauth"
+  const [busy, setBusy] = useState(false);
   const [progres, setProgres] = useState(0);
   const [laporan, setLaporan] = useState(null);
   const [err, setErr] = useState("");
   const inputRef = useRef(null);
 
-  const muatStatus = useCallback(() => {
-    api.canvaConnect.status().then(setStatus).catch(() => setStatus({ terhubung: false, siap: false }));
-  }, []);
-  useEffect(() => { muatStatus(); }, [muatStatus]);
-
-  /* Balikan dari halaman izin Canva: /presentasi?canva=terhubung|gagal */
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const hasil = p.get("canva");
-    if (!hasil) return;
-    if (hasil === "terhubung") toast.ok("Akun Canva terhubung — tinggal klik Konversi");
-    else toast.err(`Gagal menghubungkan Canva: ${p.get("pesan") || "dibatalkan"}`);
-    window.history.replaceState({}, "", window.location.pathname);
-    muatStatus();
-  }, [muatStatus]);
-
-  const hubungkan = async () => {
-    setBusy("oauth");
-    setErr("");
-    try {
-      const { url } = await api.canvaConnect.mulai();
-      window.location.href = url; // → halaman izin Canva → callback → kembali ke sini
-    } catch (e) {
-      setErr(e.message);
-      setBusy("");
-    }
-  };
-
-  const putuskan = async () => {
-    try {
-      await api.canvaConnect.putus();
-      toast.ok("Akun Canva diputuskan");
-      muatStatus();
-    } catch (e) { toast.err(e.message); }
-  };
-
-  const selesaiKonversi = (r) => {
-    setLaporan(r.laporan || null);
-    toast.ok("Konversi selesai — font ditanam, berkas presentasi diperbarui");
-    revalidate("/api/presentasi/info").catch(() => {});
-  };
-
-  const konversiDariLink = async () => {
-    setBusy("link");
-    setErr("");
-    setLaporan(null);
-    try {
-      selesaiKonversi(await api.konversiLink());
-    } catch (e) {
-      setErr(`Gagal konversi dari tautan: ${e.message}`);
-    } finally { setBusy(""); }
-  };
-
-  const konversiDariFile = async () => {
+  const konversi = async () => {
     if (!file) { toast.err("Pilih berkas .pptx hasil unduhan Canva dahulu"); return; }
     if (!file.name.toLowerCase().endsWith(".pptx")) {
       toast.err("Berkas harus berformat .pptx"); return;
     }
-    setBusy("file");
+    setBusy(true);
     setProgres(0);
     setErr("");
     setLaporan(null);
     try {
-      selesaiKonversi(await api.konversiPptx(file, setProgres));
+      const r = await api.konversiPptx(file, setProgres);
+      setLaporan(r.laporan || null);
+      toast.ok("Konversi selesai — font ditanam, berkas presentasi diperbarui");
+      revalidate("/api/presentasi/info").catch(() => {});
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
       setErr(`Gagal konversi: ${e.message}`);
     } finally {
-      setBusy("");
+      setBusy(false);
       setProgres(0);
     }
   };
@@ -699,55 +647,29 @@ function KonversiCanvaCard({ punyaTautan, unduhUrl }) {
         </div>
       </div>
 
-      {/* --- Jalur 1: otomatis dari tautan Canva tersimpan --- */}
-      {status?.siap && (
-        <div className="row" style={{ alignItems: "center" }}>
-          {status.terhubung ? (
-            <>
-              <button className="btn primary" onClick={konversiDariLink}
-                      disabled={!!busy || !punyaTautan}
-                      title={punyaTautan ? "" : "Simpan tautan Canva dahulu di kartu atas"}>
-                {busy === "link"
-                  ? "Mengekspor dari Canva… (±30 dtk)"
-                  : <><Sparkles className="lucide" /> Konversi dari tautan Canva</>}
-              </button>
-              <button className="btn sm" onClick={putuskan} title="Putuskan akun Canva">
-                <Unplug className="lucide" /> Putuskan Canva
-              </button>
-            </>
-          ) : (
-            <button className="btn" onClick={hubungkan} disabled={!!busy}>
-              {busy === "oauth"
-                ? "Membuka Canva…"
-                : <><Plug className="lucide" /> Hubungkan akun Canva (sekali saja)</>}
-            </button>
-          )}
-          {!punyaTautan && status.terhubung && (
-            <span className="muted" style={{ fontSize: ".78rem" }}>
-              simpan tautan Canva dahulu di kartu di atas
-            </span>
-          )}
-        </div>
-      )}
+      <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
+        <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
+        <li>Unggah berkasnya di bawah ini lalu klik <b>Konversi</b></li>
+        <li>Unduh hasilnya — otomatis tersimpan juga sebagai presentasi tim</li>
+      </ol>
 
-      {/* --- Jalur 2: unggah PPTX hasil unduhan Canva --- */}
-      <div className="row" style={{ marginTop: status?.siap ? 10 : 0 }}>
+      <div className="row">
         <input
           ref={inputRef} type="file" accept=".pptx"
           style={{ flex: "1 1 260px", marginTop: 0 }}
           onChange={(e) => setFile(e.target.files?.[0] || null)}
         />
-        <button className="btn primary" onClick={konversiDariFile} disabled={!!busy}>
-          {busy === "file"
+        <button className="btn primary" onClick={konversi} disabled={busy}>
+          {busy
             ? (progres > 0 ? `Memproses… ${progres}%` : "Menanam font…")
             : <><Upload className="lucide" /> Konversi berkas Canva</>}
         </button>
       </div>
-      <p className="muted mts" style={{ fontSize: ".78rem" }}>
-        <Info className="lucide" /> Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint
-        (.pptx)</b>, lalu unggah di sini. Hasil konversi otomatis tersimpan sebagai
-        berkas presentasi tim (menggantikan yang lama).
-      </p>
+      {file && (
+        <p className="muted mts">
+          <Info className="lucide" /> {file.name} · {fmtUkuran(file.size)}
+        </p>
+      )}
 
       {err && (
         <div className="error-box mt"><TriangleAlert className="lucide" /> {err}</div>

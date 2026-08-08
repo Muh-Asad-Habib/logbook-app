@@ -141,12 +141,9 @@ memperbaikinya secara otomatis:
 | ✏️ | Teks & grup **tetap bisa diedit/digeser**, siap diberi animasi PowerPoint |
 | 📋 | Laporan hasil: font tertanam, font premium (perlu diunduh manual), dan slide berisi elemen rasterisasi Canva |
 
-Cara pakai paling cepat: di Canva pilih **Bagikan → Unduh → Microsoft
-PowerPoint (.pptx)**, lalu unggah berkasnya di kartu konversi. Hasilnya
-tersimpan sebagai berkas presentasi tim dan bisa langsung diunduh.
-
-> 💡 Ada juga jalur **satu klik dari tautan Canva** (tanpa unduh manual) —
-> perlu penyiapan sekali oleh admin, lihat [DEPLOY.md — Canva Connect](DEPLOY.md#bagian-6b--opsional-canva-connect-konversi-langsung-dari-tautan).
+Cara pakai: di Canva pilih **Bagikan → Unduh → Microsoft PowerPoint (.pptx)**,
+lalu unggah berkasnya di kartu konversi. Hasilnya tersimpan sebagai berkas
+presentasi tim dan bisa langsung diunduh.
 
 
 ### 6. Mengundang pembimbing

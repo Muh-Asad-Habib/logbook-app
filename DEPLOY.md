@@ -243,6 +243,13 @@ Ingin ikut menerima perbaikan terbaru dari repo asal? Di fork-mu klik
 
 ## Bagian 6b — (Opsional) Canva Connect: konversi langsung dari tautan
 
+> ⚠️ **Saat ini tidak dipakai.** Jalur konversi yang aktif adalah **unggah
+> berkas .pptx** (tanpa setup apa pun): di Canva pilih *Bagikan → Unduh →
+> Microsoft PowerPoint (.pptx)*, unggah di kartu konversi, selesai.
+> Endpoint jalur tautan tetap ada di backend; bagian ini disimpan sebagai
+> referensi bila kelak ingin mengaktifkannya kembali (butuh integrasi Canva
+> yang sudah lolos review agar bisa dipakai semua tim).
+
 Fitur **Canva → PPTX sama persis** (menu Presentasi) punya dua jalur:
 
 | Jalur | Perlu bagian ini? |
