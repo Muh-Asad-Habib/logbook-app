@@ -15,13 +15,14 @@ import * as store from "../storage.js";
 import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
+import { putBlob, getFileBuffer, removeFiles } from "../files.js";
 import { prosesPptxCanva } from "../export/pptx-canva.js";
 import {
   canvaSiap, mulaiOAuth, selesaikanOAuth, statusKoneksi, putuskanKoneksi,
   eksporPptx, idDesainDariUrl,
 } from "../canva.js";
 
-const MAKS_UKURAN = 60 * 1024 * 1024; // 60 MB — deck Canva berfoto resolusi tinggi pun muat
+const MAKS_UKURAN = 100 * 1024 * 1024; // 100 MB — deck Canva berfoto resolusi tinggi pun muat
 
 const MIME_PPTX =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -156,7 +157,7 @@ async function simpan(req, res, nama, buffer) {
     return res.status(400).json({ error: "Berkas bukan PowerPoint (.pptx) yang valid" });
   }
   if (buffer.length > MAKS_UKURAN) {
-    return res.status(400).json({ error: "Berkas terlalu besar (maks. 60 MB)" });
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 100 MB)" });
   }
   const hasil = await store.savePresentasi(req.userId, bersihkanNama(nama), buffer);
   catatAktivitas(req.userId, "presentasi.unggah", { nama: hasil.nama, ukuran: hasil.ukuran });
@@ -284,12 +285,12 @@ async function konversiDanSimpan(req, res, namaAsal, buffer) {
     return res.status(400).json({ error: "Berkas bukan PowerPoint (.pptx) yang valid" });
   }
   if (buffer.length > MAKS_UKURAN) {
-    return res.status(400).json({ error: "Berkas terlalu besar (maks. 60 MB)" });
+    return res.status(400).json({ error: "Berkas terlalu besar (maks. 100 MB)" });
   }
   const { buffer: hasil, laporan } = await prosesPptxCanva(buffer);
   if (hasil.length > MAKS_UKURAN) {
     return res.status(400).json({
-      error: "Hasil konversi melebihi 60 MB — kurangi jumlah font/isi desain",
+      error: "Hasil konversi melebihi 100 MB — kurangi jumlah font/isi desain",
     });
   }
   const nama = bersihkanNama(
@@ -332,7 +333,7 @@ router.post("/konversi", upload.single("file"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** Perakit potongan untuk berkas konversi > ±3 MB (tabel import_chunks). */
+/** Perakit potongan untuk berkas konversi > ±3 MB (biner di ImageKit). */
 router.post("/konversi-selesai", async (req, res, next) => {
   const id = String(req.body?.id || "");
   try {
@@ -340,21 +341,10 @@ router.post("/konversi-selesai", async (req, res, next) => {
     if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
       return res.status(400).json({ error: "id/total tidak valid" });
     }
-    const rows = await q(
-      "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
-      [id, req.userId]
-    );
-    if (rows.length !== total) {
-      return res.status(400).json({
-        error: `Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`,
-      });
-    }
-    const buffer = Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
-    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId]);
+    const buffer = await rakitPotongan(id, req.userId, total);
     await konversiDanSimpan(req, res, req.body?.nama, buffer);
   } catch (err) {
-    q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId])
-      .catch(() => {});
+    bersihkanPotongan(id, req.userId).catch(() => {});
     next(err);
   }
 });
@@ -419,11 +409,16 @@ router.delete("/canva-connect", async (req, res, next) => {
 });
 
 /* ============ unggah terpotong (file > ±3 MB) ============
- * Memakai tabel import_chunks yang sama dengan impor DOCX & laporan
- * (id unggahan berbeda, terikat user_id, dibersihkan otomatis). */
+ * BINER potongan disimpan di IMAGEKIT (kuota 20 GB) dengan kunci deterministik
+ * `tmp-<id>-<idx>.bin`; tabel import_chunks hanya menyimpan KUNCI-nya
+ * (±30 byte per baris). Dulu base64 potongan ikut masuk Neon — file besar
+ * membuat query perakitan melebihi batas respons Neon 64 MB (HTTP 507)
+ * sekaligus memboroskan kuota database 0,5 GB. */
 const CHUNK_MAX_B64 = 3.5 * 1024 * 1024;
 const CHUNK_MAX_IDX = 60;
 const ID_RE = /^[a-z0-9-]{8,64}$/;
+
+const kunciPotongan = (id, idx) => `tmp-${id}-${idx}.bin`;
 
 router.post("/chunk", async (req, res, next) => {
   try {
@@ -436,39 +431,68 @@ router.post("/chunk", async (req, res, next) => {
         !/^[A-Za-z0-9+/=]+$/.test(data)) {
       return res.status(400).json({ error: "data potongan tidak valid (harus base64 ≤ 3,5 MB)" });
     }
+    const key = kunciPotongan(id, i);
+    await putBlob(key, Buffer.from(data, "base64")); // biner → ImageKit
     await q(
       `INSERT INTO import_chunks (id, idx, user_id, data, created_at)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (id, idx) DO UPDATE SET data = EXCLUDED.data,
          user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at`,
-      [id, i, req.userId, data, new Date().toISOString()]
+      [id, i, req.userId, key, new Date().toISOString()]
     );
     res.json({ ok: true, idx: i });
   } catch (err) { next(err); }
 });
 
+/** Rakit seluruh potongan dari ImageKit lalu bersihkan jejaknya. */
+async function rakitPotongan(id, userId, total) {
+  const rows = await q(
+    "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
+    [id, userId]
+  );
+  if (rows.length !== total) {
+    const e = new Error(`Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`);
+    e.status = 400;
+    throw e;
+  }
+  const bagian = [];
+  for (const r of rows) {
+    const buf = await getFileBuffer(r.data);
+    if (!buf) {
+      const e = new Error(`Potongan #${r.idx} hilang di penyimpanan — coba unggah ulang`);
+      e.status = 400;
+      throw e;
+    }
+    bagian.push(buf);
+  }
+  await bersihkanPotongan(id, userId);
+  return Buffer.concat(bagian);
+}
+
+/** Hapus baris katalog + berkas potongan di ImageKit (abaikan kegagalan). */
+async function bersihkanPotongan(id, userId) {
+  try {
+    const rows = await q(
+      "SELECT data FROM import_chunks WHERE id = $1 AND user_id = $2", [id, userId]);
+    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, userId]);
+    await removeFiles(rows.map((r) => r.data).filter((k) => /^tmp-/.test(k)));
+  } catch { /* pembersihan best-effort */ }
+}
+
+const validTotal = (total) =>
+  Number.isInteger(total) && total >= 1 && total <= CHUNK_MAX_IDX + 1;
+
 router.post("/selesai", async (req, res, next) => {
   const id = String(req.body?.id || "");
   try {
     const total = Number(req.body?.total);
-    if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
+    if (!ID_RE.test(id) || !validTotal(total)) {
       return res.status(400).json({ error: "id/total tidak valid" });
     }
-    const rows = await q(
-      "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
-      [id, req.userId]
-    );
-    if (rows.length !== total) {
-      return res.status(400).json({
-        error: `Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`,
-      });
-    }
-    const buffer = Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
-    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId]);
+    const buffer = await rakitPotongan(id, req.userId, total);
     await simpan(req, res, req.body?.nama, buffer);
   } catch (err) {
-    q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId])
-      .catch(() => {});
+    bersihkanPotongan(id, req.userId).catch(() => {});
     next(err);
   }
 });

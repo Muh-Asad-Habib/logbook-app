@@ -28,6 +28,13 @@ import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
+const MAKS_UNGGAH = 100 * 1024 * 1024; // batas server 100 MB — dicek DI AWAL agar tak menunggu sia-sia
+
+/** Pesan error server bisa panjang/teknis — ringkas agar enak dibaca. */
+const ringkasPesan = (m) => {
+  const s = String(m || "").replace(/\{[\s\S]{80,}\}/g, "(detail teknis disembunyikan)");
+  return s.length > 200 ? `${s.slice(0, 200)}…` : s;
+};
 
 const fmtUkuran = (b) =>
   b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil((b || 0) / 1024)} KB`;
@@ -341,6 +348,12 @@ function PresentasiTim() {
       toast.err("Berkas harus berformat .pptx");
       return;
     }
+    if (file.size > MAKS_UNGGAH) {
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      setErr(`Berkas ${mb} MB melebihi batas 100 MB — perkecil dahulu (mis. kompres gambar di dalamnya).`);
+      toast.err("Berkas melebihi batas 100 MB");
+      return;
+    }
     setBusy(true);
     setProgres(0);
     setErr("");
@@ -351,7 +364,7 @@ function PresentasiTim() {
       if (inputRef.current) inputRef.current.value = "";
       revalidate("/api/presentasi/info").catch(() => {});
     } catch (e) {
-      setErr(`Gagal mengunggah: ${e.message}`);
+      setErr(`Gagal mengunggah: ${ringkasPesan(e.message)}`);
       toast.err("Gagal mengunggah presentasi");
     } finally {
       setBusy(false);
@@ -611,6 +624,13 @@ function KonversiCanvaCard({ unduhUrl }) {
     if (!file.name.toLowerCase().endsWith(".pptx")) {
       toast.err("Berkas harus berformat .pptx"); return;
     }
+    if (file.size > MAKS_UNGGAH) {
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      setErr(`Berkas ${mb} MB melebihi batas 100 MB — di Canva coba pisahkan desain ` +
+             "menjadi beberapa bagian, atau kecilkan gambar-gambarnya, lalu unduh ulang .pptx-nya.");
+      toast.err("Berkas melebihi batas 100 MB");
+      return;
+    }
     setBusy(true);
     setProgres(0);
     setErr("");
@@ -623,7 +643,8 @@ function KonversiCanvaCard({ unduhUrl }) {
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
-      setErr(`Gagal konversi: ${e.message}`);
+      setErr(`Gagal konversi: ${ringkasPesan(e.message)} — coba lagi; bila berulang, ` +
+             "perkecil berkas atau hubungi admin.");
     } finally {
       setBusy(false);
       setProgres(0);
@@ -649,7 +670,7 @@ function KonversiCanvaCard({ unduhUrl }) {
 
       <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
         <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
-        <li>Unggah berkasnya di bawah ini lalu klik <b>Konversi</b></li>
+        <li>Unggah berkasnya di bawah ini lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
         <li>Unduh hasilnya — otomatis tersimpan juga sebagai presentasi tim</li>
       </ol>
 
@@ -668,6 +689,11 @@ function KonversiCanvaCard({ unduhUrl }) {
       {file && (
         <p className="muted mts">
           <Info className="lucide" /> {file.name} · {fmtUkuran(file.size)}
+          {file.size > MAKS_UNGGAH
+            ? " — ⚠️ melebihi batas 100 MB, tidak akan diproses"
+            : file.size > 30 * 1024 * 1024
+              ? " — berkas besar, proses bisa ±1–2 menit"
+              : ""}
         </p>
       )}
 
