@@ -614,7 +614,7 @@ function KomentarPresentasiTim() {
  *   (piksel Canva sendiri), tiap slide tetap bisa diberi animasi PowerPoint,
  *   tapi isi teks tidak bisa diketik ulang. */
 function KonversiCanvaCard({ unduhUrl }) {
-  const [mode, setMode] = useState("gambar");
+  const [mode, setMode] = useState("font");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [progres, setProgres] = useState(0);
@@ -693,31 +693,33 @@ function KonversiCanvaCard({ unduhUrl }) {
             Canva → PPTX sama persis
           </div>
           <div className="muted">
-            Pilih cara sesuai kebutuhan: <b>tampilan dijamin identik</b> (slide dari
-            gambar render Canva) atau <b>teks tetap bisa diedit</b> (font Google
-            ditanam ke file). Keduanya bisa diberi animasi PowerPoint.
+            Pilih sesuai kebutuhan animasimu: <b>Mode elemen</b> — tiap teks/gambar
+            adalah objek terpisah, bisa diberi <b>animasi satu-satu</b> di PowerPoint
+            (font Google ditanam agar tampilan tetap sama). <b>Mode gambar</b> —
+            dijamin 100% identik, tapi animasi hanya bisa per slide utuh.
           </div>
         </div>
       </div>
 
       <div className="row" style={{ gap: 8, marginBottom: 10 }}>
-        {segBtn("gambar", "🖼 100% identik (dari gambar)")}
-        {segBtn("font", "✏️ Teks bisa diedit (font ditanam)")}
+        {segBtn("font", "✏️ Animasi per teks/gambar (editable)")}
+        {segBtn("gambar", "🖼 100% identik (animasi per slide)")}
       </div>
 
       {mode === "gambar" ? (
         <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
           <li>Di Canva: <b>Bagikan → Unduh → PNG</b>, centang <b>semua halaman</b> (hasilnya ZIP)</li>
           <li>Unggah ZIP-nya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
-          <li>Tiap halaman jadi 1 slide — <b>persis piksel Canva</b>; teks tidak bisa
-            diketik ulang, tapi slide tetap bisa diberi animasi</li>
+          <li>Tiap halaman jadi 1 slide — <b>persis piksel Canva</b>; animasi/transisi hanya
+            bisa dikenakan ke slide utuh (bukan per teks)</li>
         </ol>
       ) : (
         <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
           <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
           <li>Unggah berkasnya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
-          <li>Font Google ditanam otomatis — teks & grup tetap bisa diedit/digeser;
-            font premium non-Google dilaporkan agar bisa di-install manual</li>
+          <li>Semua teks/gambar/grup tetap objek terpisah — beri <b>animasi per elemen</b>
+            lewat tab Animations di PowerPoint; font Google ditanam otomatis agar
+            tampilannya tetap sama</li>
         </ol>
       )}
 
