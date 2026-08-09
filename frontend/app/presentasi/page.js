@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Presentasi â€” unggah PowerPoint (.pptx) dan/atau simpan tautan Canva.
+ * Presentasi — unggah PowerPoint (.pptx) dan/atau simpan tautan Canva.
  *
  * - PPTX  : ditampilkan oleh penampil Microsoft Office (view.officeapps.live.com)
- *           lewat tautan publik acak berumur 30 menit â€” hasil render identik
+ *           lewat tautan publik acak berumur 30 menit — hasil render identik
  *           dengan membuka file di PowerPoint. Tersedia tombol unduh.
  *           Tidak ada penampil cadangan offline untuk .pptx: bila berjalan di
  *           jaringan lokal (Microsoft tidak bisa menjangkau server) atau berkas
@@ -27,13 +27,13 @@ import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
-const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > Â±10 MB
-const MAKS_UNGGAH = 100 * 1024 * 1024; // batas server 100 MB â€” dicek DI AWAL agar tak menunggu sia-sia
+const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
+const MAKS_UNGGAH = 100 * 1024 * 1024; // batas server 100 MB — dicek DI AWAL agar tak menunggu sia-sia
 
-/** Pesan error server bisa panjang/teknis â€” ringkas agar enak dibaca. */
+/** Pesan error server bisa panjang/teknis — ringkas agar enak dibaca. */
 const ringkasPesan = (m) => {
   const s = String(m || "").replace(/\{[\s\S]{80,}\}/g, "(detail teknis disembunyikan)");
-  return s.length > 200 ? `${s.slice(0, 200)}â€¦` : s;
+  return s.length > 200 ? `${s.slice(0, 200)}…` : s;
 };
 
 const fmtUkuran = (b) =>
@@ -44,7 +44,7 @@ const fmtWaktu = (iso) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const jam = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${fmtTgl(String(iso).slice(0, 10))} Â· ${jam}`;
+  return `${fmtTgl(String(iso).slice(0, 10))} · ${jam}`;
 };
 
 /** true bila host tidak terjangkau dari internet (dev lokal / LAN). */
@@ -96,7 +96,7 @@ function OfficeFrame({ url, wrapUkuran, onLoad }) {
   );
 }
 
-/** Pratinjau Canva â€” murni embed, tanpa unduhan. */
+/** Pratinjau Canva — murni embed, tanpa unduhan. */
 function CanvaFrame({ url }) {
   return (
     <div
@@ -128,7 +128,7 @@ function PratinjauTakTersedia({ alasan, hrefUnduh }) {
     <div className="empty" style={{ margin: 0 }}>
       <div className="big"><WifiOff className="lucide" /></div>
       <p>
-        Pratinjau PowerPoint membutuhkan koneksi publik{alasan ? ` â€” ${alasan}` : ""}.
+        Pratinjau PowerPoint membutuhkan koneksi publik{alasan ? ` — ${alasan}` : ""}.
         <br />Unduh berkasnya untuk membuka di PowerPoint.
       </p>
       {hrefUnduh && (
@@ -232,7 +232,7 @@ function PresentasiFasilitator() {
   if (gagal === "belum-assign")
     return (
       <div className="empty mt">
-        <div className="big">ðŸ“ž</div>
+        <div className="big">📞</div>
         <p>Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu.</p>
       </div>
     );
@@ -251,7 +251,7 @@ function PresentasiFasilitator() {
             <div style={{ minWidth: 0 }}>
               <b className="docx-nama">{info.file.nama}</b>
               <span className="muted docx-meta">
-                {fmtUkuran(info.file.ukuran)} Â· {fmtWaktu(info.file.updated_at)} Â· ðŸ‘ mode pendamping
+                {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)} · 👁 mode pendamping
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -270,7 +270,7 @@ function PresentasiFasilitator() {
             <div className="docx-frame-wrap" ref={wrapRef}>
               {pptx.memuat && (
                 <div className="docx-loading">
-                  <Loader className="lucide docx-spin" /> Memuat presentasiâ€¦
+                  <Loader className="lucide docx-spin" /> Memuat presentasi…
                 </div>
               )}
               {pptx.officeUrl && (
@@ -286,9 +286,9 @@ function PresentasiFasilitator() {
         <div className="card mt">
           <div className="row spread" style={{ marginBottom: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <b>ðŸŽ¨ Presentasi Canva</b>
+              <b>🎨 Presentasi Canva</b>
               <span className="muted docx-meta">
-                pratinjau saja Â· {fmtWaktu(info.canva.updated_at)}
+                pratinjau saja · {fmtWaktu(info.canva.updated_at)}
               </span>
             </div>
             <a className="btn sm" style={{ textDecoration: "none" }} target="_blank"
@@ -310,7 +310,7 @@ function PresentasiFasilitator() {
       {/* ACC + komentar presentasi (target = id tim, satu status per tim) */}
       {info.ada && timId && (
         <div className="card mt">
-          <h3>âœ… Pengesahan presentasi</h3>
+          <h3>✅ Pengesahan presentasi</h3>
           <p className="sub">status ACC dari dosen pendamping</p>
           <AccPanel jenis="presentasi" targetId={timId} timId={timId}
                     acc={acc[timId]} onChange={muatAcc} />
@@ -318,7 +318,7 @@ function PresentasiFasilitator() {
       )}
       {info.ada && timId && (
         <div className="card mt">
-          <h3>ðŸ’¬ Komentar presentasi</h3>
+          <h3>💬 Komentar presentasi</h3>
           <KomentarPanel jenis="presentasi" targetId={timId} timId={timId} />
         </div>
       )}
@@ -350,7 +350,7 @@ function PresentasiTim() {
     }
     if (file.size > MAKS_UNGGAH) {
       const mb = (file.size / 1024 / 1024).toFixed(1);
-      setErr(`Berkas ${mb} MB melebihi batas 100 MB â€” perkecil dahulu (mis. kompres gambar di dalamnya).`);
+      setErr(`Berkas ${mb} MB melebihi batas 100 MB — perkecil dahulu (mis. kompres gambar di dalamnya).`);
       toast.err("Berkas melebihi batas 100 MB");
       return;
     }
@@ -359,7 +359,7 @@ function PresentasiTim() {
     setErr("");
     try {
       await api.uploadPresentasi(file, setProgres);
-      toast.ok("Presentasi tersimpan â€” berkas lama digantikan");
+      toast.ok("Presentasi tersimpan — berkas lama digantikan");
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
       revalidate("/api/presentasi/info").catch(() => {});
@@ -434,7 +434,7 @@ function PresentasiTim() {
               Unggah presentasi (.pptx)
             </div>
             <div className="muted">
-              Hanya satu berkas yang disimpan â€” unggahan baru <b>otomatis menggantikan</b> yang lama.
+              Hanya satu berkas yang disimpan — unggahan baru <b>otomatis menggantikan</b> yang lama.
             </div>
           </div>
         </div>
@@ -446,14 +446,14 @@ function PresentasiTim() {
           />
           <button className="btn primary" onClick={unggah} disabled={busy}>
             {busy
-              ? (progres > 0 ? `Mengunggahâ€¦ ${progres}%` : "Menyimpanâ€¦")
+              ? (progres > 0 ? `Mengunggah… ${progres}%` : "Menyimpan…")
               : <><Upload className="lucide" /> {info?.file?.ada ? "Ganti presentasi" : "Unggah presentasi"}</>}
           </button>
         </div>
         {file && (
           <p className="muted mts">
-            <Info className="lucide" /> {file.name} Â· {fmtUkuran(file.size)}
-            {info?.file?.ada ? " â€” akan menggantikan berkas saat ini." : ""}
+            <Info className="lucide" /> {file.name} · {fmtUkuran(file.size)}
+            {info?.file?.ada ? " — akan menggantikan berkas saat ini." : ""}
           </p>
         )}
       </div>
@@ -467,28 +467,28 @@ function PresentasiTim() {
               Tautan presentasi Canva
             </div>
             <div className="muted">
-              Salin dari tombol <b>Bagikan</b> di Canva â€” tautan{" "}
-              <b>canva.com/design/â€¦</b> maupun short-link <b>canva.link/â€¦</b>{" "}
-              diterima. Hanya untuk <b>pratinjau</b> â€” tidak ada unduhan.
+              Salin dari tombol <b>Bagikan</b> di Canva — tautan{" "}
+              <b>canva.com/design/…</b> maupun short-link <b>canva.link/…</b>{" "}
+              diterima. Hanya untuk <b>pratinjau</b> — tidak ada unduhan.
             </div>
           </div>
         </div>
         <div className="row">
           <input
-            type="url" inputMode="url" placeholder="https://www.canva.com/design/â€¦/view atau https://canva.link/â€¦"
+            type="url" inputMode="url" placeholder="https://www.canva.com/design/…/view atau https://canva.link/…"
             value={linkCanva}
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setLinkCanva(e.target.value)}
           />
           <button className="btn primary" onClick={simpanCanva} disabled={busyCanva}>
             {busyCanva
-              ? "Menyimpanâ€¦"
+              ? "Menyimpan…"
               : <><Link2 className="lucide" /> {info?.canva?.ada ? "Ganti tautan" : "Simpan tautan"}</>}
           </button>
         </div>
         <p className="muted mts" style={{ fontSize: ".78rem" }}>
-          <Info className="lucide" /> Pastikan desain Canva disetel <b>â€œSiapa saja dengan
-          tautan dapat melihatâ€</b> agar pratinjau tampil untuk pendamping.
+          <Info className="lucide" /> Pastikan desain Canva disetel <b>“Siapa saja dengan
+          tautan dapat melihat”</b> agar pratinjau tampil untuk pendamping.
         </p>
       </div>
 
@@ -507,8 +507,8 @@ function PresentasiTim() {
             <div style={{ minWidth: 0 }}>
               <b className="docx-nama">{info.file.nama}</b>
               <span className="muted docx-meta">
-                {fmtUkuran(info.file.ukuran)} Â· {fmtWaktu(info.file.updated_at)}
-                {pptx.officeUrl ? " Â· ditampilkan oleh PowerPoint Online" : ""}
+                {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)}
+                {pptx.officeUrl ? " · ditampilkan oleh PowerPoint Online" : ""}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -530,7 +530,7 @@ function PresentasiTim() {
             <div className="docx-frame-wrap" ref={wrapRef}>
               {pptx.memuat && (
                 <div className="docx-loading">
-                  <Loader className="lucide docx-spin" /> Memuat presentasiâ€¦
+                  <Loader className="lucide docx-spin" /> Memuat presentasi…
                 </div>
               )}
               {pptx.officeUrl && (
@@ -547,9 +547,9 @@ function PresentasiTim() {
         <div className="card mt">
           <div className="row spread" style={{ marginBottom: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <b>ðŸŽ¨ Presentasi Canva</b>
+              <b>🎨 Presentasi Canva</b>
               <span className="muted docx-meta">
-                pratinjau saja Â· {fmtWaktu(info.canva.updated_at)}
+                pratinjau saja · {fmtWaktu(info.canva.updated_at)}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -570,7 +570,7 @@ function PresentasiTim() {
         <div className="empty">
           <div className="big"><Presentation className="lucide" /></div>
           <p>Belum ada presentasi. Unggah berkas <b>.pptx</b> atau tempel
-          <b> tautan Canva</b> â€” keduanya boleh dipakai bersamaan.</p>
+          <b> tautan Canva</b> — keduanya boleh dipakai bersamaan.</p>
         </div>
       )}
 
@@ -580,7 +580,7 @@ function PresentasiTim() {
   );
 }
 
-/** Panel ACC + komentar presentasi milik tim â€” target_id = id akun sendiri. */
+/** Panel ACC + komentar presentasi milik tim — target_id = id akun sendiri. */
 function KomentarPresentasiTim() {
   const [idKu, setIdKu] = useState("");
   useEffect(() => {
@@ -591,12 +591,12 @@ function KomentarPresentasiTim() {
   return (
     <>
       <div className="card mt">
-        <h3>âœ… Pengesahan presentasi</h3>
+        <h3>✅ Pengesahan presentasi</h3>
         <p className="sub">status ACC dari dosen pendamping</p>
         <AccPanel jenis="presentasi" targetId={idKu} acc={acc[idKu]} onChange={muatAcc} />
       </div>
       <div className="card mt">
-        <h3>ðŸ’¬ Komentar presentasi</h3>
+        <h3>💬 Komentar presentasi</h3>
         <p className="sub">diskusi dengan pendamping tentang materi presentasi</p>
         <KomentarPanel jenis="presentasi" targetId={idKu} />
       </div>

@@ -1,7 +1,7 @@
 {
   "name": "logbook-backend",
   "version": "3.0.0",
-  "description": "Logbook Kegiatan & Keuangan â€” Express + Neon Postgres + ImageKit + Swagger (siap serverless Vercel)",
+  "description": "Logbook Kegiatan & Keuangan — Express + Neon Postgres + ImageKit + Swagger (siap serverless Vercel)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

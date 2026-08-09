@@ -1,11 +1,11 @@
 /**
- * Presentasi tim â€” SATU berkas PowerPoint (.pptx) + SATU tautan Canva per akun.
+ * Presentasi tim — SATU berkas PowerPoint (.pptx) + SATU tautan Canva per akun.
  *
  * - Berkas .pptx: unggahan baru selalu MENGGANTI yang lama (UPSERT), file besar
- *   dikirim terpotong (chunked) agar lolos batas body Â±4,5 MB Vercel â€” pola
+ *   dikirim terpotong (chunked) agar lolos batas body ±4,5 MB Vercel — pola
  *   yang sama dengan laporan kemajuan & impor DOCX.
  * - Tautan Canva: hanya PRATINJAU (di-embed), tidak diunduh. Tautan share apa
- *   pun (canva.com/design/â€¦) otomatis dinormalisasi ke bentuk `/view?embed`.
+ *   pun (canva.com/design/…) otomatis dinormalisasi ke bentuk `/view?embed`.
  * - Keduanya boleh ada bersamaan dan punya endpoint hapus masing-masing.
  */
 import { Router } from "express";
@@ -17,7 +17,7 @@ import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
 import { putBlob, getFileBufferRetry, removeFiles } from "../files.js";
 
-const MAKS_UKURAN = 100 * 1024 * 1024; // 100 MB â€” deck Canva berfoto resolusi tinggi pun muat
+const MAKS_UKURAN = 100 * 1024 * 1024; // 100 MB — deck Canva berfoto resolusi tinggi pun muat
 
 const MIME_PPTX =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -32,7 +32,7 @@ const router = Router();
 
 /* ============ TAUTAN PUBLIK BERUMUR PENDEK (tanpa login) ============
  * Penampil Microsoft Office (view.officeapps.live.com) harus bisa MENGAMBIL
- * berkas dari internet â€” ia tidak punya token login. Sama seperti laporan:
+ * berkas dari internet — ia tidak punya token login. Sama seperti laporan:
  * kunci acak 192-bit, kedaluwarsa 30 menit. Baris disimpan di tabel
  * laporan_links dengan jenis = 'presentasi'.
  * DIDAFTARKAN SEBELUM authRequired. */
@@ -51,7 +51,7 @@ router.get("/publik/:kunci", async (req, res, next) => {
     const l = rows[0];
     if (!l || Date.now() > Number(l.exp)) {
       if (l) q("DELETE FROM laporan_links WHERE kunci = $1", [kunci]).catch(() => {});
-      return res.status(404).json({ error: "Tautan kedaluwarsa â€” muat ulang halaman" });
+      return res.status(404).json({ error: "Tautan kedaluwarsa — muat ulang halaman" });
     }
     const p = await store.getPresentasi(l.user_id);
     if (!p) return res.status(404).json({ error: "Presentasi tidak ada" });
@@ -73,7 +73,7 @@ router.use(hanyaTim); // pendamping membaca lewat /api/fasilitator
  *     tags: [Presentasi]
  *     summary: Info presentasi tersimpan (berkas .pptx & tautan Canva)
  *     responses:
- *       200: { description: "{ ada, file: {â€¦}, canva: {â€¦} }" }
+ *       200: { description: "{ ada, file: {…}, canva: {…} }" }
  */
 router.get("/info", async (req, res, next) => {
   try {
@@ -114,7 +114,7 @@ router.post("/tautan", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** .pptx = arsip ZIP â†’ harus berawalan "PK". */
+/** .pptx = arsip ZIP → harus berawalan "PK". */
 const validPptx = (buf) =>
   buf && buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b;
 
@@ -147,7 +147,7 @@ async function simpan(req, res, nama, buffer) {
  *       404: { description: Belum ada berkas }
  *   delete:
  *     tags: [Presentasi]
- *     summary: Hapus berkas presentasi (.pptx) â€” tautan Canva tetap tersimpan
+ *     summary: Hapus berkas presentasi (.pptx) — tautan Canva tetap tersimpan
  *     responses:
  *       200: { description: Terhapus }
  */
@@ -177,7 +177,7 @@ router.delete("/file", async (req, res, next) => {
  * /api/presentasi:
  *   post:
  *     tags: [Presentasi]
- *     summary: Unggah presentasi (.pptx) â€” menggantikan berkas lama
+ *     summary: Unggah presentasi (.pptx) — menggantikan berkas lama
  *     requestBody:
  *       required: true
  *       content:
@@ -218,7 +218,7 @@ router.post("/", upload.single("file"), async (req, res, next) => {
  *       400: { description: Bukan tautan Canva yang sah }
  *   delete:
  *     tags: [Presentasi]
- *     summary: Hapus tautan Canva â€” berkas .pptx tetap tersimpan
+ *     summary: Hapus tautan Canva — berkas .pptx tetap tersimpan
  *     responses:
  *       200: { description: Terhapus }
  */
@@ -228,7 +228,7 @@ router.post("/canva", async (req, res, next) => {
     const hasil = await store.setCanvaPresentasi(req.userId, url);
     if (!hasil) {
       return res.status(400).json({
-        error: "Tautan Canva tidak dikenali â€” salin dari tombol Bagikan (contoh: https://www.canva.com/design/XXXX/YYYY/view atau https://canva.link/xxxx)",
+        error: "Tautan Canva tidak dikenali — salin dari tombol Bagikan (contoh: https://www.canva.com/design/XXXX/YYYY/view atau https://canva.link/xxxx)",
       });
     }
     catatAktivitas(req.userId, "presentasi.canva", { url: hasil.url });
@@ -245,10 +245,10 @@ router.delete("/canva", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/* ============ unggah terpotong (file > Â±3 MB) ============
+/* ============ unggah terpotong (file > ±3 MB) ============
  * BINER potongan disimpan di IMAGEKIT (kuota 20 GB) dengan kunci deterministik
  * `tmp-<id>-<idx>.bin`; tabel import_chunks hanya menyimpan KUNCI-nya
- * (Â±30 byte per baris). Dulu base64 potongan ikut masuk Neon â€” file besar
+ * (±30 byte per baris). Dulu base64 potongan ikut masuk Neon — file besar
  * membuat query perakitan melebihi batas respons Neon 64 MB (HTTP 507)
  * sekaligus memboroskan kuota database 0,5 GB. */
 const CHUNK_MAX_B64 = 3.5 * 1024 * 1024;
@@ -266,10 +266,10 @@ router.post("/chunk", async (req, res, next) => {
     }
     if (typeof data !== "string" || !data || data.length > CHUNK_MAX_B64 ||
         !/^[A-Za-z0-9+/=]+$/.test(data)) {
-      return res.status(400).json({ error: "data potongan tidak valid (harus base64 â‰¤ 3,5 MB)" });
+      return res.status(400).json({ error: "data potongan tidak valid (harus base64 ≤ 3,5 MB)" });
     }
     const key = kunciPotongan(id, i);
-    await putBlob(key, Buffer.from(data, "base64")); // biner â†’ ImageKit
+    await putBlob(key, Buffer.from(data, "base64")); // biner → ImageKit
     await q(
       `INSERT INTO import_chunks (id, idx, user_id, data, created_at)
        VALUES ($1, $2, $3, $4, $5)
@@ -288,7 +288,7 @@ async function rakitPotongan(id, userId, total) {
     [id, userId]
   );
   if (rows.length !== total) {
-    const e = new Error(`Potongan tidak lengkap (${rows.length}/${total}) â€” coba unggah ulang`);
+    const e = new Error(`Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`);
     e.status = 400;
     throw e;
   }
@@ -296,7 +296,7 @@ async function rakitPotongan(id, userId, total) {
   for (const r of rows) {
     const buf = await getFileBufferRetry(r.data); // retry: tunggu propagasi CDN
     if (!buf) {
-      const e = new Error(`Potongan #${r.idx} hilang di penyimpanan â€” coba unggah ulang`);
+      const e = new Error(`Potongan #${r.idx} hilang di penyimpanan — coba unggah ulang`);
       e.status = 400;
       throw e;
     }
