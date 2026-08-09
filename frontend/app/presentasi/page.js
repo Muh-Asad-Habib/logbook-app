@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Presentasi — unggah PowerPoint (.pptx) dan/atau simpan tautan Canva.
+ * Presentasi â€” unggah PowerPoint (.pptx) dan/atau simpan tautan Canva.
  *
  * - PPTX  : ditampilkan oleh penampil Microsoft Office (view.officeapps.live.com)
- *           lewat tautan publik acak berumur 30 menit — hasil render identik
+ *           lewat tautan publik acak berumur 30 menit â€” hasil render identik
  *           dengan membuka file di PowerPoint. Tersedia tombol unduh.
  *           Tidak ada penampil cadangan offline untuk .pptx: bila berjalan di
  *           jaringan lokal (Microsoft tidak bisa menjangkau server) atau berkas
@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Presentation, Upload, Download, Trash2, Info, TriangleAlert,
-  Loader, RefreshCw, Link2, ExternalLink, WifiOff, Sparkles,
+  Loader, RefreshCw, Link2, ExternalLink, WifiOff,
 } from "lucide-react";
 import {
   api, exportUrl, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
@@ -27,13 +27,13 @@ import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
-const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
-const MAKS_UNGGAH = 100 * 1024 * 1024; // batas server 100 MB — dicek DI AWAL agar tak menunggu sia-sia
+const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > Â±10 MB
+const MAKS_UNGGAH = 100 * 1024 * 1024; // batas server 100 MB â€” dicek DI AWAL agar tak menunggu sia-sia
 
-/** Pesan error server bisa panjang/teknis — ringkas agar enak dibaca. */
+/** Pesan error server bisa panjang/teknis â€” ringkas agar enak dibaca. */
 const ringkasPesan = (m) => {
   const s = String(m || "").replace(/\{[\s\S]{80,}\}/g, "(detail teknis disembunyikan)");
-  return s.length > 200 ? `${s.slice(0, 200)}…` : s;
+  return s.length > 200 ? `${s.slice(0, 200)}â€¦` : s;
 };
 
 const fmtUkuran = (b) =>
@@ -44,7 +44,7 @@ const fmtWaktu = (iso) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   const jam = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${fmtTgl(String(iso).slice(0, 10))} · ${jam}`;
+  return `${fmtTgl(String(iso).slice(0, 10))} Â· ${jam}`;
 };
 
 /** true bila host tidak terjangkau dari internet (dev lokal / LAN). */
@@ -96,7 +96,7 @@ function OfficeFrame({ url, wrapUkuran, onLoad }) {
   );
 }
 
-/** Pratinjau Canva — murni embed, tanpa unduhan. */
+/** Pratinjau Canva â€” murni embed, tanpa unduhan. */
 function CanvaFrame({ url }) {
   return (
     <div
@@ -128,7 +128,7 @@ function PratinjauTakTersedia({ alasan, hrefUnduh }) {
     <div className="empty" style={{ margin: 0 }}>
       <div className="big"><WifiOff className="lucide" /></div>
       <p>
-        Pratinjau PowerPoint membutuhkan koneksi publik{alasan ? ` — ${alasan}` : ""}.
+        Pratinjau PowerPoint membutuhkan koneksi publik{alasan ? ` â€” ${alasan}` : ""}.
         <br />Unduh berkasnya untuk membuka di PowerPoint.
       </p>
       {hrefUnduh && (
@@ -232,7 +232,7 @@ function PresentasiFasilitator() {
   if (gagal === "belum-assign")
     return (
       <div className="empty mt">
-        <div className="big">📞</div>
+        <div className="big">ðŸ“ž</div>
         <p>Hubungi admin untuk menugaskanmu sebagai pendamping tim kamu.</p>
       </div>
     );
@@ -251,7 +251,7 @@ function PresentasiFasilitator() {
             <div style={{ minWidth: 0 }}>
               <b className="docx-nama">{info.file.nama}</b>
               <span className="muted docx-meta">
-                {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)} · 👁 mode pendamping
+                {fmtUkuran(info.file.ukuran)} Â· {fmtWaktu(info.file.updated_at)} Â· ðŸ‘ mode pendamping
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -270,7 +270,7 @@ function PresentasiFasilitator() {
             <div className="docx-frame-wrap" ref={wrapRef}>
               {pptx.memuat && (
                 <div className="docx-loading">
-                  <Loader className="lucide docx-spin" /> Memuat presentasi…
+                  <Loader className="lucide docx-spin" /> Memuat presentasiâ€¦
                 </div>
               )}
               {pptx.officeUrl && (
@@ -286,9 +286,9 @@ function PresentasiFasilitator() {
         <div className="card mt">
           <div className="row spread" style={{ marginBottom: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <b>🎨 Presentasi Canva</b>
+              <b>ðŸŽ¨ Presentasi Canva</b>
               <span className="muted docx-meta">
-                pratinjau saja · {fmtWaktu(info.canva.updated_at)}
+                pratinjau saja Â· {fmtWaktu(info.canva.updated_at)}
               </span>
             </div>
             <a className="btn sm" style={{ textDecoration: "none" }} target="_blank"
@@ -310,7 +310,7 @@ function PresentasiFasilitator() {
       {/* ACC + komentar presentasi (target = id tim, satu status per tim) */}
       {info.ada && timId && (
         <div className="card mt">
-          <h3>✅ Pengesahan presentasi</h3>
+          <h3>âœ… Pengesahan presentasi</h3>
           <p className="sub">status ACC dari dosen pendamping</p>
           <AccPanel jenis="presentasi" targetId={timId} timId={timId}
                     acc={acc[timId]} onChange={muatAcc} />
@@ -318,7 +318,7 @@ function PresentasiFasilitator() {
       )}
       {info.ada && timId && (
         <div className="card mt">
-          <h3>💬 Komentar presentasi</h3>
+          <h3>ðŸ’¬ Komentar presentasi</h3>
           <KomentarPanel jenis="presentasi" targetId={timId} timId={timId} />
         </div>
       )}
@@ -350,7 +350,7 @@ function PresentasiTim() {
     }
     if (file.size > MAKS_UNGGAH) {
       const mb = (file.size / 1024 / 1024).toFixed(1);
-      setErr(`Berkas ${mb} MB melebihi batas 100 MB — perkecil dahulu (mis. kompres gambar di dalamnya).`);
+      setErr(`Berkas ${mb} MB melebihi batas 100 MB â€” perkecil dahulu (mis. kompres gambar di dalamnya).`);
       toast.err("Berkas melebihi batas 100 MB");
       return;
     }
@@ -359,7 +359,7 @@ function PresentasiTim() {
     setErr("");
     try {
       await api.uploadPresentasi(file, setProgres);
-      toast.ok("Presentasi tersimpan — berkas lama digantikan");
+      toast.ok("Presentasi tersimpan â€” berkas lama digantikan");
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
       revalidate("/api/presentasi/info").catch(() => {});
@@ -434,7 +434,7 @@ function PresentasiTim() {
               Unggah presentasi (.pptx)
             </div>
             <div className="muted">
-              Hanya satu berkas yang disimpan — unggahan baru <b>otomatis menggantikan</b> yang lama.
+              Hanya satu berkas yang disimpan â€” unggahan baru <b>otomatis menggantikan</b> yang lama.
             </div>
           </div>
         </div>
@@ -446,14 +446,14 @@ function PresentasiTim() {
           />
           <button className="btn primary" onClick={unggah} disabled={busy}>
             {busy
-              ? (progres > 0 ? `Mengunggah… ${progres}%` : "Menyimpan…")
+              ? (progres > 0 ? `Mengunggahâ€¦ ${progres}%` : "Menyimpanâ€¦")
               : <><Upload className="lucide" /> {info?.file?.ada ? "Ganti presentasi" : "Unggah presentasi"}</>}
           </button>
         </div>
         {file && (
           <p className="muted mts">
-            <Info className="lucide" /> {file.name} · {fmtUkuran(file.size)}
-            {info?.file?.ada ? " — akan menggantikan berkas saat ini." : ""}
+            <Info className="lucide" /> {file.name} Â· {fmtUkuran(file.size)}
+            {info?.file?.ada ? " â€” akan menggantikan berkas saat ini." : ""}
           </p>
         )}
       </div>
@@ -467,33 +467,31 @@ function PresentasiTim() {
               Tautan presentasi Canva
             </div>
             <div className="muted">
-              Salin dari tombol <b>Bagikan</b> di Canva — tautan{" "}
-              <b>canva.com/design/…</b> maupun short-link <b>canva.link/…</b>{" "}
-              diterima. Hanya untuk <b>pratinjau</b> — tidak ada unduhan.
+              Salin dari tombol <b>Bagikan</b> di Canva â€” tautan{" "}
+              <b>canva.com/design/â€¦</b> maupun short-link <b>canva.link/â€¦</b>{" "}
+              diterima. Hanya untuk <b>pratinjau</b> â€” tidak ada unduhan.
             </div>
           </div>
         </div>
         <div className="row">
           <input
-            type="url" inputMode="url" placeholder="https://www.canva.com/design/…/view atau https://canva.link/…"
+            type="url" inputMode="url" placeholder="https://www.canva.com/design/â€¦/view atau https://canva.link/â€¦"
             value={linkCanva}
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setLinkCanva(e.target.value)}
           />
           <button className="btn primary" onClick={simpanCanva} disabled={busyCanva}>
             {busyCanva
-              ? "Menyimpan…"
+              ? "Menyimpanâ€¦"
               : <><Link2 className="lucide" /> {info?.canva?.ada ? "Ganti tautan" : "Simpan tautan"}</>}
           </button>
         </div>
         <p className="muted mts" style={{ fontSize: ".78rem" }}>
-          <Info className="lucide" /> Pastikan desain Canva disetel <b>“Siapa saja dengan
-          tautan dapat melihat”</b> agar pratinjau tampil untuk pendamping.
+          <Info className="lucide" /> Pastikan desain Canva disetel <b>â€œSiapa saja dengan
+          tautan dapat melihatâ€</b> agar pratinjau tampil untuk pendamping.
         </p>
       </div>
 
-      {/* ===== Konversi Canva → PPTX (font tertanam, tampilan sama persis) ===== */}
-      <KonversiCanvaCard unduhUrl={unduhUrl} />
 
       {(err || pptx.err || infoErr) && (
         <div className="error-box mt">
@@ -509,8 +507,8 @@ function PresentasiTim() {
             <div style={{ minWidth: 0 }}>
               <b className="docx-nama">{info.file.nama}</b>
               <span className="muted docx-meta">
-                {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)}
-                {pptx.officeUrl ? " · ditampilkan oleh PowerPoint Online" : ""}
+                {fmtUkuran(info.file.ukuran)} Â· {fmtWaktu(info.file.updated_at)}
+                {pptx.officeUrl ? " Â· ditampilkan oleh PowerPoint Online" : ""}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -532,7 +530,7 @@ function PresentasiTim() {
             <div className="docx-frame-wrap" ref={wrapRef}>
               {pptx.memuat && (
                 <div className="docx-loading">
-                  <Loader className="lucide docx-spin" /> Memuat presentasi…
+                  <Loader className="lucide docx-spin" /> Memuat presentasiâ€¦
                 </div>
               )}
               {pptx.officeUrl && (
@@ -549,9 +547,9 @@ function PresentasiTim() {
         <div className="card mt">
           <div className="row spread" style={{ marginBottom: 10 }}>
             <div style={{ minWidth: 0 }}>
-              <b>🎨 Presentasi Canva</b>
+              <b>ðŸŽ¨ Presentasi Canva</b>
               <span className="muted docx-meta">
-                pratinjau saja · {fmtWaktu(info.canva.updated_at)}
+                pratinjau saja Â· {fmtWaktu(info.canva.updated_at)}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -572,7 +570,7 @@ function PresentasiTim() {
         <div className="empty">
           <div className="big"><Presentation className="lucide" /></div>
           <p>Belum ada presentasi. Unggah berkas <b>.pptx</b> atau tempel
-          <b> tautan Canva</b> — keduanya boleh dipakai bersamaan.</p>
+          <b> tautan Canva</b> â€” keduanya boleh dipakai bersamaan.</p>
         </div>
       )}
 
@@ -582,7 +580,7 @@ function PresentasiTim() {
   );
 }
 
-/** Panel ACC + komentar presentasi milik tim — target_id = id akun sendiri. */
+/** Panel ACC + komentar presentasi milik tim â€” target_id = id akun sendiri. */
 function KomentarPresentasiTim() {
   const [idKu, setIdKu] = useState("");
   useEffect(() => {
@@ -593,237 +591,15 @@ function KomentarPresentasiTim() {
   return (
     <>
       <div className="card mt">
-        <h3>✅ Pengesahan presentasi</h3>
+        <h3>âœ… Pengesahan presentasi</h3>
         <p className="sub">status ACC dari dosen pendamping</p>
         <AccPanel jenis="presentasi" targetId={idKu} acc={acc[idKu]} onChange={muatAcc} />
       </div>
       <div className="card mt">
-        <h3>💬 Komentar presentasi</h3>
+        <h3>ðŸ’¬ Komentar presentasi</h3>
         <p className="sub">diskusi dengan pendamping tentang materi presentasi</p>
         <KomentarPanel jenis="presentasi" targetId={idKu} />
       </div>
     </>
   );
 }
-
-/* ===================== KONVERSI CANVA → PPTX (2 mode) =====================
- * Mode A "font ditanam": server menanam font Google ke PPTX ekspor Canva —
- *   teks & grup tetap bisa diedit/digeser; tampilan mendekati Canva
- *   (bergantung ketersediaan font di Google Fonts).
- * Mode B "gambar": PPTX disusun dari PNG render Canva — DIJAMIN 100% identik
- *   (piksel Canva sendiri), tiap slide tetap bisa diberi animasi PowerPoint,
- *   tapi isi teks tidak bisa diketik ulang. */
-function KonversiCanvaCard({ unduhUrl }) {
-  const [mode, setMode] = useState("font");
-  const [files, setFiles] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [progres, setProgres] = useState(0);
-  const [laporan, setLaporan] = useState(null);
-  const [err, setErr] = useState("");
-  const inputRef = useRef(null);
-
-  const gantiMode = (m) => {
-    setMode(m);
-    setFiles([]);
-    setErr("");
-    setLaporan(null);
-    if (inputRef.current) inputRef.current.value = "";
-  };
-
-  const totalUkuran = files.reduce((s, f) => s + f.size, 0);
-
-  const konversi = async () => {
-    if (!files.length) {
-      toast.err(mode === "font"
-        ? "Pilih berkas .pptx hasil unduhan Canva dahulu"
-        : "Pilih ZIP atau gambar PNG/JPG dari Canva dahulu");
-      return;
-    }
-    if (mode === "font" && !files[0].name.toLowerCase().endsWith(".pptx")) {
-      toast.err("Berkas harus berformat .pptx"); return;
-    }
-    if (totalUkuran > MAKS_UNGGAH) {
-      const mb = (totalUkuran / 1024 / 1024).toFixed(1);
-      setErr(`Unggahan ${mb} MB melebihi batas 100 MB — di Canva unduh dengan ` +
-             "ukuran/kualitas lebih kecil, atau pisahkan desainnya.");
-      toast.err("Melebihi batas 100 MB");
-      return;
-    }
-    setBusy(true);
-    setProgres(0);
-    setErr("");
-    setLaporan(null);
-    try {
-      const r = mode === "font"
-        ? await api.konversiPptx(files[0], setProgres)
-        : await api.konversiGambar(files, setProgres);
-      setLaporan(r.laporan || null);
-      toast.ok(mode === "font"
-        ? "Konversi selesai — font ditanam, berkas presentasi diperbarui"
-        : "Konversi selesai — slide 100% identik render Canva");
-      revalidate("/api/presentasi/info").catch(() => {});
-      setFiles([]);
-      if (inputRef.current) inputRef.current.value = "";
-    } catch (e) {
-      setErr(`Gagal konversi: ${ringkasPesan(e.message)} — coba lagi; bila berulang, ` +
-             "perkecil berkas atau hubungi admin.");
-    } finally {
-      setBusy(false);
-      setProgres(0);
-    }
-  };
-
-  const segBtn = (m, label) => (
-    <button
-      className={`btn ${mode === m ? "primary" : ""}`}
-      style={{ fontSize: ".82rem" }}
-      onClick={() => gantiMode(m)}
-      disabled={busy}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <div className="card mt">
-      <div className="metric" style={{ marginBottom: 10 }}>
-        <div className="metric-ic v3"><Sparkles className="lucide" /></div>
-        <div>
-          <div className="metric-value" style={{ fontSize: "1.02rem" }}>
-            Canva → PPTX sama persis
-          </div>
-          <div className="muted">
-            Pilih sesuai kebutuhan animasimu: <b>Mode elemen</b> — tiap teks/gambar
-            adalah objek terpisah, bisa diberi <b>animasi satu-satu</b> di PowerPoint
-            (font Google ditanam agar tampilan tetap sama). <b>Mode gambar</b> —
-            dijamin 100% identik, tapi animasi hanya bisa per slide utuh.
-          </div>
-        </div>
-      </div>
-
-      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
-        {segBtn("font", "✏️ Animasi per teks/gambar (editable)")}
-        {segBtn("gambar", "🖼 100% identik (animasi per slide)")}
-      </div>
-
-      {mode === "gambar" ? (
-        <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
-          <li>Di Canva: <b>Bagikan → Unduh → PNG</b>, centang <b>semua halaman</b> (hasilnya ZIP)</li>
-          <li>Unggah ZIP-nya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
-          <li>Tiap halaman jadi 1 slide — <b>persis piksel Canva</b>; animasi/transisi hanya
-            bisa dikenakan ke slide utuh (bukan per teks)</li>
-        </ol>
-      ) : (
-        <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
-          <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
-          <li>Unggah berkasnya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
-          <li>Semua teks/gambar/grup tetap objek terpisah — beri <b>animasi per elemen</b>
-            lewat tab Animations di PowerPoint; font Google ditanam otomatis agar
-            tampilannya tetap sama</li>
-        </ol>
-      )}
-
-      <div className="row">
-        <input
-          ref={inputRef}
-          type="file"
-          accept={mode === "font" ? ".pptx" : ".zip,.png,.jpg,.jpeg"}
-          multiple={mode === "gambar"}
-          style={{ flex: "1 1 260px", marginTop: 0 }}
-          onChange={(e) => setFiles([...(e.target.files || [])])}
-        />
-        <button className="btn primary" onClick={konversi} disabled={busy}>
-          {busy
-            ? (progres > 0 ? `Memproses… ${progres}%` : "Memproses…")
-            : <><Upload className="lucide" /> Konversi berkas Canva</>}
-        </button>
-      </div>
-      {files.length > 0 && (
-        <p className="muted mts">
-          <Info className="lucide" />{" "}
-          {files.length === 1 ? files[0].name : `${files.length} berkas`} · {fmtUkuran(totalUkuran)}
-          {totalUkuran > MAKS_UNGGAH
-            ? " — ⚠️ melebihi batas 100 MB, tidak akan diproses"
-            : totalUkuran > 30 * 1024 * 1024
-              ? " — berkas besar, proses bisa ±1–2 menit"
-              : ""}
-        </p>
-      )}
-
-      {err && (
-        <div className="error-box mt"><TriangleAlert className="lucide" /> {err}</div>
-      )}
-      {laporan && <LaporanKonversi laporan={laporan} unduhUrl={unduhUrl} />}
-    </div>
-  );
-}
-
-/** Hasil konversi: status tiap font + slide yang memuat elemen rasterisasi. */
-function LaporanKonversi({ laporan, unduhUrl }) {
-  if (laporan.mode === "gambar") {
-    return (
-      <div className="mt" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
-        <b>📋 Laporan konversi</b>
-        <p className="mts" style={{ fontSize: ".85rem" }}>
-          ✅ <b>{laporan.totalSlide} slide</b> disusun dari gambar render Canva —
-          tampilan <b>100% identik</b> dengan desain aslinya di komputer mana pun.
-        </p>
-        <p className="mts muted" style={{ fontSize: ".8rem" }}>
-          Tiap slide berupa satu gambar utuh: bebas diberi animasi/transisi PowerPoint,
-          urutannya bisa diubah, tapi isi teksnya tidak bisa diketik ulang.
-        </p>
-        <a className="btn primary mt" style={{ textDecoration: "none" }} href={unduhUrl}>
-          <Download className="lucide" /> Unduh PPTX hasil konversi
-        </a>
-      </div>
-    );
-  }
-  const tertanam = laporan.fonts.filter((f) => f.status === "tertanam");
-  const sistem = laporan.fonts.filter((f) => f.status === "sistem");
-  const manual = laporan.fonts.filter((f) => f.status === "manual");
-  return (
-    <div className="mt" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
-      <b>📋 Laporan konversi</b>
-      <p className="muted mts" style={{ fontSize: ".8rem" }}>
-        {laporan.totalSlide} slide diproses
-        {laporan.sudahTertanam ? " · file sumber sudah memiliki font tertanam" : ""}
-      </p>
-      {tertanam.length > 0 && (
-        <p className="mts" style={{ fontSize: ".85rem" }}>
-          ✅ <b>Font ditanam ke dalam file</b> (tampil sama di komputer mana pun):{" "}
-          {tertanam.map((f) => f.nama).join(", ")}
-        </p>
-      )}
-      {sistem.length > 0 && (
-        <p className="mts muted" style={{ fontSize: ".8rem" }}>
-          ℹ️ Font bawaan Windows/Office (tidak perlu ditanam): {sistem.map((f) => f.nama).join(", ")}
-        </p>
-      )}
-      {manual.length > 0 && (
-        <div className="mts" style={{ fontSize: ".85rem" }}>
-          ⚠️ <b>Font premium Canva — tidak tersedia di Google Fonts.</b> Agar tampil
-          persis, unduh & install manual (atau ganti fontnya di Canva):
-          <ul style={{ margin: "4px 0 0 18px" }}>
-            {manual.map((f) => (
-              <li key={f.nama}>
-                {f.nama}{" "}
-                <a href={f.url} target="_blank" rel="noreferrer">cari font ↗</a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {laporan.raster.length > 0 && (
-        <p className="mts muted" style={{ fontSize: ".8rem" }}>
-          🖼 Slide {laporan.raster.map((r) => r.slide).join(", ")} memuat gambar/elemen
-          yang dirasterisasi Canva (mis. teks melengkung/efek khusus) — tetap bisa
-          digeser & diberi animasi, tapi isinya tidak bisa diketik ulang.
-        </p>
-      )}
-      <a className="btn primary mt" style={{ textDecoration: "none" }} href={unduhUrl}>
-        <Download className="lucide" /> Unduh PPTX hasil konversi
-      </a>
-    </div>
-  );
-}
-

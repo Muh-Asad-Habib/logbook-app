@@ -329,50 +329,6 @@ export const api = {
     }),
   deleteCanva: () => aFetch("/api/presentasi/canva", { method: "DELETE" }),
 
-  // ---- Konversi Canva → PPTX "sama persis" (font Google ditanam otomatis) ----
-  /**
-   * Unggah PPTX ekspor Canva untuk dikonversi (font ditanam). File besar
-   * otomatis dipotong ±2 MB (endpoint chunk yang sama dengan unggah biasa,
-   * perakitnya /konversi-selesai). Hasil tersimpan sebagai presentasi tim.
-   */
-  konversiPptx: async (file, onProgress) => {
-    if (file.size <= LANGSUNG_MAKS) {
-      const fd = new FormData();
-      fd.append("file", file);
-      return aFetch("/api/presentasi/konversi", { method: "POST", body: fd });
-    }
-    return uploadChunked("/api/presentasi", file, onProgress,
-      { nama: file.name }, "konversi-selesai");
-  },
-  /**
-   * Mode B — susun PPTX dari GAMBAR render Canva (ZIP "Unduh → PNG → Semua
-   * halaman" atau banyak PNG/JPG). Hasil 100% identik render Canva.
-   * ZIP tunggal yang besar dipotong lewat jalur chunk yang sama.
-   */
-  konversiGambar: async (files, onProgress) => {
-    const daftar = [...files];
-    if (daftar.length === 1 && daftar[0].size > LANGSUNG_MAKS) {
-      return uploadChunked("/api/presentasi", daftar[0], onProgress,
-        { nama: daftar[0].name }, "konversi-gambar-selesai");
-    }
-    const total = daftar.reduce((s, f) => s + f.size, 0);
-    if (daftar.length > 1 && total > LANGSUNG_MAKS) {
-      throw new Error(
-        "Total gambar terlalu besar untuk dikirim terpisah — unggah langsung berkas ZIP dari Canva (Unduh → PNG → Semua halaman)"
-      );
-    }
-    const fd = new FormData();
-    for (const f of daftar) fd.append("file", f);
-    return aFetch("/api/presentasi/konversi-gambar", { method: "POST", body: fd });
-  },
-  /** Ekspor otomatis dari tautan Canva tersimpan lalu konversi (butuh akun terhubung). */
-  konversiLink: () => aFetch("/api/presentasi/konversi-link", { method: "POST" }),
-  canvaConnect: {
-    status: () => aFetch("/api/presentasi/canva-connect/status", { cache: "no-store" }),
-    /** { url } — arahkan browser ke URL persetujuan Canva. */
-    mulai: () => aFetch("/api/presentasi/canva-connect/mulai", { cache: "no-store" }),
-    putus: () => aFetch("/api/presentasi/canva-connect", { method: "DELETE" }),
-  },
 
   // ---- Kode tim (akun tim) — hubungkan pendamping tanpa bantuan admin ----
   tim: {
