@@ -201,22 +201,6 @@ const SKEMA = [
      PRIMARY KEY (jenis, target_id)
    )`,
   `CREATE INDEX IF NOT EXISTS persetujuan_tim_idx ON persetujuan (tim_user_id, jenis)`,
-  // ---- Integrasi Canva Connect (konversi tautan → PPTX font tertanam) ----
-  // Token OAuth per pengguna; state+verifier PKCE sementara (≤10 menit) —
-  // disimpan di DB karena instance serverless tidak berbagi memori.
-  `CREATE TABLE IF NOT EXISTS canva_oauth (
-     user_id       TEXT PRIMARY KEY,
-     access_token  TEXT NOT NULL,
-     refresh_token TEXT NOT NULL DEFAULT '',
-     exp           BIGINT NOT NULL,
-     updated_at    TEXT NOT NULL
-   )`,
-  `CREATE TABLE IF NOT EXISTS canva_oauth_state (
-     state      TEXT PRIMARY KEY,
-     user_id    TEXT NOT NULL,
-     verifier   TEXT NOT NULL,
-     created_at BIGINT NOT NULL
-   )`,
 ];
 
 /** Pastikan seluruh tabel ada (sekali per proses; satu round-trip HTTP). */
