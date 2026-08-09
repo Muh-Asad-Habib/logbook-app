@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import JSZip from "jszip";
+import sharp from "sharp";
 import { config } from "../config.js";
 import * as store from "../storage.js";
 import { getFileBuffer, compressForEmbed } from "../files.js";
@@ -29,16 +30,23 @@ const fmtTgl = (iso) => {
 
 /**
  * Parse teks tanggal bebas dari isi lama dokumen
- * ("23-Mei-26", "15 - Juni - 2026", "1/Juli/2026", "16 Juni 2026")
+ * ("23-Mei-26", "15 - Juni - 2026", "1/Juli/2026", "16 Juni 2026",
+ *  termasuk BULAN ANGKA: "23-05-2026", "23/5/26")
  * lalu kembalikan bentuk standar "16 Juni 2026"; null jika bukan tanggal.
  */
 function parseTanggalText(s) {
   const m = String(s).trim()
-    .match(/^(\d{1,2})\s*[-/. ]\s*([A-Za-z]+)\s*[-/. ]\s*(\d{2,4})$/);
+    .match(/^(\d{1,2})\s*[-/. ]\s*([A-Za-z]+|\d{1,2})\s*[-/. ]\s*(\d{2,4})$/);
   if (!m) return null;
-  const kode = m[2].slice(0, 3).toLowerCase();
-  const idx = BULAN.findIndex((b) => b.toLowerCase().startsWith(kode));
-  if (idx < 0) return null;
+  let idx;
+  if (/^\d+$/.test(m[2])) {
+    idx = Number(m[2]) - 1;              // bulan angka: "05" → Mei
+    if (idx < 0 || idx > 11) return null;
+  } else {
+    const kode = m[2].slice(0, 3).toLowerCase();
+    idx = BULAN.findIndex((b) => b.toLowerCase().startsWith(kode));
+    if (idx < 0) return null;
+  }
   const y = Number(m[3]) < 100 ? Number(m[3]) + 2000 : Number(m[3]);
   return `${parseInt(m[1], 10)} ${BULAN[idx]} ${y}`;
 }
@@ -118,8 +126,10 @@ function drawingXml(rid, docPrId, cx, cy) {
 
 /** Kelola penambahan media + relationship pada zip docx.
  *  Foto sudah di-prefetch (bufferMap: key -> Buffer) supaya penyisipan
- *  ke XML tetap sinkron walau sumbernya cloud. */
-function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap) {
+ *  ke XML tetap sinkron walau sumbernya cloud.
+ *  `sizeMap` berisi dimensi asli hasil sharp (rasio foto selalu benar);
+ *  `docXml` dipindai agar id drawing baru tidak bentrok dengan bawaan template. */
+function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap, sizeMap, docXml = "") {
   let mediaN = 1000;
   let relN = 1000;
   let docPrN = 9000;
@@ -127,6 +137,12 @@ function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap) {
   for (const m of existing) {
     const n = parseInt(m.match(/\d+/)[0], 10);
     if (n >= relN) relN = n + 1;
+  }
+  // id <wp:docPr> WAJIB unik satu dokumen — id ganda membuat Word menampilkan
+  // dialog "dokumen perlu diperbaiki" saat dibuka.
+  for (const m of docXml.match(/docPr[^>]*\bid="(\d+)"/g) || []) {
+    const n = parseInt(m.match(/id="(\d+)"/)[1], 10);
+    if (n >= docPrN) docPrN = n + 1;
   }
   return {
     /** Sisipkan gambar; kembalikan XML drawing atau null. */
@@ -149,7 +165,8 @@ function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap) {
           "</Relationships>",
           `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${name}"/></Relationships>`
         );
-        const { w, h } = imgSize(buf);
+        // dimensi dari sharp; parser header manual hanya cadangan
+        const { w, h } = sizeMap?.get(fileKey) || imgSize(buf);
         const cx = Math.round(widthCm * 360000);
         const cy = Math.round(cx * (h / w));
         return drawingXml(rid, docPrN++, cx, cy);
@@ -323,6 +340,58 @@ function fillTable(tblXml, entries, buildCells, refreshRow) {
   return { added, skipped, xml };
 }
 
+/** "16 Juni 2026" → epoch ms (UTC); null bila bukan tanggal standar. */
+function tanggalKeMs(teks) {
+  const m = String(teks).trim().match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (!m) return null;
+  const idx = BULAN.findIndex((b) => b.toLowerCase() === m[2].toLowerCase());
+  if (idx < 0) return null;
+  return Date.UTC(Number(m[3]), idx, Number(m[1]));
+}
+
+/**
+ * Urutkan baris DATA tabel secara KRONOLOGIS (stabil).
+ * Tanpa ini, entri baru selalu menumpuk di baris kosong/akhir tabel sehingga
+ * tanggalnya melompat-lompat dibanding baris lama.
+ * - baris judul & baris pertama dipertahankan di tempatnya;
+ * - baris tanpa tanggal (lanjutan) mengikuti baris bertanggal sebelumnya;
+ * - urutan asli dipakai sebagai penyeimbang saat tanggalnya sama.
+ * Hanya isi baris yang ditukar — properti tabel (tblPr/tblGrid) tak tersentuh.
+ */
+function sortRowsByDate(tblXml) {
+  const rows = rowsOf(tblXml);
+  const dataIdx = [];
+  rows.forEach((r, i) => {
+    if (i === 0 || isHeaderRow(r) || cellCount(r) < 2) return;
+    dataIdx.push(i);
+  });
+  if (dataIdx.length < 2) return tblXml;
+
+  let terakhir = Number.MIN_SAFE_INTEGER;
+  const kunci = dataIdx.map((i, urut) => {
+    const cells = rows[i].match(/<w:tc>[\s\S]*?<\/w:tc>/g) || [];
+    const ms = tanggalKeMs(textOf(cells[0] || ""));
+    if (ms !== null) terakhir = ms;
+    return { i, urut, ms: ms !== null ? ms : terakhir };
+  });
+  const urutan = [...kunci].sort((a, b) => (a.ms - b.ms) || (a.urut - b.urut));
+  if (urutan.every((k, j) => k.i === kunci[j].i)) return tblXml; // sudah urut
+
+  const rowsBaru = rows.slice();
+  dataIdx.forEach((i, j) => { rowsBaru[i] = rows[urutan[j].i]; });
+
+  // Rakit ulang berdasarkan POSISI tiap baris (bukan replace global) agar
+  // baris berisi teks identik tidak saling tertukar/tertimpa.
+  let hasil = "", pos = 0, k = 0;
+  for (const r of rows) {
+    const at = tblXml.indexOf(r, pos);
+    if (at < 0) return tblXml; // jaga-jaga: struktur tak terduga → biarkan
+    hasil += tblXml.slice(pos, at) + rowsBaru[k++];
+    pos = at + r.length;
+  }
+  return hasil + tblXml.slice(pos);
+}
+
 /** Entri yang BELUM ada di dokumen (untuk ditampilkan di UI).
  *  Memakai pencocokan per-baris yang sama dengan fillTable — termasuk
  *  hitungan per-kemunculan untuk teks kembar — agar angkanya selalu
@@ -412,7 +481,30 @@ export async function buildDocx(userId) {
       if (buf) bufferMap.set(k, await compressForEmbed(buf));
     })
   );
-  const imgs = makeImageStore(zip, relsRef, ctRef, bufferMap);
+
+  // PENJAGA UKURAN — logbook dengan puluhan foto bisa menembus batas respons
+  // serverless Vercel (±4,5 MB) dan unduhan gagal tanpa pesan jelas.
+  // Bila total sematan masih di atas anggaran, kompresi diperketat bertahap.
+  const EMBED_BUDGET = 3 * 1024 * 1024;
+  const totalEmbed = () => [...bufferMap.values()].reduce((s, b) => s + b.length, 0);
+  for (const [dim, mutu] of [[480, 60], [360, 50], [260, 42]]) {
+    if (totalEmbed() <= EMBED_BUDGET) break;
+    await Promise.all([...bufferMap.entries()].map(async ([k, b]) => {
+      bufferMap.set(k, await compressForEmbed(b, dim, mutu));
+    }));
+  }
+
+  // Dimensi asli tiap foto via sharp — rasio di dokumen selalu benar
+  // (dulu memakai parser header JPEG manual yang bisa jatuh ke fallback 4:3
+  // sehingga foto tampil gepeng/melar).
+  const sizeMap = new Map();
+  await Promise.all([...bufferMap.entries()].map(async ([k, b]) => {
+    try {
+      const md = await sharp(b).metadata();
+      if (md.width && md.height) sizeMap.set(k, { w: md.width, h: md.height });
+    } catch {}
+  }));
+  const imgs = makeImageStore(zip, relsRef, ctRef, bufferMap, sizeMap, docXml);
 
   // Pisahkan dua tabel utama
   const tblRe = /<w:tbl>[\s\S]*?<\/w:tbl>/g;
@@ -467,12 +559,16 @@ export async function buildDocx(userId) {
     4: P(fmtRupiah(e.total), stKeu[4]),
   }));
 
-  // Susun ulang dokumen (ganti kedua tabel sesuai urutan)
+  // Susun ulang dokumen (ganti kedua tabel sesuai urutan) —
+  // baris data diurutkan kronologis lebih dulu agar entri baru tidak
+  // sekadar menumpuk di akhir tabel.
+  const kegXml = sortRowsByDate(hasilKeg.xml);
+  const keuXml = sortRowsByDate(hasilKeu.xml);
   let idx = 0;
   docXml = docXml.replace(tblRe, (m) => {
     idx += 1;
-    if (idx === 1) return hasilKeg.xml;
-    if (idx === 2) return hasilKeu.xml;
+    if (idx === 1) return kegXml;
+    if (idx === 2) return keuXml;
     return m;
   });
 
