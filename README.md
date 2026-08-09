@@ -1,26 +1,26 @@
-# 📒 Logbook Kegiatan & Keuangan
+# ðŸ“’ Logbook Kegiatan & Keuangan
 
 Aplikasi web untuk **mencatat, memantau, dan melaporkan** perjalanan sebuah tim
-proyek — mulai dari kegiatan harian, pengeluaran dana, laporan kemajuan, sampai
-materi presentasi — dalam satu tempat yang rapi dan dapat diakses bersama
+proyek â€” mulai dari kegiatan harian, pengeluaran dana, laporan kemajuan, sampai
+materi presentasi â€” dalam satu tempat yang rapi dan dapat diakses bersama
 pembimbing.
 
 Dibuat untuk kebutuhan nyata tim program kemahasiswaan (PKM, proyek penelitian,
 tugas besar, program pendampingan): setiap catatan harus lengkap dengan **foto
-bukti**, **rekap dana**, dan **pengesahan dosen** — lalu pada akhirnya harus
+bukti**, **rekap dana**, dan **pengesahan dosen** â€” lalu pada akhirnya harus
 bisa dicetak menjadi dokumen laporan.
 
-> ⚡ **Ingin langsung memakainya?** *Fork* repo ini, lalu ikuti
-> **[DEPLOY.md](DEPLOY.md)** — ±30 menit sampai aplikasi hidup di alamat tetap
+> âš¡ **Ingin langsung memakainya?** *Fork* repo ini, lalu ikuti
+> **[DEPLOY.md](DEPLOY.md)** â€” Â±30 menit sampai aplikasi hidup di alamat tetap
 > `https://nama-kamu.vercel.app`, gratis dan tanpa kartu kredit.
 
 ---
 
-## 📌 Daftar isi
+## ðŸ“Œ Daftar isi
 
 - [Apa yang bisa dilakukan aplikasi ini](#-apa-yang-bisa-dilakukan-aplikasi-ini)
 - [Siapa saja penggunanya](#-siapa-saja-penggunanya)
-- [Cara memakai — panduan pengguna](#-cara-memakai--panduan-pengguna)
+- [Cara memakai â€” panduan pengguna](#-cara-memakai--panduan-pengguna)
 - [Panduan untuk pembimbing](#-panduan-untuk-pembimbing-fasilitator--dosen)
 - [Panduan untuk admin](#-panduan-untuk-admin)
 - [Menjalankan aplikasi](#-menjalankan-aplikasi)
@@ -35,36 +35,36 @@ bisa dicetak menjadi dokumen laporan.
 
 ---
 
-## ✨ Apa yang bisa dilakukan aplikasi ini
+## âœ¨ Apa yang bisa dilakukan aplikasi ini
 
 | Fitur | Penjelasan |
 |---|---|
-| 🗓️ **Catatan kegiatan** | Tanggal, uraian kegiatan, durasi, tambahan capaian (%), dan beberapa foto sekaligus. Otomatis dikelompokkan per bulan. |
-| 💰 **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan. |
-| 📊 **Dashboard** | Ringkasan capaian, total waktu, dana terpakai & sisa dana, grafik mini, dan kegiatan terbaru. |
-| 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
-| 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. |
-| 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
-| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. |
-| 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
-| 💬 **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
-| ✅ **Pengesahan (ACC)** | Dosen menyetujui atau meminta revisi tiap entri; statusnya terlihat jelas oleh tim. |
-| 🌙 **Nyaman dipakai** | Tampilan terang/gelap, responsif di ponsel, dan bisa dipasang sebagai aplikasi (PWA). |
+| ðŸ—“ï¸ **Catatan kegiatan** | Tanggal, uraian kegiatan, durasi, tambahan capaian (%), dan beberapa foto sekaligus. Otomatis dikelompokkan per bulan. |
+| ðŸ’° **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan. |
+| ðŸ“Š **Dashboard** | Ringkasan capaian, total waktu, dana terpakai & sisa dana, grafik mini, dan kegiatan terbaru. |
+| ðŸ“„ **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
+| ðŸ“Š **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva â€” keduanya boleh dipakai bersamaan. |
+| ðŸ–¼ï¸ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
+| ðŸ“¤ **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** â€” siap dikumpulkan. |
+| ðŸ“¥ **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
+| ðŸ’¬ **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
+| âœ… **Pengesahan (ACC)** | Dosen menyetujui atau meminta revisi tiap entri; statusnya terlihat jelas oleh tim. |
+| ðŸŒ™ **Nyaman dipakai** | Tampilan terang/gelap, responsif di ponsel, dan bisa dipasang sebagai aplikasi (PWA). |
 
 ---
 
-## 👥 Siapa saja penggunanya
+## ðŸ‘¥ Siapa saja penggunanya
 
 Aplikasi mengenal empat peran dengan hak akses berbeda:
 
 | Peran | Bisa melihat | Ubah data | Komentar | ACC / minta revisi |
 |---|---|:--:|:--:|:--:|
-| 👥 **Tim** | logbook miliknya sendiri | ✅ | ✅ (membalas) | — |
-| 🎓 **Fasilitator** | logbook tim yang didampingi | — | ✅ | — |
-| 👨‍🏫 **Dosen Pendamping** | logbook tim yang didampingi | — | ✅ | ✅ |
-| 🛡️ **Admin** | semua akun & data | pengelolaan akun | — | — |
+| ðŸ‘¥ **Tim** | logbook miliknya sendiri | âœ… | âœ… (membalas) | â€” |
+| ðŸŽ“ **Fasilitator** | logbook tim yang didampingi | â€” | âœ… | â€” |
+| ðŸ‘¨â€ðŸ« **Dosen Pendamping** | logbook tim yang didampingi | â€” | âœ… | âœ… |
+| ðŸ›¡ï¸ **Admin** | semua akun & data | pengelolaan akun | â€” | â€” |
 
-Setiap akun tim memiliki logbook yang **benar-benar terpisah** — kegiatan,
+Setiap akun tim memiliki logbook yang **benar-benar terpisah** â€” kegiatan,
 keuangan, dana, galeri, dan dokumennya tidak terlihat oleh tim lain.
 
 Pembatasan hak akses ini dijaga di sisi server, bukan sekadar disembunyikan di
@@ -72,21 +72,21 @@ tampilan: permintaan yang tidak berhak selalu ditolak dengan kode **403**.
 
 ---
 
-## 📖 Cara memakai — panduan pengguna
+## ðŸ“– Cara memakai â€” panduan pengguna
 
 ### 1. Membuat akun & masuk
 
-1. Buka alamat aplikasi, lalu pilih tab **✨ Daftar**.
+1. Buka alamat aplikasi, lalu pilih tab **âœ¨ Daftar**.
 2. Pilih peran:
-   - **Tim** — dapat langsung mendaftar.
-   - **Fasilitator** atau **Dosen Pendamping** — memerlukan **kode pendaftaran**
+   - **Tim** â€” dapat langsung mendaftar.
+   - **Fasilitator** atau **Dosen Pendamping** â€” memerlukan **kode pendaftaran**
      dari admin (kode untuk keduanya berbeda).
 3. Isi username & password, lalu daftar. Akun baru selalu dimulai dari logbook
    kosong.
 4. Untuk kunjungan berikutnya, gunakan tab **Masuk**.
 
-> Username dan password dapat diganti kapan saja melalui nama akun (pojok) →
-> **⚙️ Pengaturan akun**. Mengganti password otomatis mengeluarkan sesi di
+> Username dan password dapat diganti kapan saja melalui nama akun (pojok) â†’
+> **âš™ï¸ Pengaturan akun**. Mengganti password otomatis mengeluarkan sesi di
 > perangkat lain.
 
 ### 2. Menyiapkan dana awal
@@ -96,14 +96,14 @@ dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil ekspor.
 
 ### 3. Mencatat kegiatan
 
-1. Buka menu **Kegiatan** → tombol **Tambah** (di ponsel: tombol **➕** melayang).
+1. Buka menu **Kegiatan** â†’ tombol **Tambah** (di ponsel: tombol **âž•** melayang).
 2. Isi bagian berikut:
    - **Tanggal** kegiatan
-   - **Uraian kegiatan** — tulis sedetail mungkin (tempat, jam, siapa yang hadir)
+   - **Uraian kegiatan** â€” tulis sedetail mungkin (tempat, jam, siapa yang hadir)
    - **Durasi** dalam menit
-   - **Tambahan capaian (%)** — kemajuan dari kegiatan ini; aplikasi
+   - **Tambahan capaian (%)** â€” kemajuan dari kegiatan ini; aplikasi
      menjumlahkannya menjadi capaian total
-   - **Foto** — boleh beberapa sekaligus
+   - **Foto** â€” boleh beberapa sekaligus
 3. Simpan. Entri akan muncul dikelompokkan per bulan, dan foto dapat diklik
    untuk diperbesar.
 
@@ -112,7 +112,7 @@ dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil ekspor.
 
 ### 4. Mencatat pengeluaran
 
-Buka menu **Keuangan** → **Tambah**, lalu isi nama item, harga satuan, jumlah,
+Buka menu **Keuangan** â†’ **Tambah**, lalu isi nama item, harga satuan, jumlah,
 dan satuan (misalnya "per bulan"). Total dihitung otomatis, dan foto nota dapat
 dilampirkan sebagai bukti.
 
@@ -127,28 +127,11 @@ Untuk Canva, salin tautan dari tombol **Bagikan** dan pastikan setelannya
 *"Siapa saja dengan tautan dapat melihat"* agar pratinjaunya dapat dibuka
 pembimbing.
 
-#### ✨ Canva → PPTX sama persis (font ditanam)
-
-PPTX unduhan Canva sering tampil beda di PowerPoint karena fontnya tidak
-ter-install. Kartu **Canva → PPTX sama persis** di menu Presentasi
-memperbaikinya secara otomatis:
-
-| | |
-|---|---|
-| 🔍 | Memindai semua font yang dipakai desain |
-| ⬇️ | Mengunduh berkas fontnya dari Google Fonts |
-| 📌 | **Menanam font ke dalam PPTX** — tampil identik di komputer mana pun |
-| ✏️ | Teks & grup **tetap bisa diedit/digeser**, siap diberi animasi PowerPoint |
-| 📋 | Laporan hasil: font tertanam, font premium (perlu diunduh manual), dan slide berisi elemen rasterisasi Canva |
-
-Cara pakai: di Canva pilih **Bagikan → Unduh → Microsoft PowerPoint (.pptx)**,
-lalu unggah berkasnya di kartu konversi. Hasilnya tersimpan sebagai berkas
-presentasi tim dan bisa langsung diunduh.
 
 
 ### 6. Mengundang pembimbing
 
-1. Buka menu **Profil** → bagian **Kode tim** (contoh: `ABCD-2345`).
+1. Buka menu **Profil** â†’ bagian **Kode tim** (contoh: `ABCD-2345`).
 2. Kirimkan kode tersebut kepada fasilitator atau dosen.
 3. Pembimbing memasukkannya di dashboard mereka melalui **Gabung ke tim dengan
    kode**.
@@ -164,9 +147,9 @@ status:
 
 | Status | Arti |
 |---|---|
-| ⏳ **Menunggu ACC** | belum ditinjau dosen |
-| ✔ **Disetujui** | sudah disahkan dosen pendamping |
-| ↺ **Revisi** | dosen meminta perbaikan — selalu disertai catatan |
+| â³ **Menunggu ACC** | belum ditinjau dosen |
+| âœ” **Disetujui** | sudah disahkan dosen pendamping |
+| â†º **Revisi** | dosen meminta perbaikan â€” selalu disertai catatan |
 
 Bila entri diperbaiki (atau berkas laporan/presentasi diganti), statusnya
 otomatis kembali ke **menunggu** supaya pengesahan selalu merujuk versi
@@ -178,7 +161,7 @@ Buka menu **Ekspor**:
 
 | Format | Isi |
 |---|---|
-| **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. |
+| **Word (.docx)** | Dokumen logbook terisi otomatis â€” entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. |
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
 
@@ -191,7 +174,7 @@ Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).pdf
 Logbook Tim Alpha - Rekap Kegiatan & Keuangan (04-08-2026).xlsx
 ```
 
-Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan baru dan
+Ekspor **tidak pernah mengubah data** â€” yang diunduh selalu salinan baru dan
 aman diulang berkali-kali.
 
 **Impor:** pada halaman yang sama, unggah logbook Word lama lalu klik **Impor
@@ -202,16 +185,16 @@ harga `Rp 100.000 / bulan` sudah dikenali.
 
 ---
 
-## 🎓 Panduan untuk pembimbing (fasilitator & dosen)
+## ðŸŽ“ Panduan untuk pembimbing (fasilitator & dosen)
 
 1. **Daftar** dengan peran Fasilitator atau Dosen Pendamping memakai kode dari
    admin.
-2. **Terhubung ke tim** — masukkan kode tim di dashboard, atau minta admin
+2. **Terhubung ke tim** â€” masukkan kode tim di dashboard, atau minta admin
    menugaskan secara manual.
-3. **Memantau** — menu Kegiatan, Keuangan, Laporan Kemajuan, dan Presentasi
+3. **Memantau** â€” menu Kegiatan, Keuangan, Laporan Kemajuan, dan Presentasi
    menampilkan data tim yang didampingi (hanya dapat dibaca).
-4. **Berkomentar** — mulai diskusi pada entri mana pun; tim akan membalas.
-5. **Memberi ACC** (khusus dosen) — setujui entri atau minta revisi disertai
+4. **Berkomentar** â€” mulai diskusi pada entri mana pun; tim akan membalas.
+5. **Memberi ACC** (khusus dosen) â€” setujui entri atau minta revisi disertai
    catatan perbaikan.
 
 Bila mendampingi lebih dari satu tim, gunakan **pemilih tim** pada bilah atas
@@ -219,33 +202,33 @@ untuk berpindah. Pembimbing juga dapat keluar dari sebuah tim kapan saja.
 
 ---
 
-## 🛡️ Panduan untuk admin
+## ðŸ›¡ï¸ Panduan untuk admin
 
 Panel admin merupakan halaman terpisah dengan login tersendiri. Di dalamnya
 tersedia:
 
 - **Ringkasan** jumlah akun, kegiatan, belanja, sesi aktif, entri ter-ACC, dan
   laporan.
-- **Daftar akun** bertab **👥 Tim / 🎓 Fasilitator / 👨‍🏫 Dosen Pendamping**
+- **Daftar akun** bertab **ðŸ‘¥ Tim / ðŸŽ“ Fasilitator / ðŸ‘¨â€ðŸ« Dosen Pendamping**
   lengkap dengan pencarian.
-- **Detail akun** — kegiatan, keuangan, laporan, dan jejak aktivitas satu akun.
-- **Pengelolaan akun** — ganti username, setel ulang password, keluarkan dari
+- **Detail akun** â€” kegiatan, keuangan, laporan, dan jejak aktivitas satu akun.
+- **Pengelolaan akun** â€” ganti username, setel ulang password, keluarkan dari
   semua perangkat, hapus akun.
 - **Kode pendaftaran** untuk fasilitator dan dosen (dapat diganti kapan saja).
-- **Penugasan tim** — hubungkan pembimbing ke tim melalui tombol **🔗 Tim**.
+- **Penugasan tim** â€” hubungkan pembimbing ke tim melalui tombol **ðŸ”— Tim**.
 - **Catatan audit** yang diperbarui langsung.
 
 > Alamat panel admin beserta kredensialnya dibuat otomatis saat aplikasi pertama
-> kali dijalankan dan ditampilkan **satu kali** pada log server — catat baik-baik.
+> kali dijalankan dan ditampilkan **satu kali** pada log server â€” catat baik-baik.
 > Kredensial dapat disetel ulang kapan saja dengan `node tools/superuser.mjs`.
 > Karena alamat tersebut tidak pernah ditautkan dari halaman mana pun, simpanlah
 > secara pribadi.
 
 ---
 
-## 🚀 Menjalankan aplikasi
+## ðŸš€ Menjalankan aplikasi
 
-### Pilihan A — Online 24 jam (disarankan)
+### Pilihan A â€” Online 24 jam (disarankan)
 
 Aplikasi dirancang untuk berjalan di layanan gratis:
 
@@ -255,12 +238,12 @@ Aplikasi dirancang untuk berjalan di layanan gratis:
 | Database | **Neon** (PostgreSQL) |
 | Penyimpanan gambar & dokumen | **ImageKit** |
 
-Panduan lengkap langkah demi langkah tersedia pada **[DEPLOY.md](DEPLOY.md)** —
+Panduan lengkap langkah demi langkah tersedia pada **[DEPLOY.md](DEPLOY.md)** â€”
 mulai dari mem-*fork* repo ini sampai aplikasi hidup di alamat tetap.
 Setelah terpasang, aplikasi dapat diakses siapa pun melalui alamat tetap tanpa
 memerlukan perangkat yang menyala terus-menerus.
 
-### Pilihan B — Menjalankan sendiri (lokal)
+### Pilihan B â€” Menjalankan sendiri (lokal)
 
 **Prasyarat:** [Git](https://git-scm.com) dan [Node.js LTS](https://nodejs.org)
 terpasang, lalu ambil kodenya dan isi berkas `.env`
@@ -289,16 +272,16 @@ aplikasi memperoleh alamat publik sementara yang dapat dibagikan.
 > hanya dapat diakses selama server masih berjalan. Untuk pemakaian jangka
 > panjang, gunakan Pilihan A.
 
-### Pilihan C — Mode pengembangan
+### Pilihan C â€” Mode pengembangan
 
 ```powershell
 npm run dev --workspace backend      # API pada :4000 (muat ulang otomatis)
-npm run dev --workspace frontend     # Antarmuka pada :3000 (API → localhost:4000)
+npm run dev --workspace frontend     # Antarmuka pada :3000 (API â†’ localhost:4000)
 ```
 
 ---
 
-## 🧰 Daftar perintah npm
+## ðŸ§° Daftar perintah npm
 
 Dijalankan dari folder proyek (akar):
 
@@ -321,7 +304,7 @@ Utilitas lain di folder `tools/`:
 
 ---
 
-## ⚙️ Konfigurasi (.env)
+## âš™ï¸ Konfigurasi (.env)
 
 Salin `.env.example` menjadi `.env` di akar folder proyek, lalu isi:
 
@@ -329,18 +312,18 @@ Salin `.env.example` menjadi `.env` di akar folder proyek, lalu isi:
 |---|---|
 | `DATABASE_URL` | Alamat koneksi database Neon (PostgreSQL). |
 | `IMAGEKIT_PUBLIC_KEY` | Kunci publik ImageKit. |
-| `IMAGEKIT_PRIVATE_KEY` | Kunci privat ImageKit — rahasia. |
+| `IMAGEKIT_PRIVATE_KEY` | Kunci privat ImageKit â€” rahasia. |
 | `IMAGEKIT_URL_ENDPOINT` | Endpoint URL ImageKit. |
 | `IMAGEKIT_FOLDER` | Folder penyimpanan (opsional, bawaan `/logbook`). |
 
 Tabel database dibuat otomatis saat server pertama kali tersambung sehingga
 tidak ada langkah migrasi manual. Bila kunci ImageKit dikosongkan, berkas
-disimpan ke folder `uploads/` — praktis untuk pengembangan, namun tidak
+disimpan ke folder `uploads/` â€” praktis untuk pengembangan, namun tidak
 disarankan untuk pemakaian sungguhan.
 
 ---
 
-## 💾 Di mana data disimpan
+## ðŸ’¾ Di mana data disimpan
 
 | Data | Lokasi |
 |---|---|
@@ -355,14 +338,14 @@ database tetap lega, sekaligus membuat pemuatan foto lebih cepat melalui CDN.
 
 ---
 
-## 📚 REST API & dokumentasi Swagger
+## ðŸ“š REST API & dokumentasi Swagger
 
 Dokumentasi interaktif tersedia pada `/docs` (misalnya
 `http://localhost:4000/docs`). Seluruh endpoint data memerlukan token login,
 melalui header `Authorization: Bearer <token>` atau query `?token=...`.
 
 ```bash
-# 1) masuk → memperoleh token
+# 1) masuk â†’ memperoleh token
 curl -X POST https://ALAMAT-APLIKASI/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"USERNAME","password":"PASSWORD"}'
@@ -428,10 +411,6 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | POST / DELETE | `/api/presentasi/canva` | Simpan / hapus tautan Canva |
 | POST | `/api/presentasi/tautan` | Tautan sementara untuk penampil PowerPoint |
 | GET | `/api/presentasi/publik/{kunci}` | Akses berkas melalui tautan sementara |
-| POST | `/api/presentasi/konversi` | Konversi PPTX Canva → font ditanam (potongan: `/chunk` + `/konversi-selesai`) |
-| POST | `/api/presentasi/konversi-link` | Ekspor dari tautan Canva lalu konversi (perlu Canva Connect) |
-| GET / DELETE | `/api/presentasi/canva-connect/status` · `/canva-connect` | Status / putuskan koneksi akun Canva |
-| GET | `/api/presentasi/canva-connect/mulai` · `/callback` | Alur OAuth menghubungkan akun Canva |
 
 **Pembimbing (hanya baca)**
 
@@ -462,42 +441,42 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 
 ---
 
-## 🗂️ Struktur proyek
+## ðŸ—‚ï¸ Struktur proyek
 
 ```
 logbook-app/
-├── start.ps1            ← menjalankan aplikasi secara lokal
-├── stop.ps1             ← menghentikan proses terkait
-├── vercel.json          ← pengaturan hosting serverless (build, rewrite, region)
-├── .env                 ← konfigurasi database & penyimpanan berkas (lokal saja)
-├── api/index.js         ← titik masuk untuk hosting serverless (Vercel)
-├── tools/               ← utilitas: kredensial admin, migrasi data, cek online
-├── backend/             ← Express: REST API + Swagger + penyaji frontend
-│   └── src/
-│       ├── server.js    ← titik masuk & pemasangan seluruh rute
-│       ├── db.js        ← koneksi database + pembuatan skema otomatis
-│       ├── storage.js   ← seluruh akses data (akun, entri, komentar, ACC)
-│       ├── files.js     ← unggah foto, .docx & .pptx ke penyimpanan berkas
-│       ├── auth.js      ← sesi login + pembatasan hak akses per peran
-│       ├── assets/      ← template-logbook.docx (kerangka dokumen ekspor)
-│       ├── export/      ← penyusun berkas docx, pdf, xlsx
-│       ├── import/      ← pembaca logbook Word lama
-│       ├── admin/       ← panel admin (panel.js + routes.js)
-│       └── routes/      ← kegiatan, keuangan, laporan, presentasi, dst.
-└── frontend/            ← Next.js, dibangun menjadi berkas statis
-    ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
-    │                       Galeri, Ekspor, Profil
-    ├── lib/api.js       ← pemanggil REST API + cache sisi klien
-    └── components/      ← Shell, Komentar, Acc, KartuAcc, dsb.
+â”œâ”€â”€ start.ps1            â† menjalankan aplikasi secara lokal
+â”œâ”€â”€ stop.ps1             â† menghentikan proses terkait
+â”œâ”€â”€ vercel.json          â† pengaturan hosting serverless (build, rewrite, region)
+â”œâ”€â”€ .env                 â† konfigurasi database & penyimpanan berkas (lokal saja)
+â”œâ”€â”€ api/index.js         â† titik masuk untuk hosting serverless (Vercel)
+â”œâ”€â”€ tools/               â† utilitas: kredensial admin, migrasi data, cek online
+â”œâ”€â”€ backend/             â† Express: REST API + Swagger + penyaji frontend
+â”‚   â””â”€â”€ src/
+â”‚       â”œâ”€â”€ server.js    â† titik masuk & pemasangan seluruh rute
+â”‚       â”œâ”€â”€ db.js        â† koneksi database + pembuatan skema otomatis
+â”‚       â”œâ”€â”€ storage.js   â† seluruh akses data (akun, entri, komentar, ACC)
+â”‚       â”œâ”€â”€ files.js     â† unggah foto, .docx & .pptx ke penyimpanan berkas
+â”‚       â”œâ”€â”€ auth.js      â† sesi login + pembatasan hak akses per peran
+â”‚       â”œâ”€â”€ assets/      â† template-logbook.docx (kerangka dokumen ekspor)
+â”‚       â”œâ”€â”€ export/      â† penyusun berkas docx, pdf, xlsx
+â”‚       â”œâ”€â”€ import/      â† pembaca logbook Word lama
+â”‚       â”œâ”€â”€ admin/       â† panel admin (panel.js + routes.js)
+â”‚       â””â”€â”€ routes/      â† kegiatan, keuangan, laporan, presentasi, dst.
+â””â”€â”€ frontend/            â† Next.js, dibangun menjadi berkas statis
+    â”œâ”€â”€ app/             â† Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
+    â”‚                       Galeri, Ekspor, Profil
+    â”œâ”€â”€ lib/api.js       â† pemanggil REST API + cache sisi klien
+    â””â”€â”€ components/      â† Shell, Komentar, Acc, KartuAcc, dsb.
 ```
 
 > Template `backend/src/assets/template-logbook.docx` hanya berisi **kerangka
-> tabel kosong** (judul kolom) — hasil ekspor diisi sepenuhnya dari data akun
+> tabel kosong** (judul kolom) â€” hasil ekspor diisi sepenuhnya dari data akun
 > yang sedang masuk.
 
 ---
 
-## 🧪 Pengujian otomatis
+## ðŸ§ª Pengujian otomatis
 
 Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 
@@ -507,16 +486,15 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:panel-api --workspace backend` | Endpoint panel admin: validasi input, pengelolaan akun, audit |
 | `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
-| `npm run diag:konversi --workspace backend` | Konversi Canva → PPTX: pemindaian font, unduhan Google Fonts, penanaman ke berkas, laporan, dan penolakan berkas tak valid (tanpa server; butuh internet) |
 
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
 tidak terganggu.
 
 ---
 
-## 🔒 Keamanan
+## ðŸ”’ Keamanan
 
-- Password disimpan sebagai **hash scrypt** (satu arah) — tidak dapat dibaca
+- Password disimpan sebagai **hash scrypt** (satu arah) â€” tidak dapat dibaca
   kembali oleh siapa pun, termasuk pengelola aplikasi.
 - Seluruh endpoint data memerlukan token login; pengunjung yang hanya mengetahui
   alamat aplikasi hanya akan melihat halaman masuk.
@@ -531,12 +509,12 @@ tidak terganggu.
 
 ---
 
-## ❓ Tanya-jawab
+## â“ Tanya-jawab
 
 **Bisakah saya memakainya untuk timku sendiri?**
 Bisa. *Fork* repo ini, buat akun gratis di Vercel + Neon + ImageKit, lalu ikuti
 [DEPLOY.md](DEPLOY.md). Seluruh data (akun, foto, dokumen) tersimpan di layanan
-milikmu sendiri — tidak ada yang dikirim ke pemilik repo.
+milikmu sendiri â€” tidak ada yang dikirim ke pemilik repo.
 
 **Apakah data hilang bila perangkat dimatikan?**
 Tidak. Seluruh data tersimpan pada layanan cloud (database dan penyimpanan

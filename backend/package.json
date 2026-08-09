@@ -1,7 +1,7 @@
 {
   "name": "logbook-backend",
   "version": "3.0.0",
-  "description": "Logbook Kegiatan & Keuangan — Express + Neon Postgres + ImageKit + Swagger (siap serverless Vercel)",
+  "description": "Logbook Kegiatan & Keuangan â€” Express + Neon Postgres + ImageKit + Swagger (siap serverless Vercel)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -12,7 +12,6 @@
     "diag:panel-api": "node diag-panel-api.mjs",
     "diag:peran": "node diag-fasilitator.mjs",
     "diag:presentasi": "node diag-presentasi.mjs",
-    "diag:konversi": "node diag-konversi.mjs",
     "diag": "npm run diag:rute && npm run diag:panel"
   },
   "dependencies": {
