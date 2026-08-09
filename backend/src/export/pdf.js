@@ -131,8 +131,22 @@ export async function buildPdf(userId, namaTim = "") {
     // ================= Bagian 1: Kegiatan =================
     judulBagian("1", "LOGBOOK KEGIATAN");
 
+    const BATAS_BAWAH = () => doc.page.height - 64; // sama dengan pastikanRuang
+
     for (const [i, e] of kegiatan.entries()) {
-      pastikanRuang(84);
+      // Ukur kebutuhan entri (judul+teks+foto) supaya tidak ada ruang kosong
+      // besar: entri dipindah utuh HANYA bila muat di satu halaman penuh;
+      // selebihnya cukup pastikan kepala entri + 1 baris foto muat.
+      const fotos = (e.foto_keys || []).slice(0, 8).filter((k) => bufferMap.get(k));
+      const fw = 88, fh = 66, gap = 8;
+      const perBaris = Math.max(1, Math.floor((W - 22 + gap) / (fw + gap)));
+      const barisFoto = Math.ceil(fotos.length / perBaris);
+      doc.font("Helvetica").fontSize(9.5);
+      const tinggiTeks = doc.heightOfString(e.kegiatan, { width: W - 22, lineGap: 1.6 });
+      const butuh = 20 + tinggiTeks + 7 + (barisFoto ? barisFoto * (fh + gap) + 6 : 0) + 12;
+      const muatSatuHalaman = doc.page.height - 64 - 46; // area konten halaman kosong
+      pastikanRuang(Math.min(butuh, muatSatuHalaman));
+
       const y0 = doc.y;
       // badge nomor entri
       doc.circle(X + 8, y0 + 7, 8).fill(INDIGO_BG);
@@ -152,18 +166,21 @@ export async function buildPdf(userId, namaTim = "") {
         .text(e.kegiatan, X + 22, doc.y, { width: W - 22, lineGap: 1.6 });
       doc.y += 7;
 
-      // foto (maks 4 per baris)
-      const fotos = (e.foto_keys || []).slice(0, 8);
+      // foto (dibariskan; pindah halaman dihitung dari posisi BARIS foto, bukan
+      // doc.y — dulu memakai doc.y basi sehingga baris kedua tergambar melewati
+      // batas bawah halaman → tampak "kosong" besar lalu lompat halaman)
       if (fotos.length) {
-        const fw = 88, fh = 66, gap = 8;
+        if (doc.y + fh + 14 > BATAS_BAWAH()) doc.addPage();
         let fx = X + 22, fy = doc.y;
-        pastikanRuang(fh + 14);
-        fy = doc.y;
         for (const k of fotos) {
           try {
             const buf = bufferMap.get(k);
             if (!buf) continue;
-            if (fx + fw > X + W) { fx = X + 22; fy += fh + gap; pastikanRuang(fh + 14); if (doc.y > fy) fy = doc.y; }
+            if (fx + fw > X + W) {
+              fx = X + 22;
+              fy += fh + gap;
+              if (fy + fh > BATAS_BAWAH()) { doc.addPage(); fy = doc.y; }
+            }
             doc.image(buf, fx, fy, { fit: [fw, fh], align: "center", valign: "center" });
             doc.roundedRect(fx, fy, fw, fh, 4).lineWidth(0.8).stroke(LINE);
             fx += fw + gap;
@@ -260,15 +277,25 @@ export async function buildPdf(userId, namaTim = "") {
     doc.y = ty + 60;
 
     // ================= Footer setiap halaman =================
+    // PENTING: teks footer berada DI BAWAH margin bawah halaman — tanpa
+    // penanganan, pdfkit "melanjutkan" teks itu ke HALAMAN BARU otomatis
+    // (continueOnNewPage) sehingga dokumen dipenuhi halaman kosong di akhir.
+    // Solusi: nolkan margin bawah sementara + matikan lineBreak.
     const range = doc.bufferedPageRange();
     for (let p = 0; p < range.count; p++) {
       doc.switchToPage(p);
+      const mb = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       const fy = doc.page.height - 40;
       doc.moveTo(X, fy - 6).lineTo(X + W, fy - 6).lineWidth(0.5).stroke(LINE);
       doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
-        .text(namaTim ? `Logbook ${namaTim}` : "Logbook", X, fy, { width: W / 3, align: "left" });
-      doc.text(`Halaman ${p + 1} dari ${range.count}`, X, fy, { width: W, align: "center" });
-      doc.text(new Date().toLocaleDateString("id-ID"), X, fy, { width: W, align: "right" });
+        .text(namaTim ? `Logbook ${namaTim}` : "Logbook", X, fy,
+          { width: W / 3, align: "left", lineBreak: false });
+      doc.text(`Halaman ${p + 1} dari ${range.count}`, X, fy,
+        { width: W, align: "center", lineBreak: false });
+      doc.text(new Date().toLocaleDateString("id-ID"), X, fy,
+        { width: W, align: "right", lineBreak: false });
+      doc.page.margins.bottom = mb;
     }
     doc.end();
   });
