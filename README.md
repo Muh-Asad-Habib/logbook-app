@@ -490,6 +490,20 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
 tidak terganggu.
 
+### Perawatan kuota database
+
+Berkas biner (foto, `.docx`, `.pptx`, termasuk potongan unggahan sementara)
+disimpan di **ImageKit** (20 GB) — **Neon** (0,5 GB) hanya menyimpan teks dan
+katalog kunci sehingga kuotanya awet. Bila ingin merapikan sisa lama:
+
+```bash
+npm run bersih:db --workspace backend
+```
+
+Perintah ini menghapus potongan unggahan terbengkalai, mengosongkan kolom
+base64 lama yang sudah bermigrasi ke ImageKit, lalu `VACUUM FULL` agar
+ruangnya benar-benar kembali ke kuota.
+
 ---
 
 ## 🔒 Keamanan
