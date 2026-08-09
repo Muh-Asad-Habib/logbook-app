@@ -252,6 +252,57 @@ export async function putBlob(key, buffer) {
   return key;
 }
 
+/* ---------------- berkas BESAR (> batas 25 MB/berkas ImageKit gratis) ----------------
+ * Berkas final yang melebihi PART_MAX otomatis dipecah menjadi beberapa bagian
+ * `<stem>.partN.bin` di ImageKit, dan kolom file_key menyimpan kunci komposit
+ * `multi:<jumlah>:<stem>`. Perakitan kembali transparan lewat getFileBesar(). */
+const PART_MAX = 20 * 1024 * 1024; // aman di bawah batas 25 MB ImageKit gratis
+
+export async function putFileBesar(originalName, buffer, prefix = "lap") {
+  if (buffer.length <= PART_MAX) return putFileRaw(originalName, buffer, prefix);
+  const ext = path.extname(originalName || "").toLowerCase();
+  if (!EXT_DOKUMEN.has(ext)) {
+    throw new Error("Hanya berkas .docx atau .pptx yang diizinkan");
+  }
+  const stem = buatKey(prefix, ""); // tanpa ekstensi — jadi pangkal nama bagian
+  const jumlah = Math.ceil(buffer.length / PART_MAX);
+  const tersimpan = [];
+  try {
+    for (let i = 0; i < jumlah; i++) {
+      const k = `${stem}.part${i}.bin`;
+      await putBlob(k, buffer.subarray(i * PART_MAX, (i + 1) * PART_MAX));
+      tersimpan.push(k);
+    }
+  } catch (err) {
+    await removeFiles(tersimpan); // jangan tinggalkan bagian yatim
+    throw err;
+  }
+  return `multi:${jumlah}:${stem}`;
+}
+
+/** Ambil isi berkas — kunci biasa maupun komposit `multi:` (dirakit ulang). */
+export async function getFileBesar(key) {
+  const s = String(key || "");
+  if (!s.startsWith("multi:")) return getFileBufferRetry(s);
+  const [, nStr, stem] = s.split(":");
+  const n = Number(nStr) || 0;
+  const bagian = [];
+  for (let i = 0; i < n; i++) {
+    const buf = await getFileBufferRetry(`${stem}.part${i}.bin`);
+    if (!buf) return null; // satu bagian hilang = berkas tidak utuh
+    bagian.push(buf);
+  }
+  return n ? Buffer.concat(bagian) : null;
+}
+
+/** Jabarkan kunci (komposit → daftar kunci bagian) untuk penghapusan. */
+export function kunciBagian(key) {
+  const s = String(key || "");
+  if (!s.startsWith("multi:")) return s ? [s] : [];
+  const [, nStr, stem] = s.split(":");
+  return Array.from({ length: Number(nStr) || 0 }, (_, i) => `${stem}.part${i}.bin`);
+}
+
 /** Hapus banyak berkas (abaikan yang sudah tidak ada / gagal). */
 export async function removeFiles(keys) {
   for (const k of keys || []) {
@@ -307,5 +358,22 @@ export async function getFileBuffer(key) {
   } catch {
     return null;
   }
+}
+
+/**
+ * getFileBuffer + RETRY — berkas yang BARU diunggah ke ImageKit kadang belum
+ * langsung tersedia di CDN (jeda propagasi ±1–5 dtk, terbukti saat pengujian:
+ * baca pertama 404/NULL, baca kedua sukses). Tiap percobaan membuat signed URL
+ * BARU (timestamp beda → path cache CDN beda) agar tidak menabrak cache 404.
+ * Dipakai perakit potongan unggahan & perakit berkas multi-bagian.
+ */
+export async function getFileBufferRetry(key, percobaan = 4, jedaMs = 1500) {
+  for (let i = 0; i < percobaan; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, jedaMs));
+    const buf = await getFileBuffer(key);
+    if (buf) return buf;
+    if (!pakaiCloud()) break; // lokal: file tidak ada ya tidak ada
+  }
+  return null;
 }
 

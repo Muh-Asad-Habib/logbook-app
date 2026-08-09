@@ -9,7 +9,7 @@
 import crypto from "node:crypto";
 import { q, angka, larik } from "./db.js";
 import { hashPassword, newToken } from "./passwords.js";
-import { putFileRaw, getFileBuffer, removeFiles } from "./files.js";
+import { putFileRaw, getFileBuffer, removeFiles, putFileBesar, getFileBesar, kunciBagian } from "./files.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -267,7 +267,7 @@ export async function deleteUser(userId) {
   for (const r of await q(
     "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''", [userId]
   )) {
-    fileKeys.push(r.file_key);
+    fileKeys.push(...kunciBagian(r.file_key));
   }
   await q("DELETE FROM kegiatan   WHERE user_id = $1", [userId]);
   await q("DELETE FROM keuangan   WHERE user_id = $1", [userId]);
@@ -505,7 +505,7 @@ export async function saveLaporan(userId, nama, buffer) {
   const lama = await q(
     "SELECT file_key FROM laporan_docx WHERE user_id = $1 AND file_key <> ''", [userId]
   );
-  const key = await putFileRaw(nama, buffer, "lap");
+  const key = await putFileBesar(nama, buffer, "lap");
   await q(
     `INSERT INTO laporan_docx (user_id, nama, data, ukuran, updated_at, file_key)
      VALUES ($1, $2, '', $3, $4, $5)
@@ -514,7 +514,7 @@ export async function saveLaporan(userId, nama, buffer) {
        file_key = EXCLUDED.file_key`,
     [userId, nama, buffer.length, nowIso(), key]
   );
-  if (lama[0]?.file_key) await removeFiles([lama[0].file_key]);
+  if (lama[0]?.file_key) await removeFiles(kunciBagian(lama[0].file_key));
   // Laporan diganti → ACC lama tidak lagi relevan (kembali "menunggu")
   await hapusPersetujuan("laporan", userId);
   return { nama, ukuran: buffer.length };
@@ -540,7 +540,7 @@ export async function getLaporan(userId) {
   if (!rows[0]) return null;
   const { nama, data, file_key: fileKey } = rows[0];
   if (fileKey) {
-    const buffer = await getFileBuffer(fileKey);
+    const buffer = await getFileBesar(fileKey);
     if (buffer) return { nama, buffer };
     // Berkas hilang di cloud tapi masih ada base64 lama → pakai itu
     if (data) return { nama, buffer: Buffer.from(data, "base64") };
@@ -564,7 +564,7 @@ export async function deleteLaporan(userId) {
   const rows = await q(
     "DELETE FROM laporan_docx WHERE user_id = $1 RETURNING nama, file_key", [userId]
   );
-  if (rows[0]?.file_key) await removeFiles([rows[0].file_key]);
+  if (rows[0]?.file_key) await removeFiles(kunciBagian(rows[0].file_key));
   if (rows.length) await hapusPersetujuan("laporan", userId);
   return rows.length > 0;
 }
@@ -662,7 +662,8 @@ export async function savePresentasi(userId, nama, buffer) {
   const lama = await q(
     "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''", [userId]
   );
-  const key = await putFileRaw(nama, buffer, "ppt");
+  // > ±20 MB otomatis dipecah beberapa bagian (batas ImageKit gratis 25 MB/berkas)
+  const key = await putFileBesar(nama, buffer, "ppt");
   const ts = nowIso();
   await q(
     `INSERT INTO presentasi (user_id, nama, ukuran, file_key, file_at, updated_at)
@@ -672,7 +673,7 @@ export async function savePresentasi(userId, nama, buffer) {
        file_at = EXCLUDED.file_at, updated_at = EXCLUDED.updated_at`,
     [userId, nama, buffer.length, key, ts]
   );
-  if (lama[0]?.file_key) await removeFiles([lama[0].file_key]);
+  if (lama[0]?.file_key) await removeFiles(kunciBagian(lama[0].file_key));
   await hapusPersetujuan("presentasi", userId);
   return { nama, ukuran: buffer.length };
 }
@@ -697,20 +698,26 @@ export async function infoPresentasi(userId) {
 export async function getPresentasi(userId) {
   const r = await barisPresentasi(userId);
   if (!r?.file_key) return null;
-  const buffer = await getFileBuffer(r.file_key);
+  const buffer = await getFileBesar(r.file_key);
   if (!buffer) return null;
   return { nama: r.nama, buffer };
 }
 
 export async function deletePresentasiFile(userId) {
-  const rows = await q(
+  // CATATAN: `UPDATE … RETURNING` mengembalikan nilai SESUDAH update (sudah
+  // kosong) — kunci lama harus diambil dulu agar berkasnya ikut terhapus.
+  const lama = await q(
+    "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''",
+    [userId]
+  );
+  if (!lama.length) return false;
+  await q(
     `UPDATE presentasi SET nama = '', ukuran = 0, file_key = '', file_at = '',
             updated_at = $2
-       WHERE user_id = $1 AND file_key <> '' RETURNING file_key`,
+       WHERE user_id = $1`,
     [userId, nowIso()]
   );
-  if (!rows.length) return false;
-  if (rows[0].file_key) await removeFiles([rows[0].file_key]);
+  await removeFiles(kunciBagian(lama[0].file_key));
   await rapikanPresentasi(userId);
   await hapusPersetujuan("presentasi", userId);
   return true;
