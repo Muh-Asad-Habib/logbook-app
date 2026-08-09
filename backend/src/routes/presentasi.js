@@ -17,6 +17,7 @@ import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
 import { putBlob, getFileBufferRetry, removeFiles } from "../files.js";
 import { prosesPptxCanva } from "../export/pptx-canva.js";
+import { kumpulkanGambar, buatPptxDariGambar } from "../export/pptx-gambar.js";
 import {
   canvaSiap, mulaiOAuth, selesaikanOAuth, statusKoneksi, putuskanKoneksi,
   eksporPptx, idDesainDariUrl,
@@ -30,6 +31,12 @@ const MIME_PPTX =
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAKS_UKURAN, files: 1 },
+});
+
+/** Mode gambar: boleh banyak berkas (ZIP atau hingga 40 PNG/JPG sekaligus). */
+const uploadBanyak = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAKS_UKURAN, files: 40 },
 });
 
 const router = Router();
@@ -343,6 +350,66 @@ router.post("/konversi-selesai", async (req, res, next) => {
     }
     const buffer = await rakitPotongan(id, req.userId, total);
     await konversiDanSimpan(req, res, req.body?.nama, buffer);
+  } catch (err) {
+    bersihkanPotongan(id, req.userId).catch(() => {});
+    next(err);
+  }
+});
+
+/* ---- Mode B: PPTX dari GAMBAR render Canva (100% identik, tidak editable) ----
+ * Input: ZIP hasil "Unduh → PNG → Semua halaman" di Canva, atau banyak
+ * PNG/JPG langsung. Tiap gambar = satu slide penuh — dijamin sama persis
+ * karena memakai piksel render Canva sendiri. */
+async function konversiGambarDanSimpan(req, res, namaAsal, berkas) {
+  const gambar = await kumpulkanGambar(berkas);
+  const { buffer, totalSlide } = await buatPptxDariGambar(gambar);
+  if (buffer.length > MAKS_UKURAN) {
+    return res.status(400).json({
+      error: "Hasil melebihi 100 MB — unduh PNG dari Canva dengan ukuran lebih kecil",
+    });
+  }
+  const nama = bersihkanNama(
+    String(namaAsal || "presentasi").replace(/\.(zip|png|jpe?g)$/i, "") + " (identik Canva).pptx"
+  );
+  const tersimpan = await store.savePresentasi(req.userId, nama, buffer);
+  catatAktivitas(req.userId, "presentasi.konversi-gambar", { nama, totalSlide });
+  res.json({
+    ok: true, ...tersimpan,
+    laporan: { totalSlide, mode: "gambar" },
+    catatan: "Hasil tersimpan sebagai berkas presentasi (menggantikan yang lama)",
+  });
+}
+
+/**
+ * @openapi
+ * /api/presentasi/konversi-gambar:
+ *   post:
+ *     tags: [Presentasi]
+ *     summary: Susun PPTX dari gambar render Canva (ZIP/PNG/JPG) — 100% identik
+ *     responses:
+ *       200: { description: "{ ok, nama, ukuran, laporan: { totalSlide } }" }
+ *       400: { description: Tidak ada gambar valid }
+ */
+router.post("/konversi-gambar", uploadBanyak.array("file", 40), async (req, res, next) => {
+  try {
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: "Pilih ZIP atau gambar PNG/JPG dahulu" });
+    await konversiGambarDanSimpan(req, res, files[0].originalname,
+      files.map((f) => ({ nama: f.originalname, buffer: f.buffer })));
+  } catch (err) { next(err); }
+});
+
+/** Perakit potongan untuk ZIP gambar > ±3 MB (jalur chunk yang sama). */
+router.post("/konversi-gambar-selesai", async (req, res, next) => {
+  const id = String(req.body?.id || "");
+  try {
+    const total = Number(req.body?.total);
+    if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
+      return res.status(400).json({ error: "id/total tidak valid" });
+    }
+    const buffer = await rakitPotongan(id, req.userId, total);
+    const nama = String(req.body?.nama || "presentasi.zip");
+    await konversiGambarDanSimpan(req, res, nama, [{ nama, buffer }]);
   } catch (err) {
     bersihkanPotongan(id, req.userId).catch(() => {});
     next(err);

@@ -606,29 +606,47 @@ function KomentarPresentasiTim() {
   );
 }
 
-/* ===================== KONVERSI CANVA → PPTX (font tertanam) =====================
- * Masalah yang diselesaikan: PPTX unduhan Canva tampil beda di PowerPoint
- * karena fontnya tidak ter-install. Server menanam font Google langsung ke
- * dalam file → tampilan sama persis di komputer mana pun, semua teks & grup
- * tetap bisa diedit/digeser. Alur: unduh .pptx dari Canva → unggah → konversi. */
+/* ===================== KONVERSI CANVA → PPTX (2 mode) =====================
+ * Mode A "font ditanam": server menanam font Google ke PPTX ekspor Canva —
+ *   teks & grup tetap bisa diedit/digeser; tampilan mendekati Canva
+ *   (bergantung ketersediaan font di Google Fonts).
+ * Mode B "gambar": PPTX disusun dari PNG render Canva — DIJAMIN 100% identik
+ *   (piksel Canva sendiri), tiap slide tetap bisa diberi animasi PowerPoint,
+ *   tapi isi teks tidak bisa diketik ulang. */
 function KonversiCanvaCard({ unduhUrl }) {
-  const [file, setFile] = useState(null);
+  const [mode, setMode] = useState("gambar");
+  const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [progres, setProgres] = useState(0);
   const [laporan, setLaporan] = useState(null);
   const [err, setErr] = useState("");
   const inputRef = useRef(null);
 
+  const gantiMode = (m) => {
+    setMode(m);
+    setFiles([]);
+    setErr("");
+    setLaporan(null);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const totalUkuran = files.reduce((s, f) => s + f.size, 0);
+
   const konversi = async () => {
-    if (!file) { toast.err("Pilih berkas .pptx hasil unduhan Canva dahulu"); return; }
-    if (!file.name.toLowerCase().endsWith(".pptx")) {
+    if (!files.length) {
+      toast.err(mode === "font"
+        ? "Pilih berkas .pptx hasil unduhan Canva dahulu"
+        : "Pilih ZIP atau gambar PNG/JPG dari Canva dahulu");
+      return;
+    }
+    if (mode === "font" && !files[0].name.toLowerCase().endsWith(".pptx")) {
       toast.err("Berkas harus berformat .pptx"); return;
     }
-    if (file.size > MAKS_UNGGAH) {
-      const mb = (file.size / 1024 / 1024).toFixed(1);
-      setErr(`Berkas ${mb} MB melebihi batas 100 MB — di Canva coba pisahkan desain ` +
-             "menjadi beberapa bagian, atau kecilkan gambar-gambarnya, lalu unduh ulang .pptx-nya.");
-      toast.err("Berkas melebihi batas 100 MB");
+    if (totalUkuran > MAKS_UNGGAH) {
+      const mb = (totalUkuran / 1024 / 1024).toFixed(1);
+      setErr(`Unggahan ${mb} MB melebihi batas 100 MB — di Canva unduh dengan ` +
+             "ukuran/kualitas lebih kecil, atau pisahkan desainnya.");
+      toast.err("Melebihi batas 100 MB");
       return;
     }
     setBusy(true);
@@ -636,11 +654,15 @@ function KonversiCanvaCard({ unduhUrl }) {
     setErr("");
     setLaporan(null);
     try {
-      const r = await api.konversiPptx(file, setProgres);
+      const r = mode === "font"
+        ? await api.konversiPptx(files[0], setProgres)
+        : await api.konversiGambar(files, setProgres);
       setLaporan(r.laporan || null);
-      toast.ok("Konversi selesai — font ditanam, berkas presentasi diperbarui");
+      toast.ok(mode === "font"
+        ? "Konversi selesai — font ditanam, berkas presentasi diperbarui"
+        : "Konversi selesai — slide 100% identik render Canva");
       revalidate("/api/presentasi/info").catch(() => {});
-      setFile(null);
+      setFiles([]);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
       setErr(`Gagal konversi: ${ringkasPesan(e.message)} — coba lagi; bila berulang, ` +
@@ -651,47 +673,76 @@ function KonversiCanvaCard({ unduhUrl }) {
     }
   };
 
+  const segBtn = (m, label) => (
+    <button
+      className={`btn ${mode === m ? "primary" : ""}`}
+      style={{ fontSize: ".82rem" }}
+      onClick={() => gantiMode(m)}
+      disabled={busy}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="card mt">
       <div className="metric" style={{ marginBottom: 10 }}>
         <div className="metric-ic v3"><Sparkles className="lucide" /></div>
         <div>
           <div className="metric-value" style={{ fontSize: "1.02rem" }}>
-            Canva → PPTX sama persis (font ditanam)
+            Canva → PPTX sama persis
           </div>
           <div className="muted">
-            PPTX unduhan Canva sering <b>berubah tampilannya</b> di PowerPoint karena
-            fontnya tidak ter-install. Fitur ini <b>menanam font Google ke dalam file</b> —
-            tampilan jadi identik, semua teks & grup <b>tetap bisa diedit/digeser</b>,
-            siap diberi animasi PowerPoint.
+            Pilih cara sesuai kebutuhan: <b>tampilan dijamin identik</b> (slide dari
+            gambar render Canva) atau <b>teks tetap bisa diedit</b> (font Google
+            ditanam ke file). Keduanya bisa diberi animasi PowerPoint.
           </div>
         </div>
       </div>
 
-      <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
-        <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
-        <li>Unggah berkasnya di bawah ini lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
-        <li>Unduh hasilnya — otomatis tersimpan juga sebagai presentasi tim</li>
-      </ol>
+      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+        {segBtn("gambar", "🖼 100% identik (dari gambar)")}
+        {segBtn("font", "✏️ Teks bisa diedit (font ditanam)")}
+      </div>
+
+      {mode === "gambar" ? (
+        <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
+          <li>Di Canva: <b>Bagikan → Unduh → PNG</b>, centang <b>semua halaman</b> (hasilnya ZIP)</li>
+          <li>Unggah ZIP-nya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
+          <li>Tiap halaman jadi 1 slide — <b>persis piksel Canva</b>; teks tidak bisa
+            diketik ulang, tapi slide tetap bisa diberi animasi</li>
+        </ol>
+      ) : (
+        <ol className="muted" style={{ margin: "0 0 10px 18px", fontSize: ".85rem", lineHeight: 1.7 }}>
+          <li>Di Canva: <b>Bagikan → Unduh → Microsoft PowerPoint (.pptx)</b></li>
+          <li>Unggah berkasnya di bawah lalu klik <b>Konversi</b> (maks. <b>100 MB</b>)</li>
+          <li>Font Google ditanam otomatis — teks & grup tetap bisa diedit/digeser;
+            font premium non-Google dilaporkan agar bisa di-install manual</li>
+        </ol>
+      )}
 
       <div className="row">
         <input
-          ref={inputRef} type="file" accept=".pptx"
+          ref={inputRef}
+          type="file"
+          accept={mode === "font" ? ".pptx" : ".zip,.png,.jpg,.jpeg"}
+          multiple={mode === "gambar"}
           style={{ flex: "1 1 260px", marginTop: 0 }}
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) => setFiles([...(e.target.files || [])])}
         />
         <button className="btn primary" onClick={konversi} disabled={busy}>
           {busy
-            ? (progres > 0 ? `Memproses… ${progres}%` : "Menanam font…")
+            ? (progres > 0 ? `Memproses… ${progres}%` : "Memproses…")
             : <><Upload className="lucide" /> Konversi berkas Canva</>}
         </button>
       </div>
-      {file && (
+      {files.length > 0 && (
         <p className="muted mts">
-          <Info className="lucide" /> {file.name} · {fmtUkuran(file.size)}
-          {file.size > MAKS_UNGGAH
+          <Info className="lucide" />{" "}
+          {files.length === 1 ? files[0].name : `${files.length} berkas`} · {fmtUkuran(totalUkuran)}
+          {totalUkuran > MAKS_UNGGAH
             ? " — ⚠️ melebihi batas 100 MB, tidak akan diproses"
-            : file.size > 30 * 1024 * 1024
+            : totalUkuran > 30 * 1024 * 1024
               ? " — berkas besar, proses bisa ±1–2 menit"
               : ""}
         </p>
@@ -707,6 +758,24 @@ function KonversiCanvaCard({ unduhUrl }) {
 
 /** Hasil konversi: status tiap font + slide yang memuat elemen rasterisasi. */
 function LaporanKonversi({ laporan, unduhUrl }) {
+  if (laporan.mode === "gambar") {
+    return (
+      <div className="mt" style={{ borderTop: "1px solid var(--border, #e5e7eb)", paddingTop: 10 }}>
+        <b>📋 Laporan konversi</b>
+        <p className="mts" style={{ fontSize: ".85rem" }}>
+          ✅ <b>{laporan.totalSlide} slide</b> disusun dari gambar render Canva —
+          tampilan <b>100% identik</b> dengan desain aslinya di komputer mana pun.
+        </p>
+        <p className="mts muted" style={{ fontSize: ".8rem" }}>
+          Tiap slide berupa satu gambar utuh: bebas diberi animasi/transisi PowerPoint,
+          urutannya bisa diubah, tapi isi teksnya tidak bisa diketik ulang.
+        </p>
+        <a className="btn primary mt" style={{ textDecoration: "none" }} href={unduhUrl}>
+          <Download className="lucide" /> Unduh PPTX hasil konversi
+        </a>
+      </div>
+    );
+  }
   const tertanam = laporan.fonts.filter((f) => f.status === "tertanam");
   const sistem = laporan.fonts.filter((f) => f.status === "sistem");
   const manual = laporan.fonts.filter((f) => f.status === "manual");
