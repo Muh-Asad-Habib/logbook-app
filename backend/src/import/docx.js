@@ -56,9 +56,16 @@ const parseSuffix = (s) => {
   return m ? `/${m[1]}` : "";
 };
 
-/** "10" → 10 mnt · "2 jam" → 120 · "1 j 30 mnt" → 90 */
+/** "10" → 10 mnt · "2 jam" → 120 · "1 j 30 mnt" → 90 · "10.00-15.00" → 300 */
 function parseWaktu(s) {
   const t = String(s).toLowerCase();
+  // rentang jam "07.00-14.40" / "10-13.30" / "20:00–21:10" → durasi menit
+  const r = t.match(/(\d{1,2})(?:[.:](\d{2}))?\s*[-–]\s*(\d{1,2})(?:[.:](\d{2}))?/);
+  if (r) {
+    const m1 = (+r[1]) * 60 + (+(r[2] || 0));
+    const m2 = (+r[3]) * 60 + (+(r[4] || 0));
+    if (m2 > m1 && +r[1] <= 24 && +r[3] <= 24) return m2 - m1;
+  }
   const jam = t.match(/(\d+(?:[.,]\d+)?)\s*j/);
   const mnt = t.match(/(\d+)\s*m/) || (!jam ? t.match(/(\d+)/) : null);
   let total = 0;
@@ -133,7 +140,11 @@ export async function importDocx(buffer, userId) {
   if (!tables.length) throw new Error("Dokumen tidak dikenali (tidak ada tabel logbook)");
 
   const warnings = [];
-  const kegAda = new Set((await store.listKegiatan(userId)).map((e) => norm(e.kegiatan)));
+  // Kunci dedup kegiatan = tanggal + isi — kegiatan berulang (mis. rapat
+  // pendampingan dengan uraian mirip) di TANGGAL BERBEDA adalah entri berbeda.
+  const kegAda = new Set(
+    (await store.listKegiatan(userId)).map((e) => `${e.tanggal}|${norm(e.kegiatan)}`)
+  );
   const keuAda = new Set((await store.listKeuangan(userId)).map((e) => norm(e.item)));
 
   /**
@@ -150,41 +161,61 @@ export async function importDocx(buffer, userId) {
     if (kepala.includes("harga") && (kepala.includes("item") || kepala.includes("jumlah"))) {
       return "keuangan";
     }
-    if (kepala.includes("kegiatan") && (kepala.includes("capaian") || kepala.includes("waktu"))) {
+    if ((kepala.includes("kegiatan") || kepala.includes("keterangan") ||
+         kepala.includes("persentase") || kepala.includes("dokumentasi")) &&
+        (kepala.includes("capaian") || kepala.includes("waktu") || kepala.includes("tanggal"))) {
       return "kegiatan";
     }
     for (const tr of rows.slice(0, 5)) {
       const teks = cellsOf(tr).map(cellText);
-      if (/^\d+\s*%$/.test((teks[2] || "").trim())) return "kegiatan";
+      if (teks.some((t) => /^\d+\s*%$/.test(String(t).trim()))) return "kegiatan";
       if (/rp\s*[\d.]/i.test(teks[2] || "")) return "keuangan";
     }
     return sebelumnya;
   }
 
   // ---------- Baris kegiatan ----------
+  // Template resmi: Tanggal | Kegiatan | Capaian | Waktu | …
+  // Varian umum:    Tanggal | Dokumentasi | Waktu | Persentase | Keterangan
+  // Peta kolom dideteksi dari baris header; tanpa header → asumsi template.
   let kegBaru = 0, kegLewat = 0, prevCum = 0, lastTglKeg = null;
+  let kolom = { kegiatan: 1, capaian: 2, waktu: 3 };
   async function prosesKegiatan(tbl) {
     for (const tr of rowsOf(tbl)) {
       const cells = cellsOf(tr);
-      if (cells.length < 5) continue;
+      if (cells.length < 4) continue;
       const teks = cells.map(cellText);
       const semua = teks.join(" ").toLowerCase();
       if (!semua.trim()) continue;
-      if (semua.includes("tanggal") && semua.includes("kegiatan")) continue; // header
+      if (semua.includes("tanggal") &&
+          (semua.includes("kegiatan") || semua.includes("keterangan") ||
+           semua.includes("persentase"))) {
+        // baris header → susun peta kolom dari judulnya
+        const cari = (kata, def) => {
+          const i = teks.findIndex((t) => kata.some((k) => t.toLowerCase().includes(k)));
+          return i >= 0 ? i : def;
+        };
+        kolom = {
+          kegiatan: cari(["kegiatan", "keterangan", "uraian", "deskripsi"], 1),
+          capaian: cari(["capaian", "persentase", "persen", "%"], 2),
+          waktu: cari(["waktu", "durasi", "jam"], 3),
+        };
+        continue;
+      }
 
       const tanggal = parseTanggal(teks[0]) || lastTglKeg;
       if (parseTanggal(teks[0])) lastTglKeg = parseTanggal(teks[0]);
-      const kegiatan = teks[1].trim();
+      const kegiatan = (teks[kolom.kegiatan] || "").trim();
       if (!tanggal || !kegiatan) {
         if (warnings.length < 8) {
           warnings.push(`Baris kegiatan dilewati (tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
         }
         continue;
       }
-      const cum = parseAngka(teks[2]);
+      const cum = parseAngka(teks[kolom.capaian]);
       const delta = Math.max(0, cum - prevCum);
       prevCum = Math.max(prevCum, cum);
-      if (kegAda.has(norm(kegiatan))) { kegLewat += 1; continue; }
+      if (kegAda.has(`${tanggal}|${norm(kegiatan)}`)) { kegLewat += 1; continue; }
 
       // Foto bisa diletakkan pengguna di sel mana pun (kolom Berkas, kolom
       // Kegiatan, bahkan kolom Tanggal/Validasi) — sisir seluruh sel baris.
@@ -197,9 +228,9 @@ export async function importDocx(buffer, userId) {
       }
       await store.addKegiatan(userId, {
         tanggal, kegiatan, capaian_delta: delta,
-        waktu_menit: parseWaktu(teks[3]), foto_keys: fotoKeys,
+        waktu_menit: parseWaktu(teks[kolom.waktu]), foto_keys: fotoKeys,
       });
-      kegAda.add(norm(kegiatan));
+      kegAda.add(`${tanggal}|${norm(kegiatan)}`);
       kegBaru += 1;
     }
   }
