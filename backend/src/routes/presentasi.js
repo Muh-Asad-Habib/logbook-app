@@ -15,7 +15,10 @@ import * as store from "../storage.js";
 import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
-import { putBlob, getFileBufferRetry, removeFiles } from "../files.js";
+import {
+  cekPotongan, simpanPotongan, rakitPotongan, bersihkanPotongan,
+  ID_RE, validTotal,
+} from "../potongan.js";
 
 const MAKS_UKURAN = 100 * 1024 * 1024; // 100 MB — deck Canva berfoto resolusi tinggi pun muat
 
@@ -246,78 +249,17 @@ router.delete("/canva", async (req, res, next) => {
 });
 
 /* ============ unggah terpotong (file > ±3 MB) ============
- * BINER potongan disimpan di IMAGEKIT (kuota 20 GB) dengan kunci deterministik
- * `tmp-<id>-<idx>.bin`; tabel import_chunks hanya menyimpan KUNCI-nya
- * (±30 byte per baris). Dulu base64 potongan ikut masuk Neon — file besar
- * membuat query perakitan melebihi batas respons Neon 64 MB (HTTP 507)
- * sekaligus memboroskan kuota database 0,5 GB. */
-const CHUNK_MAX_B64 = 3.5 * 1024 * 1024;
-const CHUNK_MAX_IDX = 60;
-const ID_RE = /^[a-z0-9-]{8,64}$/;
-
-const kunciPotongan = (id, idx) => `tmp-${id}-${idx}.bin`;
-
+ * Biner potongan ke IMAGEKIT, Neon hanya katalog kunci — lihat src/potongan.js. */
 router.post("/chunk", async (req, res, next) => {
   try {
     const { id, idx, data } = req.body || {};
-    const i = Number(idx);
-    if (!ID_RE.test(String(id || "")) || !Number.isInteger(i) || i < 0 || i > CHUNK_MAX_IDX) {
-      return res.status(400).json({ error: "id/idx potongan tidak valid" });
-    }
-    if (typeof data !== "string" || !data || data.length > CHUNK_MAX_B64 ||
-        !/^[A-Za-z0-9+/=]+$/.test(data)) {
-      return res.status(400).json({ error: "data potongan tidak valid (harus base64 ≤ 3,5 MB)" });
-    }
-    const key = kunciPotongan(id, i);
-    await putBlob(key, Buffer.from(data, "base64")); // biner → ImageKit
-    await q(
-      `INSERT INTO import_chunks (id, idx, user_id, data, created_at)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (id, idx) DO UPDATE SET data = EXCLUDED.data,
-         user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at`,
-      [id, i, req.userId, key, new Date().toISOString()]
-    );
-    res.json({ ok: true, idx: i });
+    const salah = cekPotongan(id, idx, data);
+    if (salah) return res.status(400).json({ error: salah });
+    await simpanPotongan(String(id), Number(idx), req.userId, data);
+    res.json({ ok: true, idx: Number(idx) });
   } catch (err) { next(err); }
 });
 
-/** Rakit seluruh potongan dari ImageKit lalu bersihkan jejaknya. */
-async function rakitPotongan(id, userId, total) {
-  const rows = await q(
-    "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
-    [id, userId]
-  );
-  if (rows.length !== total) {
-    const e = new Error(`Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`);
-    e.status = 400;
-    throw e;
-  }
-  const bagian = [];
-  for (const r of rows) {
-    const buf = await getFileBufferRetry(r.data); // retry: tunggu propagasi CDN
-    if (!buf) {
-      const e = new Error(`Potongan #${r.idx} hilang di penyimpanan — coba unggah ulang`);
-      e.status = 400;
-      throw e;
-    }
-    bagian.push(buf);
-  }
-  await bersihkanPotongan(id, userId);
-  return Buffer.concat(bagian);
-}
-
-/** Hapus baris katalog + berkas potongan di ImageKit (abaikan kegagalan). */
-async function bersihkanPotongan(id, userId) {
-  try {
-    const rows = await q(
-      "SELECT data FROM import_chunks WHERE id = $1 AND user_id = $2", [id, userId]);
-    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, userId]);
-    await removeFiles(rows.map((r) => r.data).filter((k) => /^tmp-/.test(k)));
-  } catch { /* pembersihan best-effort */ }
-}
-
-const validTotal = (total) =>
-  Number.isInteger(total) && total >= 1 && total <= CHUNK_MAX_IDX + 1;
 
 router.post("/selesai", async (req, res, next) => {
   const id = String(req.body?.id || "");

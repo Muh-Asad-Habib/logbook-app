@@ -2,7 +2,10 @@ import { Router } from "express";
 import multer from "multer";
 import { importDocx } from "../import/docx.js";
 import { authRequired, hanyaTim } from "../auth.js";
-import { q } from "../db.js";
+import {
+  cekPotongan, simpanPotongan, rakitPotongan, bersihkanPotongan,
+  ID_RE, validTotal,
+} from "../potongan.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -55,19 +58,9 @@ router.post("/docx", upload.single("file"), async (req, res, next) => {
 
 /* ================= Impor terpotong (chunked) =================
  * Di Vercel, satu request dibatasi ±4,5 MB — .docx berisi banyak foto
- * jauh melampaui itu (dulu langsung 413). Solusi: browser memotong file
- * jadi potongan ±2 MB (base64) → tiap potongan disimpan di tabel
- * import_chunks → /selesai merakit kembali & menjalankan impor.
- */
-const CHUNK_MAX_B64 = 3.5 * 1024 * 1024; // ± 2,6 MB biner per potongan
-const CHUNK_MAX_IDX = 60;                // maks ± 150 MB total — jauh dari cukup
-const ID_RE = /^[a-z0-9-]{8,64}$/;
-
-/** Buang sisa unggahan yang terbengkalai (> 1 jam). ISO string → lexicographic aman. */
-function bersihkanKedaluwarsa() {
-  const batas = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  q("DELETE FROM import_chunks WHERE created_at < $1", [batas]).catch(() => {});
-}
+ * jauh melampaui itu (dulu langsung 413). Browser memotong file jadi
+ * potongan ±2 MB; BINER potongan disimpan di ImageKit, Neon hanya
+ * menyimpan katalog kuncinya — lihat src/potongan.js. */
 
 /**
  * @openapi
@@ -93,23 +86,10 @@ function bersihkanKedaluwarsa() {
 router.post("/docx/chunk", async (req, res, next) => {
   try {
     const { id, idx, data } = req.body || {};
-    const i = Number(idx);
-    if (!ID_RE.test(String(id || "")) || !Number.isInteger(i) || i < 0 || i > CHUNK_MAX_IDX) {
-      return res.status(400).json({ error: "id/idx potongan tidak valid" });
-    }
-    if (typeof data !== "string" || !data || data.length > CHUNK_MAX_B64 ||
-        !/^[A-Za-z0-9+/=]+$/.test(data)) {
-      return res.status(400).json({ error: "data potongan tidak valid (harus base64 ≤ 3,5 MB)" });
-    }
-    await q(
-      `INSERT INTO import_chunks (id, idx, user_id, data, created_at)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (id, idx) DO UPDATE SET data = EXCLUDED.data,
-         user_id = EXCLUDED.user_id, created_at = EXCLUDED.created_at`,
-      [id, i, req.userId, data, new Date().toISOString()]
-    );
-    if (i === 0) bersihkanKedaluwarsa();
-    res.json({ ok: true, idx: i });
+    const salah = cekPotongan(id, idx, data);
+    if (salah) return res.status(400).json({ error: salah });
+    await simpanPotongan(String(id), Number(idx), req.userId, data);
+    res.json({ ok: true, idx: Number(idx) });
   } catch (err) {
     next(err);
   }
@@ -139,25 +119,14 @@ router.post("/docx/selesai", async (req, res, next) => {
   const id = String(req.body?.id || "");
   try {
     const total = Number(req.body?.total);
-    if (!ID_RE.test(id) || !Number.isInteger(total) || total < 1 || total > CHUNK_MAX_IDX + 1) {
+    if (!ID_RE.test(id) || !validTotal(total)) {
       return res.status(400).json({ error: "id/total tidak valid" });
     }
-    const rows = await q(
-      "SELECT idx, data FROM import_chunks WHERE id = $1 AND user_id = $2 ORDER BY idx",
-      [id, req.userId]
-    );
-    if (rows.length !== total) {
-      return res.status(400).json({
-        error: `Potongan tidak lengkap (${rows.length}/${total}) — coba unggah ulang`,
-      });
-    }
-    const buffer = Buffer.concat(rows.map((r) => Buffer.from(r.data, "base64")));
-    await q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId]);
+    const buffer = await rakitPotongan(id, req.userId, total);
     res.json(await importDocx(buffer, req.userId));
   } catch (err) {
-    q("DELETE FROM import_chunks WHERE id = $1 AND user_id = $2", [id, req.userId])
-      .catch(() => {});
-    err.status = 400;
+    bersihkanPotongan(id, req.userId).catch(() => {});
+    err.status = err.status || 400;
     next(err);
   }
 });
