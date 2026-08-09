@@ -159,12 +159,13 @@ function KeuanganFasilitator() {
       )}
 
       {view.length > 0 && mode === "Tabel" && (
-        <div className="card mt table-wrap">
+        <div className="card mt table-wrap keu-table">
           <table>
             <thead>
               <tr>
-                <th>Tanggal</th><th>Item</th><th>Harga satuan</th><th>Jml</th>
-                <th>Total</th><th>Bukti</th><th></th>
+                <th>Tanggal</th><th>Item</th><th className="num">Harga satuan</th>
+                <th className="num">Jml</th><th className="num">Total</th>
+                <th>Bukti</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -172,15 +173,16 @@ function KeuanganFasilitator() {
                 r.jenis === "sub" ? (
                   <tr key={`sub-${r.kunci}`} className="subtotal">
                     <td colSpan={4}>{labelBulan(r.kunci)}</td>
-                    <td colSpan={3}>{fmtRupiah(r.total)}</td>
+                    <td className="num">{fmtRupiah(r.total)}</td>
+                    <td colSpan={2}></td>
                   </tr>
                 ) : (
                   <tr key={r.e.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
-                    <td>{r.e.item}</td>
-                    <td>{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
-                    <td>{r.e.jumlah}</td>
-                    <td><b>{fmtRupiah(r.e.total)}</b></td>
+                    <td className="item-col">{r.e.item}</td>
+                    <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
+                    <td className="num">{r.e.jumlah}</td>
+                    <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {r.e.bukti_key ? (
                         <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
@@ -189,7 +191,7 @@ function KeuanganFasilitator() {
                                       borderRadius: 8, cursor: "zoom-in" }} />
                       ) : "—"}
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
+                    <td className="aksi">
                       <AccPanel jenis="keuangan" targetId={r.e.id} timId={timId}
                                 acc={acc[r.e.id]} onChange={muatAcc} />
                       <KomentarPanel jenis="keuangan" targetId={r.e.id} timId={timId}
@@ -344,12 +346,13 @@ function KeuanganTim() {
       )}
 
       {view.length > 0 && mode === "Tabel" && (
-        <div className="card mt table-wrap">
+        <div className="card mt table-wrap keu-table">
           <table>
             <thead>
               <tr>
-                <th>Tanggal</th><th>Item</th><th>Harga satuan</th><th>Jml</th>
-                <th>Total</th><th>Bukti</th><th></th>
+                <th>Tanggal</th><th>Item</th><th className="num">Harga satuan</th>
+                <th className="num">Jml</th><th className="num">Total</th>
+                <th>Bukti</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -357,15 +360,16 @@ function KeuanganTim() {
                 r.jenis === "sub" ? (
                   <tr key={`sub-${r.kunci}`} className="subtotal">
                     <td colSpan={4}>{labelBulan(r.kunci)}</td>
-                    <td colSpan={3}>{fmtRupiah(r.total)}</td>
+                    <td className="num">{fmtRupiah(r.total)}</td>
+                    <td colSpan={2}></td>
                   </tr>
                 ) : (
                   <tr key={r.e.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
-                    <td>{r.e.item}</td>
-                    <td>{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
-                    <td>{r.e.jumlah}</td>
-                    <td><b>{fmtRupiah(r.e.total)}</b></td>
+                    <td className="item-col">{r.e.item}</td>
+                    <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
+                    <td className="num">{r.e.jumlah}</td>
+                    <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {r.e.bukti_key ? (
                         <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
@@ -374,14 +378,16 @@ function KeuanganTim() {
                                       borderRadius: 8, cursor: "zoom-in" }} />
                       ) : "—"}
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      <button className="btn sm" onClick={() => setEdit(r.e)} aria-label="Edit">
-                        <Pencil className="lucide" />
-                      </button>{" "}
-                      <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
-                        <Trash2 className="lucide" />
-                      </button>
-                      <div style={{ marginTop: 6 }}><AccBadge acc={acc[r.e.id]} /></div>
+                    <td className="aksi">
+                      <div>
+                        <button className="btn sm" onClick={() => setEdit(r.e)} aria-label="Edit">
+                          <Pencil className="lucide" />
+                        </button>{" "}
+                        <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
+                          <Trash2 className="lucide" />
+                        </button>
+                      </div>
+                      <AccBadge acc={acc[r.e.id]} />
                       <KomentarPanel jenis="keuangan" targetId={r.e.id}
                                      n={petaKomentar[r.e.id] || 0} />
                     </td>
