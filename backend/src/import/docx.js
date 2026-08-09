@@ -145,7 +145,9 @@ export async function importDocx(buffer, userId) {
   const kegAda = new Set(
     (await store.listKegiatan(userId)).map((e) => `${e.tanggal}|${norm(e.kegiatan)}`)
   );
-  const keuAda = new Set((await store.listKeuangan(userId)).map((e) => norm(e.item)));
+  const keuAda = new Set(
+    (await store.listKeuangan(userId)).map((e) => `${e.tanggal}|${norm(e.item)}`)
+  );
 
   /**
    * Tentukan jenis sebuah tabel: 'kegiatan' | 'keuangan' | null.
@@ -158,7 +160,9 @@ export async function importDocx(buffer, userId) {
     const rows = rowsOf(tbl);
     const kepala = rows.slice(0, 2)
       .map((tr) => cellsOf(tr).map(cellText).join(" ").toLowerCase()).join(" ");
-    if (kepala.includes("harga") && (kepala.includes("item") || kepala.includes("jumlah"))) {
+    if (kepala.includes("harga") &&
+        (kepala.includes("item") || kepala.includes("jumlah") ||
+         kepala.includes("total") || kepala.includes("keterangan"))) {
       return "keuangan";
     }
     if ((kepala.includes("kegiatan") || kepala.includes("keterangan") ||
@@ -236,21 +240,42 @@ export async function importDocx(buffer, userId) {
   }
 
   // ---------- Baris keuangan ----------
+  // Template resmi: Tanggal | Item | Harga satuan | Jml | Total | Bukti
+  // Varian umum:    Tanggal | Keterangan | Harga Satuan | Total | Gambar
+  // Peta kolom dideteksi dari header; tanpa kolom Jml, jumlah diturunkan
+  // dari Total ÷ Harga (total tersimpan = harga × jumlah).
   let keuBaru = 0, keuLewat = 0, lastTglKeu = null;
+  let kolomKeu = { item: 1, harga: 2, jumlah: 3, total: 4, bukti: 5 };
   async function prosesKeuangan(tbl) {
     for (const tr of rowsOf(tbl)) {
       const cells = cellsOf(tr);
-      if (cells.length < 6) continue;
+      if (cells.length < 4) continue;
       const teks = cells.map(cellText);
       const semua = teks.join(" ").toLowerCase();
       if (!semua.trim()) continue;
-      if (semua.includes("item") && semua.includes("harga")) continue; // header
+      if (semua.includes("harga") &&
+          (semua.includes("item") || semua.includes("keterangan") || semua.includes("total"))) {
+        // baris header → susun peta kolom dari judulnya
+        const cari = (kata, def) => {
+          const i = teks.findIndex((t) => kata.some((k) => t.toLowerCase().includes(k)));
+          return i >= 0 ? i : def;
+        };
+        const iHarga = cari(["harga"], 2);
+        kolomKeu = {
+          item: cari(["item", "keterangan", "uraian", "nama"], 1),
+          harga: iHarga,
+          jumlah: teks.findIndex((t) => /jml|jumlah|qty/i.test(t)), // -1 bila tak ada
+          total: cari(["total"], -1),
+          bukti: cari(["bukti", "gambar", "foto", "nota"], cells.length - 1),
+        };
+        continue;
+      }
 
       const tanggal = parseTanggal(teks[0]) || lastTglKeu;
       if (parseTanggal(teks[0])) lastTglKeu = parseTanggal(teks[0]);
-      const item = teks[1].trim();
+      const item = (teks[kolomKeu.item] || "").trim();
       if (!item) continue;
-      if (keuAda.has(norm(item))) { keuLewat += 1; continue; }
+      if (keuAda.has(`${tanggal}|${norm(item)}`)) { keuLewat += 1; continue; }
       if (!tanggal) {
         if (warnings.length < 8) {
           warnings.push(`Baris belanja dilewati (tanggal tidak terbaca): "${teks.join(" ").slice(0, 60)}…"`);
@@ -258,20 +283,41 @@ export async function importDocx(buffer, userId) {
         continue;
       }
 
+      let harga = parseRupiah(teks[kolomKeu.harga]);
+      let jumlah = kolomKeu.jumlah >= 0 ? parseAngka(teks[kolomKeu.jumlah], 1) || 1 : 0;
+      const totalDok = kolomKeu.total >= 0 ? parseRupiah(teks[kolomKeu.total]) : 0;
+      // Sel harga kadang berisi JUMLAH ("1 Item") sementara nilai uangnya di
+      // kolom Total — kenali dari kewajaran: angka ≤100 (tak masuk akal sebagai
+      // rupiah) padahal totalnya ratusan kali lipat → perlakukan sebagai jumlah.
+      if (harga > 0 && totalDok > 0 && harga <= 100 && totalDok >= harga * 100) {
+        jumlah = harga;
+        harga = 0;
+      }
+      if (!jumlah) {
+        // tanpa kolom Jml → turunkan dari Total ÷ Harga (boleh pecahan, mis. 2,5 L)
+        if (harga > 0 && totalDok > 0) jumlah = Math.round((totalDok / harga) * 100) / 100;
+        else jumlah = 1;
+      }
+      if (!harga && totalDok > 0) harga = Math.round((totalDok / jumlah) * 100) / 100;
+
       let buktiKey = "";
-      // Utamakan kolom Bukti (ke-6), tetapi terima juga bila foto diletakkan
+      // Utamakan kolom Bukti/Gambar, tetapi terima juga bila foto diletakkan
       // di sel lain pada baris yang sama.
-      const ids = [...cellImageIds(cells[5]), ...cells.filter((_, c) => c !== 5).flatMap(cellImageIds)];
+      const selBukti = cells[kolomKeu.bukti] || "";
+      const ids = [
+        ...cellImageIds(selBukti),
+        ...cells.filter((_, c) => c !== kolomKeu.bukti).flatMap(cellImageIds),
+      ];
       if (ids.length) buktiKey = (await saveImage(zip, relMap, ids[0], `keu_${tanggal}`)) || "";
 
       await store.addKeuangan(userId, {
         tanggal, item,
-        harga_satuan: parseRupiah(teks[2]),
-        satuan_suffix: parseSuffix(teks[2]),
-        jumlah: parseAngka(teks[3], 1) || 1,
+        harga_satuan: harga,
+        satuan_suffix: parseSuffix(teks[kolomKeu.harga]),
+        jumlah,
         bukti_key: buktiKey,
       });
-      keuAda.add(norm(item));
+      keuAda.add(`${tanggal}|${norm(item)}`);
       keuBaru += 1;
     }
   }
