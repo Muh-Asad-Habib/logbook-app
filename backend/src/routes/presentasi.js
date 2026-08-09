@@ -15,7 +15,7 @@ import * as store from "../storage.js";
 import { authRequired, hanyaTim } from "../auth.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
-import { putBlob, getFileBuffer, removeFiles } from "../files.js";
+import { putBlob, getFileBufferRetry, removeFiles } from "../files.js";
 import { prosesPptxCanva } from "../export/pptx-canva.js";
 import {
   canvaSiap, mulaiOAuth, selesaikanOAuth, statusKoneksi, putuskanKoneksi,
@@ -457,7 +457,7 @@ async function rakitPotongan(id, userId, total) {
   }
   const bagian = [];
   for (const r of rows) {
-    const buf = await getFileBuffer(r.data);
+    const buf = await getFileBufferRetry(r.data); // retry: tunggu propagasi CDN
     if (!buf) {
       const e = new Error(`Potongan #${r.idx} hilang di penyimpanan — coba unggah ulang`);
       e.status = 400;
