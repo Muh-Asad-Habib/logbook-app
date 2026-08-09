@@ -866,6 +866,12 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 .table-wrap table { min-width: 560px; }
+/* .card memakai overflow-wrap:anywhere (untuk teks bebas) — di TABEL itu
+ * mematahkan angka & header di sembarang tempat ("Rp24.00|0", "JM|L").
+ * Kembalikan ke pemenggalan kata normal; sel panjang tetap boleh membungkus
+ * antar-kata. Tabel lebar diselamatkan oleh scroll horizontal .table-wrap. */
+.table-wrap table { overflow-wrap: normal; word-break: normal; }
+th { white-space: nowrap; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--soft-2); }
 th:first-child { border-radius: 10px 0 0 10px; }
@@ -876,6 +882,19 @@ tr.subtotal td {
   background: var(--soft-2); font-weight: 800; font-size: 0.76rem;
   color: var(--muted); border-bottom: 2px solid var(--line);
 }
+/* Kolom ANGKA (harga/jumlah/total): rata kanan, tak pernah patah, digit
+ * selebar seragam agar lurus antarbaris. */
+th.num, td.num {
+  text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+/* Kolom aksi (ACC/komentar/edit): isinya bertumpuk rapi, tidak melebar liar */
+td.aksi { white-space: nowrap; }
+td.aksi > * { display: block; }
+td.aksi > * + * { margin-top: 6px; }
+/* Kolom item: beri ruang bernapas agar uraian panjang membungkus wajar */
+td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
+/* Tabel keuangan 7 kolom — lebih lebar supaya scroll, bukan saling menghimpit */
+.keu-table table { min-width: 820px; }
 
 @media (max-width: 640px) {
   table { font-size: 0.78rem; }
