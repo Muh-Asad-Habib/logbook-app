@@ -344,6 +344,27 @@ export const api = {
     return uploadChunked("/api/presentasi", file, onProgress,
       { nama: file.name }, "konversi-selesai");
   },
+  /**
+   * Mode B — susun PPTX dari GAMBAR render Canva (ZIP "Unduh → PNG → Semua
+   * halaman" atau banyak PNG/JPG). Hasil 100% identik render Canva.
+   * ZIP tunggal yang besar dipotong lewat jalur chunk yang sama.
+   */
+  konversiGambar: async (files, onProgress) => {
+    const daftar = [...files];
+    if (daftar.length === 1 && daftar[0].size > LANGSUNG_MAKS) {
+      return uploadChunked("/api/presentasi", daftar[0], onProgress,
+        { nama: daftar[0].name }, "konversi-gambar-selesai");
+    }
+    const total = daftar.reduce((s, f) => s + f.size, 0);
+    if (daftar.length > 1 && total > LANGSUNG_MAKS) {
+      throw new Error(
+        "Total gambar terlalu besar untuk dikirim terpisah — unggah langsung berkas ZIP dari Canva (Unduh → PNG → Semua halaman)"
+      );
+    }
+    const fd = new FormData();
+    for (const f of daftar) fd.append("file", f);
+    return aFetch("/api/presentasi/konversi-gambar", { method: "POST", body: fd });
+  },
   /** Ekspor otomatis dari tautan Canva tersimpan lalu konversi (butuh akun terhubung). */
   konversiLink: () => aFetch("/api/presentasi/konversi-link", { method: "POST" }),
   canvaConnect: {

@@ -83,60 +83,108 @@ async function ambil(url, opsi = {}) {
 }
 
 /**
- * Ambil CSS Google Fonts untuk satu keluarga font.
- * Tanpa header User-Agent → Google membalas URL berformat TrueType (.ttf)
- * TANPA pemecahan unicode-range (satu berkas per gaya). Dicoba beberapa
- * kombinasi axis karena tidak semua font punya varian bold/italic.
+ * Sufiks bobot pada nama font ekspor Canva ("Poppins SemiBold", "Open Sans
+ * Light", …). PowerPoint memperlakukan nama itu sebagai KELUARGA tersendiri,
+ * sedangkan Google Fonts mengenalnya sebagai keluarga dasar + bobot — tanpa
+ * penguraian ini pencarian selalu gagal dan font tidak tertanam (penyebab
+ * utama "hasil jauh dari desain Canva").
  */
-async function cssGoogle(family) {
-  const fam = family.trim().replace(/ /g, "+");
-  const kombinasi = [
-    "ital,wght@0,400;0,700;1,400;1,700",
-    "wght@400;700",
-    "wght@400",
-    null,
-  ];
-  for (const axis of kombinasi) {
-    try {
-      const url = `https://fonts.googleapis.com/css2?family=${fam}${axis ? ":" + axis : ""}`;
-      const res = await ambil(url, { headers: { Accept: "text/css,*/*" } });
-      if (res.ok) return await res.text();
-    } catch { /* coba kombinasi berikutnya */ }
+const SUFIKS_BERAT = {
+  thin: 100, hairline: 100,
+  extralight: 200, "extra light": 200, ultralight: 200, "ultra light": 200,
+  light: 300,
+  regular: 400, normal: 400, book: 400,
+  medium: 500,
+  semibold: 600, "semi bold": 600, demibold: 600, "demi bold": 600,
+  bold: 700,
+  extrabold: 800, "extra bold": 800, ultrabold: 800, "ultra bold": 800,
+  black: 900, heavy: 900,
+};
+
+/** Urai "Poppins SemiBold Italic" → { keluarga:"Poppins", berat:600, italic:true } */
+export function uraiNamaFont(nama) {
+  const kata = String(nama).trim().split(/\s+/);
+  let berat = null;
+  let italic = false;
+  while (kata.length > 1) {
+    const satu = kata[kata.length - 1].toLowerCase();
+    const dua = kata.length > 2
+      ? `${kata[kata.length - 2].toLowerCase()} ${satu}` : "";
+    if (satu === "italic" || satu === "oblique") { italic = true; kata.pop(); continue; }
+    if (dua && SUFIKS_BERAT[dua] != null) { berat = SUFIKS_BERAT[dua]; kata.splice(-2); continue; }
+    if (SUFIKS_BERAT[satu] != null) { berat = SUFIKS_BERAT[satu]; kata.pop(); continue; }
+    break;
   }
-  return "";
+  return { keluarga: kata.join(" "), berat: berat ?? 400, italic };
+}
+
+/** Cache unduhan per proses konversi: "keluarga|berat|ital" → Buffer|null. */
+function buatCacheTtf() {
+  const peta = new Map();
+  return async function ttf(keluarga, berat, italic) {
+    const kunci = `${keluarga.toLowerCase()}|${berat}|${italic ? 1 : 0}`;
+    if (peta.has(kunci)) return peta.get(kunci);
+    const buf = await unduhSatuVarian(keluarga, berat, italic);
+    peta.set(kunci, buf);
+    return buf;
+  };
 }
 
 /**
- * Unduh varian TTF sebuah font dari Google Fonts.
- * @returns {Promise<{varian: Record<string,Buffer>}|null>} null bila tidak ada.
+ * Unduh SATU varian TTF dari Google Fonts. Tanpa header User-Agent → Google
+ * membalas URL format TrueType utuh (tanpa pecahan unicode-range). Bobot yang
+ * tak tersedia dibalas error → coba bobot terdekat.
  */
-async function unduhFontGoogle(family) {
-  const css = await cssGoogle(family);
-  if (!css) return null;
-  const blok = css.match(/@font-face\s*\{[^}]*\}/g) || [];
-  const varian = {};
-  for (const b of blok) {
-    const gaya = (b.match(/font-style:\s*(\w+)/) || [])[1] || "normal";
-    const berat = Number((b.match(/font-weight:\s*(\d+)/) || [])[1] || 400);
-    const url = (b.match(/src:\s*url\((https:[^)]+)\)/) || [])[1];
-    if (!url) continue;
-    const kunci =
-      berat >= 600
-        ? (gaya === "italic" ? VARIAN.boldItalic : VARIAN.bold)
-        : (gaya === "italic" ? VARIAN.italic : VARIAN.regular);
-    if (varian[kunci]) continue; // sudah ada (subset pertama cukup)
+async function unduhSatuVarian(keluarga, berat, italic) {
+  const fam = keluarga.trim().replace(/ /g, "+");
+  const kandidat = [...new Set([
+    berat,
+    berat - 100, berat + 100,
+    berat - 200, berat + 200,
+    400, 700,
+  ])].filter((w) => w >= 100 && w <= 900);
+  for (const w of kandidat) {
     try {
-      const res = await ambil(url);
+      const url = `https://fonts.googleapis.com/css2?family=${fam}:ital,wght@${italic ? 1 : 0},${w}`;
+      const res = await ambil(url, { headers: { Accept: "text/css,*/*" } });
       if (!res.ok) continue;
-      const buf = Buffer.from(await res.arrayBuffer());
-      // TTF/OTF valid berawalan 00 01 00 00 (ttf) atau "OTTO" (otf)
-      const ttf = buf.length > 4 &&
+      const css = await res.text();
+      const src = (css.match(/src:\s*url\((https:[^)]+)\)/) || [])[1];
+      if (!src) continue;
+      const r2 = await ambil(src);
+      if (!r2.ok) continue;
+      const buf = Buffer.from(await r2.arrayBuffer());
+      const valid = buf.length > 4 &&
         ((buf[0] === 0 && buf[1] === 1 && buf[2] === 0 && buf[3] === 0) ||
          buf.toString("ascii", 0, 4) === "OTTO");
-      if (ttf) varian[kunci] = buf;
-    } catch { /* varian ini dilewati */ }
+      if (valid) return buf;
+    } catch { /* coba bobot berikutnya */ }
   }
-  return varian[VARIAN.regular] ? { varian } : null;
+  return null;
+}
+
+/**
+ * Kumpulkan varian TTF untuk SATU nama typeface persis seperti di slide.
+ * - "Poppins"            → regular 400, bold 700, italic, boldItalic
+ * - "Poppins SemiBold"   → regular = Poppins 600 (+bold 800, italic 600i, …)
+ * - "Poppins Bold Italic"→ regular = Poppins 700 italic
+ * @returns {Promise<{varian:Record<string,Buffer>, keluarga:string, berat:number}|null>}
+ */
+async function unduhFontGoogle(nama, ttf) {
+  const { keluarga, berat, italic } = uraiNamaFont(nama);
+  const beratBold = Math.min(berat + (berat >= 700 ? 100 : 300), 900);
+  const dasar = await ttf(keluarga, berat, italic);
+  if (!dasar) return null;
+  const varian = { [VARIAN.regular]: dasar };
+  const b = await ttf(keluarga, beratBold, italic);
+  if (b && !b.equals(dasar)) varian[VARIAN.bold] = b;
+  if (!italic) {
+    const i = await ttf(keluarga, berat, true);
+    if (i) varian[VARIAN.italic] = i;
+    const bi = await ttf(keluarga, beratBold, true);
+    if (bi && (!i || !bi.equals(i))) varian[VARIAN.boldItalic] = bi;
+  }
+  return { varian, keluarga, berat };
 }
 
 /* ================= penanaman ke PPTX ================= */
@@ -250,19 +298,21 @@ export async function prosesPptxCanva(buffer) {
 
   const fonts = [];
   const untukDitanam = [];
+  const ttf = buatCacheTtf(); // satu varian tidak diunduh dua kali
   for (const nama of semuaFont) {
-    if (FONT_SISTEM.has(nama.toLowerCase())) {
+    const { keluarga } = uraiNamaFont(nama);
+    if (FONT_SISTEM.has(nama.toLowerCase()) || FONT_SISTEM.has(keluarga.toLowerCase())) {
       fonts.push({ nama, status: "sistem", varian: [], url: "" });
       continue;
     }
-    const hasil = await unduhFontGoogle(nama);
+    const hasil = await unduhFontGoogle(nama, ttf);
     if (hasil) {
       untukDitanam.push({ nama, varian: hasil.varian });
       fonts.push({ nama, status: "tertanam", varian: Object.keys(hasil.varian), url: "" });
     } else {
       fonts.push({
         nama, status: "manual", varian: [],
-        url: `https://fonts.google.com/?query=${encodeURIComponent(nama)}`,
+        url: `https://fonts.google.com/?query=${encodeURIComponent(keluarga)}`,
       });
     }
   }
