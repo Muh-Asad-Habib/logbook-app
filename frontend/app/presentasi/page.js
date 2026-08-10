@@ -239,7 +239,7 @@ function PresentasiFasilitator() {
   if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
   if (info === null) return <div className="skel mt" style={{ height: 220 }} />;
 
-  const unduhUrl = `${exportUrl(`/api/fasilitator/tim/${timId}/presentasi-file`)}&unduh=1`;
+  const unduhUrl = `${exportUrl(`/api/fasilitator/tim/${timId}/presentasi-file`)}?unduh=1`;
 
   return (
     <>
@@ -421,7 +421,7 @@ function PresentasiTim() {
     }
   };
 
-  const unduhUrl = `${exportUrl("/api/presentasi/file")}&unduh=1`;
+  const unduhUrl = `${exportUrl("/api/presentasi/file")}?unduh=1`;
 
   return (
     <>

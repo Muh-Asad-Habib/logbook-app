@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
 import {
-  api, fotoUrl, fmtRupiah, fmtTgl, useApi, refreshData,
+  api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";

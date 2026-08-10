@@ -2,8 +2,11 @@
  *  Dengan begitu aplikasi otomatis bekerja lewat localhost, IP LAN,
  *  maupun URL tunnel publik (https://xxx.trycloudflare.com) tanpa konfigurasi.
  *
- *  Autentikasi: token disimpan di localStorage dan dikirim sebagai
- *  header Authorization (atau ?token= untuk <img>/link unduhan). */
+ *  Autentikasi: token disimpan di localStorage dan dikirim sebagai header
+ *  Authorization. Untuk <img> dan tautan unduhan — yang tidak bisa mengirim
+ *  header sendiri — server memasang cookie HttpOnly `logbook_sesi` saat login,
+ *  sehingga token TIDAK PERNAH muncul di URL (dulu `?token=…`, yang bocor ke
+ *  riwayat browser, log server/CDN, dan header Referer). */
 import { useEffect, useReducer } from "react";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -109,9 +112,16 @@ async function handle(res) {
   return parse(res);
 }
 
-/** fetch dengan header Authorization + penanganan 401 terpusat. */
+/** fetch dengan header Authorization + penanganan 401 terpusat.
+ *  `credentials: "same-origin"` memastikan cookie sesi HttpOnly ikut terkirim
+ *  (dipakai <img> & tautan unduhan) dan selalu disegarkan oleh server. */
 const aFetch = (path, opts = {}) =>
-  fetch(`${API_URL}${path}`, { ...opts, headers: authHeaders(opts.headers || {}) }).then(handle);
+  fetch(`${API_URL}${path}`, {
+    ...opts,
+    credentials: "same-origin",
+    headers: authHeaders(opts.headers || {}),
+  }).then(handle);
+
 
 /* ---------- Cache data antar-halaman (stale-while-revalidate) ----------
  * Data disimpan di memori selama aplikasi terbuka: pindah menu langsung
@@ -218,15 +228,18 @@ export const api = {
   register: (username, password, opts = {}) =>
     fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
+      credentials: "same-origin", // simpan cookie sesi yang dikirim server
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, ...opts }),
     }).then(parse),
   login: (username, password) =>
     fetch(`${API_URL}/api/auth/login`, {
       method: "POST",
+      credentials: "same-origin", // simpan cookie sesi yang dikirim server
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     }).then(parse),
+
   me: () => aFetch("/api/auth/me", { cache: "no-store" }),
   logout: () => aFetch("/api/auth/logout", { method: "POST" }).catch(() => {}),
   updateUsername: (username, password) =>
@@ -242,6 +255,16 @@ export const api = {
       body: JSON.stringify({ password_lama, password_baru }),
     }),
   aktivitas: (n = 30) => aFetch(`/api/auth/aktivitas?n=${n}`, { cache: "no-store" }),
+
+  // ---- Perangkat & sesi aktif (kendali keamanan milik pengguna sendiri) ----
+  sesi: {
+    /** Daftar perangkat yang sedang login: [{ id, perangkat, ip, terakhir, ini_perangkat }]. */
+    list: () => aFetch("/api/auth/sesi", { cache: "no-store" }),
+    /** Keluarkan satu perangkat (id dari daftar — bukan token). */
+    cabut: (id) => aFetch(`/api/auth/sesi/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    /** Keluarkan semua perangkat lain; sesi yang sedang dipakai tetap aktif. */
+    cabutLainnya: () => aFetch("/api/auth/sesi/lainnya", { method: "POST" }),
+  },
 
   // ---- Kegiatan ----
   listKegiatan: () => aFetch("/api/kegiatan", { cache: "no-store" }),
@@ -297,7 +320,7 @@ export const api = {
   /** Ambil berkas laporan sebagai ArrayBuffer (untuk dirender docx-preview). */
   laporanFile: async () => {
     const res = await fetch(`${API_URL}/api/laporan/file`, {
-      headers: authHeaders(), cache: "no-store",
+      headers: authHeaders(), cache: "no-store", credentials: "same-origin",
     });
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
@@ -362,7 +385,7 @@ export const api = {
       aFetch(`/api/fasilitator/tim/${timId}/laporan-tautan`, { method: "POST" }),
     laporanFile: async (timId) => {
       const res = await fetch(`${API_URL}/api/fasilitator/tim/${timId}/laporan-file`, {
-        headers: authHeaders(), cache: "no-store",
+        headers: authHeaders(), cache: "no-store", credentials: "same-origin",
       });
       if (!res.ok) {
         let msg = `HTTP ${res.status}`;
@@ -444,13 +467,34 @@ export const api = {
   },
 };
 
-/** URL gambar di server (perlu token karena <img> tidak bisa kirim header). */
-export const fotoUrl = (key) =>
-  `${API_URL}/api/files/${encodeURIComponent(key)}?token=${encodeURIComponent(getToken())}`;
+/**
+ * URL gambar di server.
+ *
+ * KEAMANAN: token TIDAK lagi ditempel di URL. Dulu setiap <img> memuat
+ * `?token=…` berisi token login penuh, sehingga token ikut tercatat di
+ * riwayat browser, log server, log CDN, dan header Referer. Sekarang browser
+ * mengirim cookie HttpOnly `logbook_sesi` secara otomatis — token tidak
+ * pernah terlihat di URL dan tidak bisa dibaca JavaScript.
+ *
+ * @param {string} key  kunci berkas
+ * @param {number} [lebar] bila diisi, server mengirim versi kecil selebar
+ *   sekian piksel (hemat kuota & bandwidth) — lihat thumbUrl().
+ */
+export const fotoUrl = (key, lebar = 0) =>
+  `${API_URL}/api/files/${encodeURIComponent(key)}${lebar ? `?w=${lebar}` : ""}`;
 
-/** URL unduhan ekspor (link <a> juga tidak bisa kirim header). */
-export const exportUrl = (path) =>
-  `${API_URL}${path}?token=${encodeURIComponent(getToken())}`;
+/**
+ * URL thumbnail — dipakai daftar, galeri, dan timeline yang hanya menampilkan
+ * foto berukuran kecil. Gambar 1600px (±300 KB) diganti versi ±300px
+ * (±20–40 KB): hemat sekitar 80–90% bandwidth tanpa perubahan tampilan.
+ * Lightbox tetap memakai fotoUrl() resolusi penuh.
+ */
+export const thumbUrl = (key, lebar = 320) => fotoUrl(key, lebar);
+
+/** URL unduhan ekspor (tautan <a> memakai cookie sesi, bukan token di URL). */
+export const exportUrl = (path) => `${API_URL}${path}`;
+
+
 
 export const fmtRupiah = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
 

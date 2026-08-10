@@ -299,7 +299,7 @@ function LaporanFasilitator() {
                 <RefreshCw className="lucide" />
               </button>
               <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
-                 href={`${exportUrl(`/api/fasilitator/tim/${timId}/laporan-file`)}&unduh=1`}>
+                 href={`${exportUrl(`/api/fasilitator/tim/${timId}/laporan-file`)}?unduh=1`}>
                 <Download className="lucide" />
               </a>
             </div>
@@ -591,7 +591,7 @@ function LaporanTim() {
                 <RefreshCw className="lucide" />
               </button>
               <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
-                 href={`${exportUrl("/api/laporan/file")}&unduh=1`}>
+                 href={`${exportUrl("/api/laporan/file")}?unduh=1`}>
                 <Download className="lucide" />
               </a>
               <button className="btn sm danger" onClick={hapus} title="Hapus laporan">
