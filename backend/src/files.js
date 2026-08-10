@@ -328,17 +328,61 @@ export async function removeFiles(keys) {
  * SIGNED URL ImageKit — tautan sementara (default 1 jam) yang membuat browser
  * mengambil foto langsung dari CDN. Algoritme tanda tangan sesuai SDK resmi:
  * signature = HMAC-SHA1(privateKey, pathRelatif + expiryTimestamp).
+ *
+ * `lebar` (opsional) menyisipkan transformasi ImageKit `tr=w-…` sehingga CDN
+ * mengirim versi KECIL gambar. Ini yang membuat daftar/galeri hemat: berkas
+ * 1600px (±300 KB) diganti ±320px (±20–40 KB) — sekitar 80–90% lebih ringan,
+ * tanpa perubahan apa pun pada berkas yang tersimpan.
+ *
+ * Penting: parameter `tr` harus ikut DITANDATANGANI (persis seperti SDK resmi
+ * yang menandatangani URL lengkap beserta query-nya), kalau tidak ImageKit
+ * akan menolak tautan saat "Restrict unsigned URLs" aktif.
  */
-export function signedUrl(key, detik = 3600) {
+export function signedUrl(key, detik = 3600, lebar = 0) {
   const relatif = `${IK.folder}/${key}`.replace(/^\/+/, "");
-  const url = `${IK.urlEndpoint}/${relatif}`;
+  const dasar = `${IK.urlEndpoint}/${relatif}`;
+  // q-70: kualitas sedikit diturunkan khusus thumbnail (mata tidak melihat
+  // bedanya pada ukuran kecil, tapi ukurannya jauh lebih ringan).
+  const url = lebar ? `${dasar}?tr=w-${lebar},q-70` : dasar;
   const kedaluwarsa = Math.floor(Date.now() / 1000) + detik;
   const signature = crypto
     .createHmac("sha1", IK.privateKey)
     .update(url.replace(IK.urlEndpoint + "/", "") + kedaluwarsa)
     .digest("hex");
-  return `${url}?ik-t=${kedaluwarsa}&ik-s=${signature}`;
+  const pemisah = url.includes("?") ? "&" : "?";
+  return `${url}${pemisah}ik-t=${kedaluwarsa}&ik-s=${signature}`;
 }
+
+/**
+ * Versi kecil gambar untuk mode LOKAL (tanpa ImageKit) — dibuat on-the-fly
+ * dengan sharp lalu disimpan di memori. Cache dibatasi jumlahnya supaya
+ * pemakaian RAM tetap terkendali.
+ */
+const cacheThumb = new Map();
+const THUMB_CACHE_MAX = 120;
+
+export async function thumbLokal(key, lebar) {
+  const kunci = `${key}|${lebar}`;
+  const ada = cacheThumb.get(kunci);
+  if (ada) return ada;
+  const p = safePath(key);
+  if (!fs.existsSync(p)) return null;
+  try {
+    const buf = await sharp(p, { failOn: "none" })
+      .rotate()
+      .resize(lebar, lebar, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 70, progressive: true, mozjpeg: true })
+      .toBuffer();
+    if (cacheThumb.size >= THUMB_CACHE_MAX) {
+      cacheThumb.delete(cacheThumb.keys().next().value); // buang yang tertua
+    }
+    cacheThumb.set(kunci, buf);
+    return buf;
+  } catch {
+    return null; // format aneh/rusak → pemanggil kirim berkas aslinya
+  }
+}
+
 
 /**
  * Ambil isi berkas sebagai Buffer — dipakai ekspor DOCX/PDF untuk menyematkan

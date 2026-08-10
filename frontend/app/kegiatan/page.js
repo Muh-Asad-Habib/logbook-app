@@ -5,7 +5,7 @@ import {
   Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange,
 } from "lucide-react";
 import {
-  api, fotoUrl, fmtDurasi, fmtTgl, useApi, refreshData,
+  api, fotoUrl, thumbUrl, fmtDurasi, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
@@ -182,7 +182,7 @@ function KegiatanFasilitator() {
                     {e.foto_keys.length > 0 && (
                       <div className="foto-row">
                         {e.foto_keys.map((k, i) => (
-                          <img key={k} src={fotoUrl(k)} alt="foto kegiatan" loading="lazy"
+                          <img key={k} src={thumbUrl(k, 240)} alt="foto kegiatan" loading="lazy"
                                onError={retryFoto} onClick={() => bukaFoto(e, i)} />
                         ))}
                       </div>
@@ -318,8 +318,10 @@ function KegiatanTim() {
                     <p className="mts" style={{ fontSize: "0.92rem" }}>{e.kegiatan}</p>
                     {e.foto_keys.length > 0 && (
                       <div className="foto-row">
+                        {/* Deretan pratinjau kecil → cukup thumbnail 240px.
+                            Klik membuka Lightbox yang memakai resolusi penuh. */}
                         {e.foto_keys.map((k, i) => (
-                          <img key={k} src={fotoUrl(k)} alt="foto kegiatan" loading="lazy"
+                          <img key={k} src={thumbUrl(k, 240)} alt="foto kegiatan" loading="lazy"
                                onError={retryFoto} onClick={() => bukaFoto(e, i)} />
                         ))}
                       </div>
@@ -448,7 +450,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             <div className="foto-row">
               {entri.foto_keys.map((k) => (
                 <label key={k} style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600 }}>
-                  <img src={fotoUrl(k)} alt="foto" onError={retryFoto} style={{ cursor: "default" }} />
+                  <img src={thumbUrl(k, 240)} alt="foto" onError={retryFoto} style={{ cursor: "default" }} />
                   <br />
                   <input
                     type="checkbox" checked={keep.includes(k)}

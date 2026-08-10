@@ -1,5 +1,19 @@
-/** Middleware autentikasi: token Bearer (header) atau ?token= (untuk <img>/link unduhan). */
+/**
+ * Middleware autentikasi.
+ *
+ * Token diterima dari DUA sumber (tidak lagi dari query string):
+ *  1. Header `Authorization: Bearer …` — dipakai seluruh panggilan fetch().
+ *  2. Cookie HttpOnly `logbook_sesi` — dipakai <img> & tautan unduhan yang
+ *     tidak bisa mengirim header sendiri.
+ *
+ * Token TIDAK PERNAH lagi diletakkan di URL (?token=), sehingga tidak bocor
+ * lewat riwayat browser, log server/CDN, maupun header Referer.
+ */
+import crypto from "node:crypto";
 import * as store from "./storage.js";
+import { COOKIE_SESI, bacaCookie, pasangCookieSesi } from "./cookies.js";
+import { jejakDari } from "./perangkat.js";
+
 
 /**
  * Cache sesi singkat (per instance). Saat halaman memuat puluhan foto
@@ -35,21 +49,53 @@ export function lupakanSesi(token) {
   sesiCache.delete(String(token || ""));
 }
 
+/**
+ * Buang sesi dari cache berdasarkan HASH token-nya.
+ * Dipakai saat pengguna mencabut sesi perangkat lain: di sana kita hanya
+ * memegang hash (token aslinya memang tidak pernah disimpan server), sedangkan
+ * cache ini dikunci token asli — jadi cocokkan dengan menghitung ulang hash
+ * tiap kunci. Isi cache dibatasi 500 entri, jadi biayanya tidak berarti.
+ */
+export function lupakanSesiHash(hash) {
+  const cari = String(hash || "");
+  if (!cari) return;
+  for (const token of sesiCache.keys()) {
+    if (crypto.createHash("sha256").update(token).digest("hex") === cari) {
+      sesiCache.delete(token);
+      return;
+    }
+  }
+}
+
+/** Buang SEMUA sesi milik satu akun dari cache (kecuali token pemanggil). */
+export function lupakanSesiUser(userId, kecualiToken = "") {
+  for (const [token, c] of sesiCache) {
+    if (c.user?.id === userId && token !== kecualiToken) sesiCache.delete(token);
+  }
+}
+
 export async function authRequired(req, res, next) {
   try {
     const h = String(req.headers.authorization || "");
     const bearer = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
-    const token = bearer || String(req.query.token || "");
+    const dariCookie = bacaCookie(req, COOKIE_SESI);
+    const token = bearer || dariCookie;
     if (!token) return res.status(401).json({ error: "Harus login terlebih dahulu" });
 
     let user = ambilCache(token);
     if (!user) {
-      const sess = await store.getSession(token);
+      // Jejak perangkat dikirim agar sesi lama (dibuat sebelum fitur daftar
+      // perangkat ada) ikut terisi labelnya sekali jalan — lihat storage.js.
+      const sess = await store.getSession(token, jejakDari(req));
       if (!sess) return res.status(401).json({ error: "Harus login terlebih dahulu" });
       user = await store.getUserById(sess.userId);
       if (!user) return res.status(401).json({ error: "Akun tidak ditemukan" });
       simpanCache(token, user);
     }
+    // Sesi lama (login sebelum fitur cookie ada) belum punya cookie: pasang
+    // sekarang supaya gambar & unduhan tetap jalan TANPA perlu login ulang.
+    if (bearer && dariCookie !== bearer) pasangCookieSesi(req, res, bearer);
+
     req.userId = user.id;
     req.user = { id: user.id, username: user.username, role: user.role || "tim" };
     req.token = token;
@@ -58,6 +104,7 @@ export async function authRequired(req, res, next) {
     next(err);
   }
 }
+
 
 /** Peran pendamping (baca + komentar): fasilitator & dosen pendamping. */
 export const PERAN_PENDAMPING = new Set(["fasilitator", "dosen"]);

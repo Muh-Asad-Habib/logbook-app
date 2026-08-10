@@ -1,11 +1,33 @@
 import { Router } from "express";
 import fs from "node:fs";
-import { safePath, contentType, signedUrl, pakaiCloud } from "../files.js";
+import { safePath, contentType, signedUrl, pakaiCloud, thumbLokal } from "../files.js";
 import { authRequired } from "../auth.js";
 import * as store from "../storage.js";
 
 const router = Router();
-router.use(authRequired); // gambar hanya untuk yang login (token via header/query)
+// Gambar hanya untuk yang login. Token dibaca dari header Authorization ATAU
+// cookie HttpOnly `logbook_sesi` — <img> tidak bisa mengirim header sendiri,
+// dan token TIDAK PERNAH lagi ditempel di URL (lihat cookies.js).
+router.use(authRequired);
+
+/**
+ * Lebar thumbnail yang DIIZINKAN.
+ *
+ * Sengaja dibatasi ke beberapa nilai saja (bukan angka bebas) karena tiap
+ * ukuran baru = entri cache CDN baru. Kalau bebas, satu orang bisa meminta
+ * ?w=1, ?w=2, ?w=3, … dan meledakkan kuota transformasi ImageKit.
+ */
+const LEBAR_SAH = new Set([160, 240, 320, 480, 640, 960]);
+
+/** Ambil lebar yang diminta, dibulatkan ke pilihan terdekat yang sah. */
+function lebarDiminta(req) {
+  const w = Number(req.query.w || 0);
+  if (!w || !Number.isFinite(w)) return 0;
+  if (LEBAR_SAH.has(w)) return w;
+  // Bulatkan ke atas ke ukuran sah terdekat (permintaan aneh tetap aman)
+  for (const l of [...LEBAR_SAH].sort((a, b) => a - b)) if (w <= l) return l;
+  return 0; // lebih besar dari thumbnail terbesar → kirim resolusi penuh
+}
 
 /**
  * @openapi
@@ -49,19 +71,35 @@ router.get(/^\/(.+)/, async (req, res) => {
       return res.status(404).json({ error: "berkas tidak ditemukan" });
     }
 
+    const lebar = lebarDiminta(req);
+
     if (pakaiCloud()) {
       // Backend hanya jadi "satpam": cek token + kepemilikan, lalu alihkan
       // browser ke signed URL — byte gambar mengalir langsung dari CDN
       // ImageKit, tidak melewati server ini sama sekali.
       res.setHeader("Cache-Control", "private, max-age=300"); // redirect boleh di-cache sebentar
-      return res.redirect(302, signedUrl(key));
+      return res.redirect(302, signedUrl(key, 3600, lebar));
     }
 
     // Mode lokal: alirkan file dari folder uploads/
     const p = safePath(key);
     if (!fs.existsSync(p)) return res.status(404).json({ error: "berkas tidak ditemukan" });
+
+    // Permintaan thumbnail: kecilkan dulu dengan sharp (hasilnya di-cache di
+    // memori) — hemat bandwidth sama seperti jalur CDN di atas.
+    if (lebar) {
+      const kecil = await thumbLokal(key, lebar);
+      if (kecil) {
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+        return res.end(kecil);
+      }
+    }
+
     res.setHeader("Content-Type", contentType(key));
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    // private: respons ini khusus pengguna yang login — jangan sampai
+    // di-cache proxy bersama lalu tersaji ke orang lain.
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
     fs.createReadStream(p).pipe(res);
   } catch {
     res.status(400).json({ error: "key tidak valid" });
@@ -69,4 +107,3 @@ router.get(/^\/(.+)/, async (req, res) => {
 });
 
 export default router;
-

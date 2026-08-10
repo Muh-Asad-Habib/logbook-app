@@ -1064,6 +1064,24 @@ td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
 .act-item .what { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .act-item .when { color: var(--muted); font-size: 0.7rem; font-weight: 600; flex: 0 0 auto; }
 
+/* ---- Daftar perangkat & sesi aktif (halaman Profil) ----
+   Varian .act-item yang boleh dua baris: baris 1 nama perangkat, baris 2
+   keterangan kecil (IP tersamar + kapan terakhir aktif). Di layar sempit
+   tombol "Keluarkan" turun ke bawah agar tidak memepet teks. */
+.sesi-item { align-items: flex-start; }
+.sesi-item svg.lucide { margin-top: 2px; }
+.sesi-item .what { white-space: normal; overflow: visible; text-overflow: clip; }
+.sesi-item .ket {
+  display: block; margin-top: 2px;
+  color: var(--muted); font-size: 0.72rem; font-weight: 600;
+}
+.sesi-item .btn { flex: 0 0 auto; }
+
+@media (max-width: 520px) {
+  .sesi-item { flex-wrap: wrap; }
+  .sesi-item .btn { margin-left: 30px; }
+}
+
 @media (max-width: 720px) {
   .login-card { padding: 24px 20px 20px; }
 }

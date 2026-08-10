@@ -33,6 +33,9 @@ tools/*.xlsx
 # catatan perencanaan internal
 *.prompt.md
 
+# laporan hasil pemeriksaan deploy (dibuat ulang tiap `npm run cek:online`)
+hasil-deploy.txt
+
 # lain-lain
 *.log
 .DS_Store

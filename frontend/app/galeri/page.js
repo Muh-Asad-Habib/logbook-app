@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Images } from "lucide-react";
-import { fotoUrl, fmtTgl, useApi } from "@/lib/api";
+import { fotoUrl, thumbUrl, fmtTgl, useApi } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
 import Lightbox from "@/components/Lightbox";
 
@@ -71,7 +71,9 @@ export default function GaleriPage() {
           <div key={it.key} className="g-item" onClick={() => bukaLb(idx)}
                role="button" tabIndex={0}
                onKeyDown={(e) => e.key === "Enter" && bukaLb(idx)}>
-            <img src={fotoUrl(it.key)} alt={it.ket} loading="lazy" onError={retryFoto} />
+            {/* Petak galeri hanya butuh gambar kecil — pakai thumbnail (±320px).
+                Versi resolusi penuh baru dimuat saat foto dibuka di Lightbox. */}
+            <img src={thumbUrl(it.key, 320)} alt={it.ket} loading="lazy" onError={retryFoto} />
             <div className="g-cap">
               <b>{fmtTgl(it.tanggal)} · {it.jenis}</b>
               {it.ket}

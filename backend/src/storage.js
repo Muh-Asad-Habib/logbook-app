@@ -19,6 +19,14 @@ export function newId() {
   return crypto.randomUUID();
 }
 
+/**
+ * Sidik jari token sesi yang disimpan di database (lihat bagian "Sesi").
+ * Didefinisikan di atas karena dipakai beberapa fungsi di bawahnya.
+ */
+const hashTokenSesi = (token) =>
+  crypto.createHash("sha256").update(String(token || "")).digest("hex");
+
+
 /* ---------- pemetaan baris DB -> objek aplikasi ---------- */
 
 const petaUser = (r) =>
@@ -136,9 +144,13 @@ export async function updateUserPassword(userId, passwordBaru) {
 
 /** Cabut semua sesi milik user (opsional: kecuali satu token). */
 export async function revokeUserSessions(userId, exceptToken = "") {
+  // Token di database tersimpan sebagai hash — kecualikan KEDUA bentuk supaya
+  // sesi milik pemanggil sendiri tidak ikut tercabut (termasuk baris lama
+  // yang belum sempat dimigrasi).
+  const asli = String(exceptToken || "");
   const rows = await q(
-    "DELETE FROM sessions WHERE user_id = $1 AND token <> $2 RETURNING token",
-    [userId, exceptToken]
+    "DELETE FROM sessions WHERE user_id = $1 AND token <> $2 AND token <> $3 RETURNING token",
+    [userId, hashTokenSesi(asli), asli]
   );
   return rows.length;
 }
@@ -292,41 +304,164 @@ export async function deleteUser(userId) {
   return { user: { id: u.id, username: u.username }, fileKeys };
 }
 
-/* ---------- Sesi (token login) ---------- */
+/* ---------- Sesi (token login) ----------
+ *
+ * KEAMANAN: yang disimpan di database adalah SHA-256 dari token, bukan token
+ * aslinya. Siapa pun yang berhasil membaca tabel `sessions` (dump/bocor)
+ * TIDAK bisa memakai isinya untuk membajak akun — persis alasan password
+ * disimpan sebagai hash. Token asli hanya ada di browser pemiliknya.
+ *
+ * Hash memakai SHA-256 polos (bukan scrypt): token sudah 256-bit acak
+ * kriptografis, jadi tidak bisa ditebak/di-brute-force — yang dibutuhkan
+ * hanyalah fungsi satu arah yang cepat (dipanggil tiap request).
+ *
+ * MIGRASI MULUS: baris lama yang masih menyimpan token mentah tetap diterima
+ * dan langsung di-upgrade ke bentuk hash saat pertama dipakai — TIDAK ADA
+ * pengguna yang ter-logout paksa karena perubahan ini.
+ */
 
-/** Umur maksimal sesi: 30 hari. Sesi lama otomatis tidak berlaku & dibersihkan. */
+/** Umur maksimal sesi MENGANGGUR: 30 hari sejak pemakaian terakhir. */
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Buang semua sesi kedaluwarsa. */
+/** Perbarui stempel pemakaian paling sering 1×/jam (hemat write ke Neon). */
+const SENTUH_MIN_MS = 60 * 60 * 1000;
+
+/** Sidik jari token yang disimpan di database (alias — lihat bagian atas). */
+const hashToken = hashTokenSesi;
+
+/**
+ * Buang sesi yang MENGANGGUR lebih dari 30 hari.
+ * Patokannya `last_used_at` (bila kosong — baris lama — pakai `created_at`),
+ * sehingga akun yang rutin dipakai tidak pernah kehilangan sesinya.
+ */
 export async function purgeExpiredSessions() {
   const batas = new Date(Date.now() - SESSION_TTL_MS).toISOString();
-  const rows = await q("DELETE FROM sessions WHERE created_at < $1 RETURNING token", [batas]);
+  const rows = await q(
+    `DELETE FROM sessions
+      WHERE COALESCE(NULLIF(last_used_at, ''), created_at) < $1
+      RETURNING token`,
+    [batas]
+  );
   return rows.length;
 }
 
-export async function createSession(userId) {
+export async function createSession(userId, jejak = {}) {
   const token = newToken();
-  await q("INSERT INTO sessions (token, user_id, created_at) VALUES ($1, $2, $3)", [
-    token, userId, nowIso(),
-  ]);
-  return token;
+  const ts = nowIso();
+  await q(
+    `INSERT INTO sessions (token, user_id, created_at, last_used_at, perangkat, ip_samar)
+     VALUES ($1, $2, $3, $3, $4, $5)`,
+    [
+      hashToken(token),
+      userId,
+      ts,
+      String(jejak.perangkat || "").slice(0, 40),
+      String(jejak.ip || "").slice(0, 45),
+    ]
+  );
+  return token; // hanya di sini token asli pernah keluar
 }
 
-export async function getSession(token) {
-  const rows = await q("SELECT * FROM sessions WHERE token = $1", [String(token || "")]);
+export async function getSession(token, jejak = null) {
+  const asli = String(token || "");
+  if (!asli) return null;
+  const hash = hashToken(asli);
+  // Cari bentuk hash (baris baru) ATAU token mentah (baris lama, belum migrasi)
+  const rows = await q(
+    "SELECT * FROM sessions WHERE token = $1 OR token = $2 LIMIT 1", [hash, asli]
+  );
   const s = rows[0];
   if (!s) return null;
-  const dibuat = Date.parse(s.created_at || "") || 0;
-  if (Date.now() - dibuat > SESSION_TTL_MS) {
-    await deleteSession(String(token));
+
+  const dipakai = Date.parse(s.last_used_at || s.created_at || "") || 0;
+  if (Date.now() - dipakai > SESSION_TTL_MS) {
+    await q("DELETE FROM sessions WHERE token = $1", [s.token]);
     return null;
+  }
+
+  if (s.token === asli) {
+    // Baris lama → simpan sebagai hash sekarang juga (pengguna tidak terganggu).
+    // ON CONFLICT: bila entah bagaimana hash-nya sudah ada, cukup buang yang lama.
+    await q(
+      `UPDATE sessions SET token = $1, last_used_at = $2 WHERE token = $3`,
+      [hash, nowIso(), asli]
+    ).catch(() => q("DELETE FROM sessions WHERE token = $1", [asli]));
+  } else if (Date.now() - dipakai > SENTUH_MIN_MS) {
+    // Perpanjang masa aktif — dibatasi 1×/jam supaya tidak boros write.
+    q("UPDATE sessions SET last_used_at = $1 WHERE token = $2", [nowIso(), hash])
+      .catch(() => {});
+  }
+
+  // Sesi yang dibuat SEBELUM fitur "Perangkat & Sesi Aktif" ada belum punya
+  // label perangkat. Isi sekali di sini supaya daftar sesi tidak penuh
+  // "Perangkat tidak dikenal" — hanya menulis bila kolomnya masih kosong.
+  if (jejak?.perangkat && !s.perangkat) {
+    q("UPDATE sessions SET perangkat = $1, ip_samar = $2 WHERE token = $3",
+      [jejak.perangkat.slice(0, 40), String(jejak.ip || "").slice(0, 45), hash])
+      .catch(() => {});
   }
   return { userId: s.user_id, createdAt: s.created_at };
 }
 
 export async function deleteSession(token) {
-  await q("DELETE FROM sessions WHERE token = $1", [String(token || "")]);
+  const asli = String(token || "");
+  await q("DELETE FROM sessions WHERE token = $1 OR token = $2", [hashToken(asli), asli]);
 }
+
+
+/* ---------- Daftar perangkat & sesi aktif (halaman Profil) ----------
+ *
+ * ID PUBLIK: token asli tidak boleh keluar dari server, dan hash penuhnya pun
+ * tidak perlu dikirim ke browser. Yang dipakai untuk menunjuk sebuah sesi
+ * adalah 12 karakter pertama hash-nya — cukup unik di dalam satu akun
+ * (peluang tabrakan ~1 : 280 triliun), tapi tidak bisa dipakai untuk
+ * membajak sesi karena bukan token dan tidak bisa dikembalikan ke token.
+ * Semua query pun tetap dipagari `user_id = $1`, jadi sesi milik akun lain
+ * mustahil disentuh sekalipun ID-nya tertebak.
+ */
+const ID_PANJANG = 12;
+
+/** ID publik sebuah sesi dari token aslinya (dipakai menandai "sesi ini"). */
+export const idSesiDariToken = (token) => hashToken(String(token || "")).slice(0, ID_PANJANG);
+
+/**
+ * Semua sesi aktif milik satu akun — terbaru dipakai di urutan atas.
+ * @param {string} userId
+ * @param {string} [tokenSekarang] token pemanggil, untuk menandai `ini_perangkat`
+ */
+export async function listSessions(userId, tokenSekarang = "") {
+  const rows = await q(
+    `SELECT LEFT(token, ${ID_PANJANG}) AS id, created_at, last_used_at, perangkat, ip_samar
+       FROM sessions
+      WHERE user_id = $1
+      ORDER BY COALESCE(NULLIF(last_used_at, ''), created_at) DESC`,
+    [userId]
+  );
+  const idSaya = tokenSekarang ? idSesiDariToken(tokenSekarang) : "";
+  return rows.map((r) => ({
+    id: r.id,
+    perangkat: r.perangkat || "",
+    ip: r.ip_samar || "",
+    dibuat: r.created_at,
+    terakhir: r.last_used_at || r.created_at,
+    ini_perangkat: !!idSaya && r.id === idSaya,
+  }));
+}
+
+/**
+ * Cabut SATU sesi milik akun ini.
+ * @returns {Promise<string>} hash token yang dihapus ("" bila tidak ada)
+ */
+export async function hapusSesiById(userId, id) {
+  const kunci = String(id || "").toLowerCase();
+  if (!/^[0-9a-f]{4,64}$/.test(kunci)) return "";
+  const rows = await q(
+    `DELETE FROM sessions WHERE user_id = $1 AND LEFT(token, ${ID_PANJANG}) = $2 RETURNING token`,
+    [userId, kunci.slice(0, ID_PANJANG)]
+  );
+  return rows[0]?.token || "";
+}
+
 
 /* ---------- Kepemilikan berkas (cegah IDOR di /api/files/:key) ----------
  * Sebelumnya endpoint gambar hanya memeriksa "sudah login?" — TIDAK memeriksa

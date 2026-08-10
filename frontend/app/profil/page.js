@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import {
   User, Lock, Eye, EyeOff, Save, KeyRound, Pencil, ShieldCheck, History,
   LogIn, LogOut, Plus, Trash2, FileEdit, UserPlus, UserMinus, Users,
+  MonitorSmartphone,
 } from "lucide-react";
 import { api, getUser, getRole, setUser as simpanUser } from "@/lib/api";
 import KodeTim from "@/components/KodeTim";
+import SesiAktif from "@/components/SesiAktif";
 import { toast } from "@/components/Toast";
 
 function PassInput({ value, onChange, placeholder, autoComplete }) {
@@ -41,6 +43,7 @@ const AKSI_LABEL = {
   "akun.keluar": ["Keluar (logout)", LogOut],
   "akun.ganti_username": ["Mengganti username", Pencil],
   "akun.ganti_password": ["Mengganti password", KeyRound],
+  "akun.sesi_cabut": ["Mengeluarkan perangkat", MonitorSmartphone],
   "kegiatan.tambah": ["Menambah kegiatan", Plus],
   "kegiatan.ubah": ["Mengubah kegiatan", FileEdit],
   "kegiatan.hapus": ["Menghapus kegiatan", Trash2],
@@ -261,6 +264,8 @@ export default function ProfilPage() {
         </div>
       </div>
 
+      <SesiAktif />
+
       <div className="card mt">
         <h3><History className="lucide" /> Riwayat aktivitas akun</h3>
         <p className="sub">30 aktivitas terakhir akunmu — login, entri baru, perubahan, dsb.</p>
@@ -272,7 +277,9 @@ export default function ProfilPage() {
         <p className="muted mts">
           • Password disimpan memakai <b>hash scrypt</b> (satu arah) — tidak ada siapa pun,
           termasuk pengelola aplikasi, yang bisa membaca password kamu.<br />
-          • Sesi login otomatis kedaluwarsa setelah <b>30 hari</b>.<br />
+          • Sesi login otomatis kedaluwarsa setelah <b>30 hari</b> tidak dipakai.<br />
+          • Perangkat yang login bisa kamu lihat &amp; keluarkan sendiri kapan saja
+          lewat kartu <b>Perangkat &amp; sesi aktif</b> di atas.<br />
           • Percobaan login dibatasi (anti brute-force).<br />
           • Lupa password? Hubungi pengelola untuk disetel ulang, lalu segera ganti lewat halaman ini.<br />
           • Gunakan password unik yang tidak dipakai di layanan lain.

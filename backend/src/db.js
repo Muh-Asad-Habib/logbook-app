@@ -39,12 +39,32 @@ const SKEMA = [
      created_at     TEXT NOT NULL,
      updated_at     TEXT
    )`,
+  // Kolom `token` kini menyimpan SHA-256 dari token asli (lihat storage.js).
+  // Baris lama (token mentah) tetap sah dan di-upgrade otomatis saat dipakai.
   `CREATE TABLE IF NOT EXISTS sessions (
      token      TEXT PRIMARY KEY,
      user_id    TEXT NOT NULL,
      created_at TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id)`,
+  // Kedaluwarsa dihitung dari PEMAKAIAN TERAKHIR, bukan tanggal dibuat:
+  // akun yang aktif tidak pernah terlempar keluar, sedangkan sesi yang
+  // menganggur 30 hari otomatis dicabut.
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TEXT NOT NULL DEFAULT ''`,
+  // Label perangkat & IP tersamar untuk halaman "Perangkat & Sesi Aktif".
+  // Sengaja RINGKAS, bukan User-Agent/IP mentah — lihat perangkat.js.
+  // Baris lama bernilai '' dan ditampilkan sebagai "Perangkat tidak dikenal".
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS perangkat TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip_samar  TEXT NOT NULL DEFAULT ''`,
+  // Pembersihan sesi menganggur menyaring pada kolom ini.
+  `CREATE INDEX IF NOT EXISTS sessions_last_used_idx ON sessions (last_used_at)`,
+  // Penghitung brute-force login APLIKASI (bukan panel) — di database supaya
+  // lockout tetap berlaku walau Vercel menjalankan banyak instance serverless.
+  `CREATE TABLE IF NOT EXISTS login_fails (
+     kunci        TEXT PRIMARY KEY,
+     n            INTEGER NOT NULL DEFAULT 0,
+     locked_until BIGINT NOT NULL DEFAULT 0
+   )`,
   `CREATE TABLE IF NOT EXISTS kegiatan (
      id            TEXT PRIMARY KEY,
      user_id       TEXT NOT NULL,

@@ -514,8 +514,13 @@ ruangnya benar-benar kembali ke kuota.
   alamat aplikasi hanya akan melihat halaman masuk.
 - Pembatasan hak akses per peran diterapkan di server, sehingga akun pembimbing
   tidak dapat mengubah data tim walaupun permintaannya dibuat secara manual.
-- Sesi kedaluwarsa otomatis setelah 30 hari, dan mengganti password langsung
-  mengakhiri sesi di perangkat lain.
+- Sesi kedaluwarsa otomatis setelah 30 hari tidak dipakai, dan mengganti password
+  langsung mengakhiri sesi di perangkat lain.
+- Halaman **Profil → Perangkat & sesi aktif** memperlihatkan setiap perangkat yang
+  sedang masuk ke akun (mis. “Chrome · Windows”, jaringan `114.120.•.•`, terakhir
+  aktif kapan) dan dapat mengeluarkannya satu per satu atau sekaligus — berguna
+  saat lupa keluar di komputer pinjaman. User-Agent dan alamat IP **tidak**
+  disimpan utuh, hanya ringkasannya.
 - Tersedia pembatasan percobaan masuk (anti tebak-tebakan password) serta header
   keamanan standar.
 - Gambar disajikan melalui tautan bertanda tangan berumur pendek dan hanya dapat

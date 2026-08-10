@@ -1376,6 +1376,8 @@ var AKSI_INFO = {
   "akun.keluar":          ["logout","b","Logout dari aplikasi"],
   "akun.ganti_username":  ["edit","y","Mengganti username"],
   "akun.ganti_password":  ["key","y","Mengganti password"],
+  "akun.sesi_cabut":      ["logout","y","Mencabut sesi perangkat"],
+
   "kegiatan.tambah":      ["cal","g","Menambah kegiatan"],
   "kegiatan.ubah":        ["edit","y","Mengubah kegiatan"],
   "kegiatan.hapus":       ["trash","r","Menghapus kegiatan"],

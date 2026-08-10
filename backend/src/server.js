@@ -27,18 +27,101 @@ import adminRouter from "./admin/routes.js";
 import { loadAdmin, panelPath } from "./admin/store.js";
 
 const app = express();
+
+/**
+ * Content-Security-Policy.
+ *
+ * Sebelumnya CSP dimatikan total (contentSecurityPolicy: false). Padahal token
+ * sesi tersimpan di localStorage, sehingga SATU celah XSS cukup untuk mencuri
+ * seluruh akun. CSP di bawah menutup vektor paling berbahaya (skrip dari
+ * domain asing) sambil tetap mengizinkan yang memang dibutuhkan aplikasi:
+ *  - 'unsafe-inline' script : skrip tema anti-kedip di <head> Next.js
+ *  - img-src blob:/data:    : pratinjau foto sebelum diunggah + lightbox
+ *  - img-src https:         : foto disajikan dari CDN ImageKit
+ *  - frame-src canva.com    : sematan pratinjau presentasi Canva
+ *  - frame-ancestors 'none' : aplikasi tidak boleh dibingkai situs lain
+ *                             (anti clickjacking)
+ */
+const CSP = {
+  useDefaults: false,
+  directives: {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    objectSrc: ["'none'"],
+    frameAncestors: ["'none'"],
+    formAction: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+    imgSrc: ["'self'", "data:", "blob:", "https:"],
+    connectSrc: ["'self'"],
+    mediaSrc: ["'self'", "blob:"],
+    workerSrc: ["'self'", "blob:"],
+    frameSrc: ["'self'", "https://www.canva.com", "https://view.officeapps.live.com"],
+    upgradeInsecureRequests: process.env.VERCEL ? [] : null,
+  },
+};
+// Hapus direktif bernilai null (upgrade-insecure-requests hanya di produksi)
+for (const [k, v] of Object.entries(CSP.directives)) {
+  if (v === null) delete CSP.directives[k];
+}
+
 app.use(
   helmet({
-    // Frontend Next inline script/style + gambar blob → CSP longgar tapi tetap aman dasar
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: CSP,
+    // Nonaktif: foto dimuat lintas-origin dari CDN ImageKit
     crossOriginEmbedderPolicy: false,
+    // Rujukan tidak pernah dibocorkan ke pihak ketiga (termasuk CDN)
+    referrerPolicy: { policy: "same-origin" },
+    hsts: process.env.VERCEL ? { maxAge: 31536000, includeSubDomains: true } : false,
   })
 );
-app.use(cors()); // API terbuka — bisa dipanggil dari mana saja
+
+// Matikan fitur browser yang sama sekali tidak dipakai aplikasi ini
+app.use((_req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()"
+  );
+  next();
+});
+
+/**
+ * CORS dibatasi ke origin milik aplikasi sendiri.
+ *
+ * Dulu `cors()` tanpa argumen mengizinkan SEMUA situs memanggil API ini.
+ * Sekarang hanya origin aplikasi (domain Vercel + localhost saat dev) yang
+ * diizinkan, dan `credentials: true` diperlukan agar cookie sesi ikut terkirim.
+ * Permintaan tanpa header Origin (mis. <img>, unduhan, curl, health check)
+ * tetap dilayani seperti biasa.
+ */
+const ORIGIN_SAH = new Set(
+  [
+    process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`,
+    process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`,
+    process.env.APP_ORIGIN,
+  ].filter(Boolean)
+);
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // bukan permintaan lintas-origin
+      if (ORIGIN_SAH.has(origin)) return cb(null, true);
+      // Pengembangan lokal: localhost / IP LAN / tunnel cloudflared
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1]|192\.168\.|10\.)/.test(origin)) {
+        return cb(null, true);
+      }
+      if (/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)) return cb(null, true);
+      return cb(null, false); // ditolak diam-diam (tanpa header CORS)
+    },
+  })
+);
 app.use(compression()); // gzip — payload JSON/HTML/JS jauh lebih kecil
 // limit 4mb: potongan impor .docx (base64 ±2,7 MB per request) tetap di bawah
 // batas keras Vercel ±4,5 MB per request
 app.use(express.json({ limit: "4mb" }));
+
 
 /**
  * Inisialisasi asinkron SEKALI per proses:
