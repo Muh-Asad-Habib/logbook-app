@@ -19,7 +19,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     --bg:#070a14;--bg2:#0b0f1e;
     --panel:#0e1329;--panel2:#111737;
     --line:#1b2242;--line2:#293159;
-    --ink:#e8ebfa;--mut:#8189b3;
+    --ink:#e8ebfa;--mut:#98a0c9;
     --p:#6d7cff;--p2:#a78bfa;--cy:#22d3ee;
     --ok:#34d399;--warn:#fbbf24;--bad:#fb7185;
     --r:18px;
@@ -89,7 +89,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .side-logo .i{width:19px;height:19px}
   .side-brand{min-width:0}
   .side-brand b{display:block;font-size:.94rem;letter-spacing:-.01em;white-space:nowrap}
-  .side-brand span{font:600 .58rem var(--mono);color:var(--mut);letter-spacing:.16em;text-transform:uppercase}
+  .side-brand span{font:600 .66rem var(--mono);color:var(--mut);letter-spacing:.1em;text-transform:uppercase}
   .side-nav{display:flex;flex-direction:column;gap:4px;margin-top:2px}
   .side-nav a{
     position:relative;display:flex;align-items:center;gap:11px;padding:10px 12px;
@@ -105,7 +105,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .side-nav a.on::before{content:"";position:absolute;left:-14px;top:22%;bottom:22%;width:3px;
     border-radius:3px;background:var(--grad3)}
   .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
-  .side-note{font:600 .58rem var(--mono);color:#4d5580;letter-spacing:.1em;
+  .side-note{font:600 .66rem var(--mono);color:#5d668f;letter-spacing:.08em;
     text-transform:uppercase;text-align:center}
   .side-out{
     width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:10px 12px;
@@ -169,7 +169,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .crumb .sep{width:4px;height:4px;border-radius:50%;background:#39406e}
   .top h1{font-size:1.05rem;letter-spacing:-.01em;display:flex;align-items:center;gap:10px;margin-top:3px}
   .top-act{margin-left:auto;display:flex;gap:8px}
-  .live{display:inline-flex;align-items:center;gap:6px;font-size:.6rem;font-weight:800;
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:.66rem;font-weight:800;
     color:#4ade80;letter-spacing:.1em;text-transform:uppercase;
     background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.35);
     padding:3px 10px;border-radius:99px}
@@ -267,14 +267,14 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .stat .tx{min-width:0}
   .stat b{font-size:1.55rem;letter-spacing:-.03em;display:block;line-height:1.1;
     font-variant-numeric:tabular-nums}
-  .stat .lbl{color:var(--mut);font-size:.64rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .stat .lbl{color:var(--mut);font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
   .s1{--a:#6d7cff}.s2{--a:#22d3ee}.s3{--a:#fbbf24}.s4{--a:#34d399}.s5{--a:#a78bfa}.s6{--a:#fb7185}
 
   /* ---------- tabel ---------- */
   .tbl{overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:13px;-webkit-overflow-scrolling:touch}
   table{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem;min-width:680px}
   th,td{text-align:left;padding:12px 15px;border-bottom:1px solid #141a36;vertical-align:middle}
-  th{color:var(--mut);font-size:.62rem;text-transform:uppercase;letter-spacing:.09em;
+  th{color:var(--mut);font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
      background:#0b1024;position:sticky;top:0;z-index:1}
   tbody tr{transition:background .13s}
   tbody tr:hover{background:rgba(109,124,255,.06)}
@@ -290,7 +290,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .ava.lg{width:42px;height:42px;flex:0 0 42px;border-radius:14px;font-size:1rem}
   .u-cell{display:flex;gap:11px;align-items:center;min-width:170px}
   .badge{display:inline-flex;align-items:center;gap:5px;padding:2.5px 10px;border-radius:99px;
-    font-size:.64rem;font-weight:700;white-space:nowrap;
+    font-size:.68rem;font-weight:700;white-space:nowrap;
     border:1px solid color-mix(in srgb,currentColor 30%,transparent)}
   .badge::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
   .badge.g{background:rgba(52,211,153,.10);color:#4ade80}
@@ -346,7 +346,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   dialog.besar .th{width:54px;height:54px;border-radius:10px}
   dialog.besar .chip{padding:11px 18px;font-size:.84rem;min-width:132px}
   dialog.besar .chip b{font-size:1.08rem}
-  dialog.besar .chip small{font-size:.62rem}
+  dialog.besar .chip small{font-size:.66rem}
   dialog.besar .tabs button{font-size:.84rem;padding:9px 20px}
   dialog.besar .prog{min-width:110px;height:9px}
   /* linimasa ikut memanjang — cukup satu scrollbar milik .dlg-b */
@@ -365,7 +365,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .chips{display:flex;gap:9px;flex-wrap:wrap}
   .chip{background:#10162e;border:1px solid var(--line);border-radius:13px;
     padding:9px 14px;font-size:.78rem;font-weight:700;min-width:116px}
-  .chip small{display:block;font-size:.58rem;color:var(--mut);font-weight:700;letter-spacing:.08em;
+  .chip small{display:block;font-size:.66rem;color:var(--mut);font-weight:700;letter-spacing:.05em;
     text-transform:uppercase;margin-bottom:3px}
   .chip b{font-size:.95rem}
   .chip.hijau{border-color:rgba(52,211,153,.34)} .chip.hijau b{color:#4ade80}
@@ -404,8 +404,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .audit .row-a{display:flex;gap:9px;align-items:center;padding:6px 5px;min-width:0;
     border-bottom:1px dashed #1b2242;border-radius:6px;transition:background .12s}
   .audit .row-a:hover{background:rgba(109,124,255,.06)}
-  .audit .t{color:#565e8c;flex:0 0 auto;font-size:.64rem}
-  .audit .badge{flex:0 0 auto;font-size:.58rem;padding:2px 8px;font-family:"Segoe UI",system-ui,sans-serif}
+  .audit .t{color:#707aa8;flex:0 0 auto;font-size:.68rem}
+  .audit .badge{flex:0 0 auto;font-size:.64rem;padding:2px 8px;font-family:"Segoe UI",system-ui,sans-serif}
   .audit .tg{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Kartu audit mengisi tinggi kolom penuh — daftar melebar sampai border
      bawah kartu (tidak menyisakan ruang kosong), digulir bila lebih panjang. */
@@ -435,7 +435,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     border-radius:12px;padding:9px 13px}
   .tl-body b{font-size:.8rem}
   .tl-meta{color:var(--mut);font-size:.68rem;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .tl-src{font-size:.56rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  .tl-src{font-size:.64rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
     padding:1.5px 8px;border-radius:99px;border:1px solid rgba(109,124,255,.44);color:#a5b4fc}
   .tl-src.panel{border-color:rgba(251,191,36,.5);color:#fcd34d}
 
@@ -504,8 +504,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     }
     /* label panjang diganti label pendek (attr data-m) agar tidak terpotong */
     .side-nav a span{display:none}
-    .side-nav a::after{content:attr(data-m);font-size:.52rem;font-weight:700;
-      letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;
+    .side-nav a::after{content:attr(data-m);font-size:.64rem;font-weight:700;
+      letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis;max-width:100%}
     .side-nav a:hover{transform:none}
     .side-nav a:hover:not(.on){background:transparent}
@@ -517,8 +517,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       border-radius:12px;
     }
     .side-out span{display:none}
-    .side-out::after{content:attr(data-m);font-size:.52rem;font-weight:700;
-      letter-spacing:.05em;text-transform:uppercase}
+    .side-out::after{content:attr(data-m);font-size:.64rem;font-weight:700;
+      letter-spacing:.02em;text-transform:uppercase}
     .main{margin-left:0}
     .wrap{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
   }
@@ -526,7 +526,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     /* --- topbar ringkas --- */
     .top-in{padding:10px 14px;flex-wrap:wrap;row-gap:9px;gap:10px}
     .top h1{flex-wrap:wrap;font-size:.94rem}
-    .crumb{font-size:.56rem;flex-wrap:wrap}
+    .crumb{font-size:.64rem;flex-wrap:wrap}
     .top-act{margin-left:auto}
     .top-act .btn-txt{display:none}
     .top-act .btn.sm{padding:8px 10px}
@@ -541,7 +541,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .stat .ic{width:34px;height:34px;flex:0 0 34px;border-radius:10px}
     .stat .ic .i{width:16px;height:16px}
     .stat b{font-size:1.16rem}
-    .stat .lbl{font-size:.52rem}
+    .stat .lbl{font-size:.62rem}
     .stat .tx{min-width:0}
     /* --- form: 16px mencegah auto-zoom iOS saat fokus --- */
     input{font-size:16px}
@@ -589,7 +589,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .dlg-h h3{font-size:.84rem}
     .acts{gap:6px}
     .crumb .sep,#upd{display:none}
-    .side-nav a::after,.side-out::after{font-size:.48rem}
+    .side-nav a::after,.side-out::after{font-size:.58rem}
     .side-out{min-width:48px;padding:8px 6px}
   }
   @media(prefers-reduced-motion:reduce){
@@ -661,7 +661,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
        Di layar sempit otomatis jadi dock bawah. -->
   <aside class="side" aria-label="Navigasi panel">
     <button class="side-toggle" id="btn-mini" type="button" title="Kecilkan navigasi"
-      aria-label="Kecilkan atau perlebar navigasi">
+      aria-label="Kecilkan atau perlebar navigasi" aria-expanded="true">
       <svg class="i"><use href="#i-chev"/></svg>
     </button>
     <div class="side-top">
@@ -1798,11 +1798,16 @@ $("#f-kode-dosen").addEventListener("submit", function(e){
   var btn = $("#btn-mini"), app = $("#v-app");
   if (!btn || !app) return;
   var KEY = "pk-mini";
+  function sink(){
+    var mini = app.classList.contains("mini");
+    btn.title = mini ? "Perlebar navigasi" : "Kecilkan navigasi";
+    btn.setAttribute("aria-expanded", mini ? "false" : "true");
+  }
   try { if (localStorage.getItem(KEY) === "1") app.classList.add("mini"); } catch(e){}
-  btn.title = app.classList.contains("mini") ? "Perlebar navigasi" : "Kecilkan navigasi";
+  sink();
   btn.addEventListener("click", function(){
     var mini = app.classList.toggle("mini");
-    btn.title = mini ? "Perlebar navigasi" : "Kecilkan navigasi";
+    sink();
     try { localStorage.setItem(KEY, mini ? "1" : "0"); } catch(e){}
   });
 })();

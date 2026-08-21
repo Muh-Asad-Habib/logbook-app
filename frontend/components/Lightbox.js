@@ -17,18 +17,32 @@ import { retryFoto } from "@/lib/foto";
 export default function Lightbox({ items, index = 0, onClose }) {
   const [i, setI] = useState(index);
   const touch = useRef(null);
+  const boxRef = useRef(null);
   const n = items.length;
   const it = items[Math.max(0, Math.min(i, n - 1))];
 
   const prev = useCallback(() => setI((v) => (v - 1 + n) % n), [n]);
   const next = useCallback(() => setI((v) => (v + 1) % n), [n]);
 
-  // Keyboard: Esc tutup, panah pindah
+  // Keyboard: Esc tutup, panah pindah, Tab terkunci di dalam dialog (focus-trap)
   useEffect(() => {
+    const pemicu = document.activeElement; // fokus dikembalikan ke sini saat tutup
+    // Pindahkan fokus ke dialog (tombol tutup) begitu terbuka
+    boxRef.current?.querySelector("button")?.focus();
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft" && n > 1) prev();
       else if (e.key === "ArrowRight" && n > 1) next();
+      else if (e.key === "Tab") {
+        // Focus-trap: Tab berputar di antara tombol-tombol lightbox saja
+        const fokusable = boxRef.current?.querySelectorAll("button");
+        if (!fokusable?.length) return;
+        const daftar = [...fokusable];
+        const idx = daftar.indexOf(document.activeElement);
+        e.preventDefault();
+        const arah = e.shiftKey ? -1 : 1;
+        daftar[(idx + arah + daftar.length) % daftar.length].focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     // Kunci scroll halaman selama lightbox terbuka
@@ -37,6 +51,7 @@ export default function Lightbox({ items, index = 0, onClose }) {
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = oldOverflow;
+      if (pemicu instanceof HTMLElement) pemicu.focus(); // kembalikan fokus
     };
   }, [onClose, prev, next, n]);
 
@@ -60,6 +75,7 @@ export default function Lightbox({ items, index = 0, onClose }) {
 
   return (
     <div
+      ref={boxRef}
       className="lb"
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onTouchStart={onTouchStart}

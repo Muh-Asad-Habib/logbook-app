@@ -236,7 +236,9 @@ function DashboardTim() {
                 <div className="tl-dot" />
                 <div className="tl-card">
                   {e.foto_keys.length > 0
-                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])} alt="" onError={retryFoto}
+                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])}
+                           alt={`Foto kegiatan ${fmtTgl(e.tanggal)}: ${e.kegiatan.slice(0, 60)}`}
+                           onError={retryFoto}
                            onClick={() => setLb({
                              items: e.foto_keys.map((k) => ({
                                src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.kegiatan.slice(0, 90),

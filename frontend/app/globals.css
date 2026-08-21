@@ -1,4 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+/* Font dimuat lewat next/font (layout.js) — tanpa @import eksternal yang
+   memblokir render. Fallback: Segoe UI. */
 
 /* ============================================================
    DESIGN SYSTEM v2 - light + dark, sidebar desktop, bottom-nav
@@ -14,6 +15,7 @@
   --p3: #db2777;
   --cy: #0ea5e9;
   --ok: #059669;
+  --bad: #ef4444;
   --bg: #f3f5fd;
   --card: rgba(255, 255, 255, 0.86);
   --card-solid: #ffffff;
@@ -53,7 +55,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+  font-family: var(--font-jakarta, "Plus Jakarta Sans"), "Segoe UI", sans-serif;
   color: var(--ink);
   min-height: 100vh;
   overflow-x: clip;
@@ -78,6 +80,24 @@ body {
 }
 
 ::selection { background: rgba(124, 58, 237, 0.32); }
+
+/* Skip-link: tersembunyi sampai difokus dengan keyboard (Tab pertama) */
+.skip-link {
+  position: fixed; top: -60px; left: 12px; z-index: 200;
+  padding: 10px 16px; border-radius: 12px;
+  background: var(--grad); color: #fff; font-weight: 700; font-size: 0.85rem;
+  text-decoration: none; box-shadow: 0 10px 24px rgba(79, 70, 229, 0.4);
+  transition: top 0.15s ease;
+}
+.skip-link:focus-visible { top: 12px; outline: 3px solid rgba(255, 255, 255, 0.6); outline-offset: 2px; }
+
+/* Tombol bergaya tautan (mis. "Daftar di sini") — aksesibel keyboard */
+.linklike {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit; font-weight: 700;
+  color: var(--p1); text-decoration: underline;
+}
+.linklike:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; border-radius: 4px; }
 
 svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
@@ -192,7 +212,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 }
 .sb-user .who { flex: 1; min-width: 0; text-align: left; }
 .sb-user .who b { display: block; font-size: 0.8rem; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-user .who small { color: var(--muted); font-size: 0.66rem; font-weight: 600; }
+.sb-user .who small { color: var(--muted); font-size: 0.68rem; font-weight: 600; }
 .sb-user > svg.lucide { color: var(--muted); font-size: 0.9rem; }
 
 .user-menu {
@@ -239,7 +259,8 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .app.sb-mini .sidebar .user-menu { left: calc(100% + 12px); right: auto; bottom: 6px; width: 230px; }
 
 .main { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; transition: margin-left 0.22s ease; }
-.container { width: 100%; max-width: none; margin: 0 auto; padding: 20px 22px 70px; }
+/* Batasi lebar baris di monitor sangat lebar agar teks tetap nyaman dibaca */
+.container { width: 100%; max-width: 1440px; margin: 0 auto; padding: 20px 22px 70px; }
 
 .topbar {
   position: sticky; top: 0; z-index: 60;
@@ -248,7 +269,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   border-bottom: 1px solid var(--line);
 }
 .topbar-inner {
-  max-width: none; margin: 0 auto; padding: 13px 22px;
+  max-width: 1440px; margin: 0 auto; padding: 13px 22px;
   display: flex; align-items: center; gap: 12px; min-height: 58px;
 }
 .topbar h1 { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; flex: 0 0 auto; }
@@ -280,7 +301,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .tim-chips .user-menu.tim-menu { top: calc(100% + 8px); right: 0; left: auto; min-width: 268px; }
 .tim-chips .user-menu input { font-size: 0.8rem; }
 .tim-chips .menu-judul {
-  padding: 6px 12px 2px; font-size: 0.66rem; font-weight: 800;
+  padding: 6px 12px 2px; font-size: 0.68rem; font-weight: 800;
   letter-spacing: 0.04em; color: var(--muted);
 }
 .tim-chips .menu-pisah { border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0; }
@@ -323,8 +344,8 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .bottom-nav a {
   position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 6px 2px 5px; border-radius: 12px; text-decoration: none;
-  color: var(--muted); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.01em;
+  padding: 6px 1px 5px; border-radius: 12px; text-decoration: none;
+  color: var(--muted); font-size: 0.66rem; font-weight: 700; letter-spacing: 0;
   transition: color 0.15s ease, transform 0.15s ease; min-height: 48px; justify-content: center;
   min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
@@ -356,7 +377,11 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .fab { display: flex; }
   .container { padding: 14px 14px calc(86px + env(safe-area-inset-bottom)); }
   .topbar-inner { padding: 10px 14px; min-height: 56px; flex-wrap: wrap; row-gap: 8px; }
-  .topbar .top-chips { display: none; }
+  /* Chip statistik tetap tampil di HP sebagai baris kedua topbar (bisa
+     digeser) — sebelumnya disembunyikan total sehingga info capaian &
+     sisa dana hilang di ponsel. Chip link publik tetap desktop-only. */
+  .topbar .top-chips { flex-basis: 100%; order: 9; margin-left: 0; }
+  .topbar .top-chips .chip-desk { display: none; }
   /* Pemilih tim fasilitator TETAP tampil di HP — baris kedua topbar */
   .topbar .top-chips.tim-chips { display: flex; flex-basis: 100%; order: 9; margin-left: 0; }
   .tim-chips .chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
@@ -371,7 +396,10 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .grid.two { grid-template-columns: 1.1fr 2fr; }
 .grid.half { grid-template-columns: 1fr 1fr; }
 .grid.side { grid-template-columns: 1fr 1.7fr; }
-@media (max-width: 860px) { .grid.two, .grid.half, .grid.side { grid-template-columns: 1fr; } }
+/* Tablet (680–1024px): kolom asimetris (two/side) runtuh lebih awal supaya
+   grafik tidak terjepit, tapi grid.half tetap 2 kolom agar ruang tak terbuang. */
+@media (max-width: 1024px) { .grid.two, .grid.side { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .grid.half { grid-template-columns: 1fr; } }
 @media (max-width: 640px) {
   .grid { gap: 10px; }
   .grid.metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -433,13 +461,13 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .metric { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 3px; align-items: center; }
   .metric > div:last-child { display: contents; }
   .metric-ic { width: 38px; height: 38px; flex: 0 0 38px; font-size: 1.1rem; border-radius: 11px; grid-row: 1; grid-column: 1; }
-  .metric-label { font-size: 0.62rem; align-self: center; }
+  .metric-label { font-size: 0.68rem; align-self: center; }
   .metric-value { font-size: 1.08rem; grid-column: 1 / -1; }
   /* Kartu "judul" (metric-value tanpa label kecil) duduk di samping ikon */
   .metric > div:last-child > .metric-value:first-child { grid-column: 2; grid-row: 1; }
   /* Teks deskripsi memakai lebar penuh kartu — tidak terjepit di kolom ikon */
   .metric .muted { grid-column: 1 / -1; }
-  .metric-delta { font-size: 0.66rem; grid-column: 1 / -1; }
+  .metric-delta { font-size: 0.68rem; grid-column: 1 / -1; }
   .metric-spark { grid-column: 1 / -1; width: 100%; margin-top: 3px; }
   /* Avatar profil di kartu pengaturan akun tetap di baris pertama */
   .metric .profil-ava { grid-row: 1; grid-column: 1; width: 44px; height: 44px; flex: 0 0 44px; font-size: 1.15rem; border-radius: 13px; }
@@ -708,8 +736,8 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 @media (max-width: 640px) {
   .galeri { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .g-item img { height: 132px; }
-  .g-cap { padding: 18px 9px 8px; font-size: 0.66rem; }
-  .g-cap b { font-size: 0.68rem; }
+  .g-cap { padding: 18px 9px 8px; font-size: 0.68rem; }
+  .g-cap b { font-size: 0.7rem; }
   .foto-row img { width: 72px; height: 72px; }
 }
 
@@ -731,7 +759,7 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .date-tile .d { font-size: 1.3rem; font-weight: 800; color: var(--p1); line-height: 1; }
-.date-tile .m { font-size: 0.66rem; font-weight: 700; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+.date-tile .m { font-size: 0.68rem; font-weight: 700; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
 .entry-actions { display: flex; flex-direction: column; gap: 8px; }
 @media (max-width: 640px) {
   .entry { flex-wrap: wrap; gap: 12px; }
@@ -798,9 +826,9 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
   gap: 4px;
   min-width: 100%;
 }
-.heat-mon { font-size: 0.62rem; font-weight: 700; color: var(--muted); white-space: nowrap; align-self: end; }
+.heat-mon { font-size: 0.68rem; font-weight: 700; color: var(--muted); white-space: nowrap; align-self: end; }
 .heat-day {
-  font-size: 0.62rem; font-weight: 700; color: var(--muted);
+  font-size: 0.68rem; font-weight: 700; color: var(--muted);
   display: flex; align-items: center; padding-right: 4px;
 }
 .heat-cell {
@@ -846,7 +874,7 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 .gauge { display: flex; justify-content: center; }
 .gauge svg { width: 190px; height: 190px; }
 .gauge-num { font-size: 2.05rem; font-weight: 800; fill: var(--gauge-num); letter-spacing: -0.03em; }
-.gauge-cap { font-size: 0.62rem; font-weight: 700; fill: var(--muted); }
+.gauge-cap { font-size: 0.68rem; font-weight: 700; fill: var(--muted); }
 .bd-row { display: flex; align-items: center; gap: 10px; margin-top: 9px; font-size: 0.8rem; }
 .bd-label { flex: 0 0 34%; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bd-bar { flex: 1; height: 12px; background: var(--soft); border-radius: 999px; overflow: hidden; }
@@ -1032,7 +1060,7 @@ td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
   padding: 4px 10px; border-radius: 999px;
 }
 .login-feats svg.lucide { color: var(--p1); }
-.login-foot { position: relative; z-index: 1; margin-top: 18px; color: rgba(214, 238, 241, 0.78); font-size: 0.74rem; text-align: center; }
+.login-foot { position: relative; z-index: 1; margin-top: 18px; color: #e3f2f4; font-size: 0.78rem; text-align: center; text-shadow: 0 1px 3px rgba(5, 10, 20, 0.55); }
 
 .auth-splash {
   min-height: 100vh; min-height: 100dvh;
@@ -1093,6 +1121,21 @@ td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Perangkat sentuh (tanpa kursor): matikan efek hover transform — di layar
+   sentuh :hover "lengket" setelah tap sehingga kartu/foto tampak bergeser. */
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: var(--shadow); border-color: var(--line); }
+  .card:hover::after { transform: scaleX(0); }
+  .card:hover .metric-ic { transform: none; }
+  .btn:hover, .pill:hover, .icon-btn:hover, .chip:hover { transform: none; }
+  .foto-row img:hover { transform: none; box-shadow: none; }
+  .g-item:hover { transform: none; box-shadow: var(--shadow); border-color: var(--line); }
+  .g-item:hover img { transform: none; }
+  .tl-card:hover { transform: none; box-shadow: none; border-color: var(--line); }
+  .heat-cell:hover { transform: none; box-shadow: none; }
+  .sb-menu a:hover { transform: none; }
 }
 
 /* ===== Penampil Laporan Kemajuan (.docx via docx-preview) =====

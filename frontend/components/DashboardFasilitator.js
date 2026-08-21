@@ -157,7 +157,9 @@ export default function DashboardFasilitator() {
                 <div className="tl-dot" />
                 <div className="tl-card">
                   {e.foto_keys?.length > 0
-                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])} alt="" loading="lazy"
+                    ? <img className="tl-img" src={fotoUrl(e.foto_keys[0])}
+                           alt={`Foto kegiatan ${fmtTgl(e.tanggal)}: ${e.kegiatan.slice(0, 60)}`}
+                           loading="lazy"
                            onError={retryFoto}
                            onClick={() => setLb({
                              items: e.foto_keys.map((k) => ({

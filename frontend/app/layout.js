@@ -1,5 +1,15 @@
 import "./globals.css";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import Shell from "@/components/Shell";
+
+/* Font di-host sendiri lewat next/font — tidak ada permintaan eksternal ke
+ * Google Fonts saat runtime (lebih cepat & tetap tampil saat offline/PWA). */
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-jakarta",
+});
 
 export const metadata = {
   title: "Logbook Kegiatan & Keuangan",
@@ -30,7 +40,7 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>
+      <body className={jakarta.variable}>
         <Shell>{children}</Shell>
       </body>
     </html>

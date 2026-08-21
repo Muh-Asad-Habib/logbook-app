@@ -182,7 +182,9 @@ function KegiatanFasilitator() {
                     {e.foto_keys.length > 0 && (
                       <div className="foto-row">
                         {e.foto_keys.map((k, i) => (
-                          <img key={k} src={thumbUrl(k, 240)} alt="foto kegiatan" loading="lazy"
+                          <img key={k} src={thumbUrl(k, 240)}
+                               alt={`Foto ${i + 1} — ${fmtTgl(e.tanggal)}: ${e.kegiatan.slice(0, 60)}`}
+                               loading="lazy"
                                onError={retryFoto} onClick={() => bukaFoto(e, i)} />
                         ))}
                       </div>
@@ -321,7 +323,9 @@ function KegiatanTim() {
                         {/* Deretan pratinjau kecil → cukup thumbnail 240px.
                             Klik membuka Lightbox yang memakai resolusi penuh. */}
                         {e.foto_keys.map((k, i) => (
-                          <img key={k} src={thumbUrl(k, 240)} alt="foto kegiatan" loading="lazy"
+                          <img key={k} src={thumbUrl(k, 240)}
+                               alt={`Foto ${i + 1} — ${fmtTgl(e.tanggal)}: ${e.kegiatan.slice(0, 60)}`}
+                               loading="lazy"
                                onError={retryFoto} onClick={() => bukaFoto(e, i)} />
                         ))}
                       </div>
