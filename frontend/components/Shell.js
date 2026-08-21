@@ -33,7 +33,7 @@ const MENU = [
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
-  { href: "/presentasi", label: "Presentasi", Ic: Presentation },
+  { href: "/presentasi", label: "Presentasi", pendek: "Slide", Ic: Presentation },
   { href: "/galeri", label: "Galeri", Ic: Images },
   { href: "/ekspor", label: "Ekspor", Ic: FileOutput },
 ];
@@ -44,7 +44,7 @@ const MENU_FAS = [
   { href: "/kegiatan", label: "Kegiatan", Ic: CalendarDays },
   { href: "/keuangan", label: "Keuangan", Ic: Wallet },
   { href: "/laporan", label: "Laporan Kemajuan", pendek: "Laporan", Ic: FileText },
-  { href: "/presentasi", label: "Presentasi", Ic: Presentation },
+  { href: "/presentasi", label: "Presentasi", pendek: "Slide", Ic: Presentation },
 ];
 
 /** Label & ikon peran — dipakai di sidebar dan chip topbar. */
@@ -124,18 +124,44 @@ function TopChips() {
       <span className="chip"><Banknote className="lucide" /> {fmtRupiah(stat.sisa_dana)} tersisa</span>
       {tunnel && (
         <>
-          <a className="chip link" href={tunnel} target="_blank" rel="noreferrer"
+          <a className="chip link chip-desk" href={tunnel} target="_blank" rel="noreferrer"
              title="Link publik — bisa dibuka siapa saja">
             <LinkIcon className="lucide" />
             <span className="chip-url">{tunnel.replace("https://", "")}</span>
           </a>
-          <button type="button" className="chip copy" onClick={salin} title="Salin link publik">
+          <button type="button" className="chip copy chip-desk" onClick={salin} title="Salin link publik">
             {disalin ? <Check className="lucide" /> : <Copy className="lucide" />}
             {disalin ? "Tersalin!" : "Salin"}
           </button>
         </>
       )}
     </div>
+  );
+}
+
+/* ---------- Badge jumlah komentar belum dibaca (aksesibel) ---------- */
+function BadgeNotif({ n, varian }) {
+  if (!n) return null;
+  const gaya = varian === "nav"
+    ? {
+        position: "absolute", top: 2, right: "18%",
+        background: "var(--bad, #ef4444)", color: "#fff", borderRadius: 99,
+        fontSize: ".62rem", fontWeight: 800, padding: "0 5px", lineHeight: 1.6,
+      }
+    : {
+        marginLeft: "auto", background: "var(--bad, #ef4444)", color: "#fff",
+        borderRadius: 99, fontSize: ".66rem", fontWeight: 800,
+        padding: "1px 7px", lineHeight: 1.5,
+      };
+  return (
+    <span
+      style={gaya}
+      role="status"
+      aria-label={`${n} komentar belum dibaca`}
+      title={`${n} komentar belum dibaca`}
+    >
+      {n}
+    </span>
   );
 }
 
@@ -361,8 +387,20 @@ export default function Shell({ children }) {
         setMenuMob(false);
       }
     };
+    // Escape → tutup menu & kembalikan fokus ke tombol pembukanya (aksesibilitas keyboard)
+    const esc = (e) => {
+      if (e.key !== "Escape") return;
+      setMenuBuka(false);
+      setMenuMob(false);
+      const wadah = menuBuka ? menuRef.current : menuMobRef.current;
+      wadah?.querySelector("[aria-haspopup='menu']")?.focus();
+    };
     document.addEventListener("pointerdown", tutup);
-    return () => document.removeEventListener("pointerdown", tutup);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", tutup);
+      document.removeEventListener("keydown", esc);
+    };
   }, [menuBuka, menuMob]);
 
   useEffect(() => {
@@ -404,6 +442,9 @@ export default function Shell({ children }) {
 
   return (
     <div className={sbMini ? "app sb-mini" : "app"}>
+      {/* Skip-link: langsung ke konten utama (pengguna keyboard/screen reader) */}
+      <a href="#konten" className="skip-link">Langsung ke konten</a>
+
       {/* ===== Sidebar (desktop) ===== */}
       <aside className="sidebar">
         <div className="sb-brand">
@@ -429,13 +470,7 @@ export default function Shell({ children }) {
               <Link key={href} href={href} className={path === href ? "active" : ""}
                     title={sbMini ? label : undefined}>
                 <Ic className="lucide" /> <span className="sb-txt">{label}</span>
-                {nBadge > 0 && (
-                  <span style={{
-                    marginLeft: "auto", background: "#ef4444", color: "#fff",
-                    borderRadius: 99, fontSize: ".62rem", fontWeight: 800,
-                    padding: "1px 7px", lineHeight: 1.5,
-                  }}>{nBadge}</span>
-                )}
+                <BadgeNotif n={nBadge} />
               </Link>
             );
           })}
@@ -488,24 +523,18 @@ export default function Shell({ children }) {
           </div>
         </header>
 
-        <main className="container">{children}</main>
+        <main id="konten" className="container">{children}</main>
       </div>
 
       {/* ===== Bottom-nav (mobile) ===== */}
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" aria-label="Menu utama">
         {menuAktif.map(({ href, label, pendek, Ic }) => {
           const nBadge = badgeUntuk(badges, href);
           return (
             <Link key={href} href={href} className={path === href ? "active" : ""}
-                  style={{ position: "relative" }}>
+                  aria-label={label} style={{ position: "relative" }}>
               <Ic className="lucide" /> {pendek || label}
-              {nBadge > 0 && (
-                <span style={{
-                  position: "absolute", top: 2, right: "18%",
-                  background: "#ef4444", color: "#fff", borderRadius: 99,
-                  fontSize: ".56rem", fontWeight: 800, padding: "0 5px", lineHeight: 1.6,
-                }}>{nBadge}</span>
-              )}
+              <BadgeNotif n={nBadge} varian="nav" />
             </Link>
           );
         })}

@@ -185,7 +185,7 @@ function KeuanganFasilitator() {
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {r.e.bukti_key ? (
-                        <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
+                        <img src={fotoUrl(r.e.bukti_key)} alt={`Bukti belanja: ${r.e.item}`} loading="lazy"
                              onError={retryFoto} onClick={() => bukaBukti(r.e)}
                              style={{ width: 44, height: 44, objectFit: "cover",
                                       borderRadius: 8, cursor: "zoom-in" }} />
@@ -218,7 +218,7 @@ function KeuanganFasilitator() {
                   </p>
                   {e.bukti_key && (
                     <div className="foto-row">
-                      <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
+                      <img src={fotoUrl(e.bukti_key)} alt={`Bukti belanja: ${e.item}`} loading="lazy"
                            onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}
@@ -372,7 +372,7 @@ function KeuanganTim() {
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {r.e.bukti_key ? (
-                        <img src={fotoUrl(r.e.bukti_key)} alt="bukti" loading="lazy"
+                        <img src={fotoUrl(r.e.bukti_key)} alt={`Bukti belanja: ${r.e.item}`} loading="lazy"
                              onError={retryFoto} onClick={() => bukaBukti(r.e)}
                              style={{ width: 44, height: 44, objectFit: "cover",
                                       borderRadius: 8, cursor: "zoom-in" }} />
@@ -412,7 +412,7 @@ function KeuanganTim() {
                   </p>
                   {e.bukti_key && (
                     <div className="foto-row">
-                      <img src={fotoUrl(e.bukti_key)} alt="bukti" loading="lazy"
+                      <img src={fotoUrl(e.bukti_key)} alt={`Bukti belanja: ${e.item}`} loading="lazy"
                            onError={retryFoto} onClick={() => bukaBukti(e)} />
                     </div>
                   )}

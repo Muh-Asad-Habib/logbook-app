@@ -234,9 +234,17 @@ export default function LoginPage() {
 
         <p className="login-note">
           {mode === "login" ? (
-            <>Belum punya akun? <a onClick={() => ganti("daftar")}>Daftar di sini</a></>
+            <>Belum punya akun?{" "}
+              <button type="button" className="linklike" onClick={() => ganti("daftar")}>
+                Daftar di sini
+              </button>
+            </>
           ) : (
-            <>Sudah punya akun? <a onClick={() => ganti("login")}>Masuk di sini</a></>
+            <>Sudah punya akun?{" "}
+              <button type="button" className="linklike" onClick={() => ganti("login")}>
+                Masuk di sini
+              </button>
+            </>
           )}
         </p>
 
