@@ -300,22 +300,25 @@ export async function importDocx(buffer, userId) {
       }
       if (!harga && totalDok > 0) harga = Math.round((totalDok / jumlah) * 100) / 100;
 
-      let buktiKey = "";
+      const buktiKeys = [];
       // Utamakan kolom Bukti/Gambar, tetapi terima juga bila foto diletakkan
-      // di sel lain pada baris yang sama.
+      // di sel lain pada baris yang sama — SEMUA gambar disimpan.
       const selBukti = cells[kolomKeu.bukti] || "";
       const ids = [
         ...cellImageIds(selBukti),
         ...cells.filter((_, c) => c !== kolomKeu.bukti).flatMap(cellImageIds),
       ];
-      if (ids.length) buktiKey = (await saveImage(zip, relMap, ids[0], `keu_${tanggal}`)) || "";
+      for (const rid of ids) {
+        const k = await saveImage(zip, relMap, rid, `keu_${tanggal}`);
+        if (k) buktiKeys.push(k);
+      }
 
       await store.addKeuangan(userId, {
         tanggal, item,
         harga_satuan: harga,
         satuan_suffix: parseSuffix(teks[kolomKeu.harga]),
         jumlah,
-        bukti_key: buktiKey,
+        bukti_keys: buktiKeys,
       });
       keuAda.add(`${tanggal}|${norm(item)}`);
       keuBaru += 1;

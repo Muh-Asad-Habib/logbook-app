@@ -71,7 +71,16 @@ export const swaggerSpec = swaggerJsdoc({
             satuan_suffix: { type: "string", example: "/bulan" },
             jumlah: { type: "number", example: 1 },
             total: { type: "number", example: 99900 },
-            bukti_key: { type: "string", example: "keu_2026-07-11_1720680000-ef56ab.jpg" },
+            bukti_keys: {
+              type: "array",
+              items: { type: "string" },
+              example: ["keu_2026-07-11_1720680000-ef56ab.jpg"],
+            },
+            bukti_key: {
+              type: "string",
+              description: "Legacy — selalu sama dengan elemen pertama bukti_keys",
+              example: "keu_2026-07-11_1720680000-ef56ab.jpg",
+            },
           },
         },
       },

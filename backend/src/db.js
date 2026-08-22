@@ -89,6 +89,12 @@ const SKEMA = [
      created_at    TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS keuangan_user_idx ON keuangan (user_id, tanggal)`,
+  // Bukti belanja kini boleh LEBIH DARI SATU — array JSONB seperti foto_keys
+  // kegiatan. Kolom bukti_key lama dipertahankan (selalu = elemen pertama)
+  // demi kompatibilitas skrip/ekspor lama; baris lama di-backfill otomatis.
+  `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS bukti_keys JSONB NOT NULL DEFAULT '[]'`,
+  `UPDATE keuangan SET bukti_keys = jsonb_build_array(bukti_key)
+    WHERE bukti_key <> '' AND bukti_keys = '[]'::jsonb`,
   `CREATE TABLE IF NOT EXISTS pengaturan (
      user_id TEXT NOT NULL,
      kunci   TEXT NOT NULL,

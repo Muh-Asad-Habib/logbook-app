@@ -21,8 +21,8 @@ export default function GaleriPage() {
       for (const k of e.foto_keys)
         all.push({ key: k, tanggal: e.tanggal, ket: e.kegiatan.slice(0, 80), jenis: "Kegiatan" });
     for (const e of keu)
-      if (e.bukti_key)
-        all.push({ key: e.bukti_key, tanggal: e.tanggal, ket: e.item.slice(0, 80), jenis: "Bukti belanja" });
+      for (const k of e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [])
+        all.push({ key: k, tanggal: e.tanggal, ket: e.item.slice(0, 80), jenis: "Bukti belanja" });
     all.sort((a, b) => (a.tanggal < b.tanggal ? 1 : -1));
     return all;
   }, [keg, keu]);

@@ -172,16 +172,17 @@ export async function buildXlsx(userId, namaTim = "") {
     "Jumlah", "Total", "Ada bukti"]);
   styleHeader(h2);
   keuangan.forEach((e, i) => {
+    const nBukti = (e.bukti_keys || []).length;
     const r = s2.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), item: e.item,
       hs: e.harga_satuan, sf: e.satuan_suffix || "", jml: e.jumlah,
-      tot: e.total, bk: e.bukti_key ? "Ya" : "-" });
+      tot: e.total, bk: nBukti > 1 ? `Ya (${nBukti})` : nBukti ? "Ya" : "-" });
     styleData(r, i % 2 === 1);
     r.getCell("no").alignment = { vertical: "middle", horizontal: "center" };
     r.getCell("item").alignment = { wrapText: true, vertical: "middle" };
     ["jml", "bk", "sf"].forEach((k) =>
       { r.getCell(k).alignment = { vertical: "middle", horizontal: "center" }; });
     ["hs", "tot"].forEach((k) => { r.getCell(k).numFmt = '"Rp"#,##0'; });
-    if (e.bukti_key) r.getCell("bk").font = { color: { argb: C.green }, bold: true };
+    if (nBukti) r.getCell("bk").font = { color: { argb: C.green }, bold: true };
   });
   s2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + keuangan.length, column: 8 } };
 

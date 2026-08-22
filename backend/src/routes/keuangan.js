@@ -7,7 +7,7 @@ import { catatAktivitas } from "../aktivitas.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     // Whitelist server-side — jangan percaya accept= di browser
     if (isAllowedImage(file.originalname, file.mimetype)) return cb(null, true);
@@ -49,7 +49,9 @@ router.use(hanyaTim); // fasilitator: baca lewat /api/fasilitator, bukan di sini
  *               harga_satuan: { type: number, example: 99900 }
  *               satuan_suffix: { type: string, example: "/bulan" }
  *               jumlah: { type: number, example: 1 }
- *               bukti: { type: string, format: binary }
+ *               bukti:
+ *                 type: array
+ *                 items: { type: string, format: binary }
  *     responses:
  *       201: { description: Entri dibuat (total dihitung server) }
  *       400: { description: Input tidak valid }
@@ -62,7 +64,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/", upload.single("bukti"), async (req, res, next) => {
+router.post("/", upload.array("bukti"), async (req, res, next) => {
   try {
     const { tanggal, item, satuan_suffix } = req.body;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal || "") || !item?.trim()) {
@@ -71,16 +73,17 @@ router.post("/", upload.single("bukti"), async (req, res, next) => {
     if (!satuan_suffix?.trim()) {
       return res.status(400).json({ error: "satuan wajib diisi (mis. /bulan, /pcs)" });
     }
-    const buktiKey = req.file
-      ? await putFile(req.file.originalname, req.file.buffer, `keu_${tanggal}`)
-      : "";
+    const buktiKeys = [];
+    for (const f of req.files || []) {
+      buktiKeys.push(await putFile(f.originalname, f.buffer, `keu_${tanggal}`));
+    }
     const e = await store.addKeuangan(req.userId, {
       tanggal,
       item: item.trim(),
       harga_satuan: Number(req.body.harga_satuan) || 0,
       satuan_suffix: satuan_suffix.trim(),
       jumlah: Number(req.body.jumlah) || 1,
-      bukti_key: buktiKey,
+      bukti_keys: buktiKeys,
     });
     catatAktivitas(req.userId, "keuangan.tambah", {
       tanggal, ringkas: item.trim().slice(0, 60), total: e.total,
@@ -96,7 +99,7 @@ router.post("/", upload.single("bukti"), async (req, res, next) => {
  * /api/keuangan/{id}:
  *   put:
  *     tags: [Keuangan]
- *     summary: Ubah entri belanja (unggah bukti baru akan mengganti yang lama)
+ *     summary: Ubah entri belanja (bukti baru ditambah; kirim keep_keys utk bukti lama yang dipertahankan)
  *     parameters:
  *       - in: path
  *         name: id
@@ -113,7 +116,10 @@ router.post("/", upload.single("bukti"), async (req, res, next) => {
  *               harga_satuan: { type: number }
  *               satuan_suffix: { type: string }
  *               jumlah: { type: number }
- *               bukti: { type: string, format: binary }
+ *               keep_keys: { type: string, description: "JSON array key bukti lama yang dipertahankan" }
+ *               bukti:
+ *                 type: array
+ *                 items: { type: string, format: binary }
  *     responses:
  *       200: { description: Entri diperbarui }
  *       404: { description: Tidak ditemukan }
@@ -129,17 +135,30 @@ router.post("/", upload.single("bukti"), async (req, res, next) => {
  *       200: { description: Terhapus }
  *       404: { description: Tidak ditemukan }
  */
-router.put("/:id", upload.single("bukti"), async (req, res, next) => {
+router.put("/:id", upload.array("bukti"), async (req, res, next) => {
   try {
     const doc = await store.getKeuangan(req.userId, req.params.id);
     if (!doc) return res.status(404).json({ error: "entri tidak ditemukan" });
 
-    const tanggal = req.body.tanggal || doc.tanggal;
-    const patch = { tanggal };
-    if (req.file) {
-      if (doc.bukti_key) await removeFiles([doc.bukti_key]);
-      patch.bukti_key = await putFile(req.file.originalname, req.file.buffer, `keu_${tanggal}`);
+    // Sama seperti kegiatan: keep_keys = bukti lama yang dipertahankan,
+    // sisanya dihapus dari penyimpanan; berkas baru ditambahkan di belakang.
+    let keep = doc.bukti_keys;
+    if (req.body.keep_keys !== undefined) {
+      try {
+        keep = JSON.parse(req.body.keep_keys);
+      } catch {
+        return res.status(400).json({ error: "keep_keys harus JSON array" });
+      }
     }
+    await removeFiles(doc.bukti_keys.filter((k) => !keep.includes(k)));
+
+    const tanggal = req.body.tanggal || doc.tanggal;
+    const newKeys = [];
+    for (const f of req.files || []) {
+      newKeys.push(await putFile(f.originalname, f.buffer, `keu_${tanggal}`));
+    }
+
+    const patch = { tanggal, bukti_keys: [...keep, ...newKeys] };
     if (req.body.item !== undefined) patch.item = req.body.item.trim();
     if (req.body.harga_satuan !== undefined) patch.harga_satuan = Number(req.body.harga_satuan) || 0;
     if (req.body.satuan_suffix !== undefined) {
@@ -163,7 +182,7 @@ router.delete("/:id", async (req, res, next) => {
   try {
     const doc = await store.deleteKeuangan(req.userId, req.params.id);
     if (!doc) return res.status(404).json({ error: "entri tidak ditemukan" });
-    if (doc.bukti_key) await removeFiles([doc.bukti_key]);
+    await removeFiles(doc.bukti_keys);
     catatAktivitas(req.userId, "keuangan.hapus", {
       tanggal: doc.tanggal, ringkas: String(doc.item || "").slice(0, 60), total: doc.total,
     });

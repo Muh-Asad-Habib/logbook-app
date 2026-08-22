@@ -1483,9 +1483,14 @@ function tabelKeuangan(list){
       '<td class="num" style="white-space:nowrap">' + rp(e.harga_satuan) + esc(e.satuan_suffix || "") + "</td>" +
       '<td class="num">' + e.jumlah + "</td>" +
       '<td class="num" style="white-space:nowrap"><b>' + rp(e.total) + "</b></td>" +
-      "<td>" + (e.bukti_key
-        ? '<img class="th" loading="lazy" src="' + fotoUrl(e.bukti_key) + '" data-act="foto" data-key="' + esc(e.bukti_key) + '" alt="">'
-        : '<span class="mut">—</span>') + "</td>" +
+      "<td>" + (function(){
+        var keys = (e.bukti_keys && e.bukti_keys.length) ? e.bukti_keys
+                 : (e.bukti_key ? [e.bukti_key] : []);
+        if (!keys.length) return '<span class="mut">—</span>';
+        return keys.map(function(k){
+          return '<img class="th" loading="lazy" src="' + fotoUrl(k) + '" data-act="foto" data-key="' + esc(k) + '" alt="">';
+        }).join(" ");
+      })() + "</td>" +
     "</tr>";
   });
   out += '<tr><td colspan="5" style="text-align:right;font-weight:800">TOTAL</td>' +

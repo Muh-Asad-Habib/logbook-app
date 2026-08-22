@@ -51,18 +51,25 @@ const petaKegiatan = (r) => ({
   createdAt: r.created_at,
 });
 
-const petaKeuangan = (r) => ({
-  id: r.id,
-  userId: r.user_id,
-  tanggal: r.tanggal,
-  item: r.item,
-  harga_satuan: angka(r.harga_satuan),
-  satuan_suffix: r.satuan_suffix || "",
-  jumlah: angka(r.jumlah),
-  total: angka(r.total),
-  bukti_key: r.bukti_key || "",
-  createdAt: r.created_at,
-});
+const petaKeuangan = (r) => {
+  // bukti_keys = kanonik (array); bukti_key lama tetap dikirim (elemen
+  // pertama) supaya klien/skrip lama tidak rusak.
+  const keys = larik(r.bukti_keys);
+  if (!keys.length && r.bukti_key) keys.push(r.bukti_key);
+  return {
+    id: r.id,
+    userId: r.user_id,
+    tanggal: r.tanggal,
+    item: r.item,
+    harga_satuan: angka(r.harga_satuan),
+    satuan_suffix: r.satuan_suffix || "",
+    jumlah: angka(r.jumlah),
+    total: angka(r.total),
+    bukti_keys: keys,
+    bukti_key: keys[0] || "",
+    createdAt: r.created_at,
+  };
+};
 
 /** Dipanggil sekali saat server start — memastikan skema siap. */
 export async function load() {
@@ -163,7 +170,9 @@ export async function listUsersWithStats() {
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id)                    AS n_keu,
             (SELECT COALESCE(SUM(jsonb_array_length(k.foto_keys)), 0)
                FROM kegiatan k WHERE k.user_id = u.id)                                  AS n_foto_keg,
-            (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id AND b.bukti_key <> '') AS n_foto_keu,
+            (SELECT COALESCE(SUM(GREATEST(jsonb_array_length(b.bukti_keys),
+                                          (b.bukti_key <> '')::int)), 0)
+               FROM keuangan b WHERE b.user_id = u.id)                                  AS n_foto_keu,
             (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id)                    AS n_sesi,
             (SELECT COUNT(*) FROM laporan_docx l WHERE l.user_id = u.id)                AS n_laporan,
             (SELECT COUNT(*) FROM presentasi pr
@@ -232,6 +241,7 @@ export async function getUserDetail(userId) {
     satuan_suffix: e.satuan_suffix,
     jumlah: e.jumlah,
     total: e.total,
+    bukti_keys: e.bukti_keys,
     bukti_key: e.bukti_key,
   }));
   const danaAwal = Number(await getSetting(userId, "dana_awal", "0")) || 0;
@@ -265,9 +275,11 @@ export async function deleteUser(userId) {
     fileKeys.push(...larik(r.foto_keys));
   }
   for (const r of await q(
-    "SELECT bukti_key FROM keuangan WHERE user_id = $1 AND bukti_key <> ''", [userId]
+    "SELECT bukti_key, bukti_keys FROM keuangan WHERE user_id = $1", [userId]
   )) {
-    fileKeys.push(r.bukti_key);
+    const keys = larik(r.bukti_keys);
+    if (!keys.length && r.bukti_key) keys.push(r.bukti_key);
+    fileKeys.push(...keys);
   }
   // Laporan .docx di ImageKit ikut dihapus lewat fileKeys
   for (const r of await q(
@@ -477,7 +489,8 @@ export async function fileDimilikiOleh(key, userIds) {
   const rows = await q(
     `SELECT 1 FROM kegiatan WHERE user_id = ANY($1::text[]) AND foto_keys ? $2::text
      UNION ALL
-     SELECT 1 FROM keuangan WHERE user_id = ANY($1::text[]) AND bukti_key = $2::text
+     SELECT 1 FROM keuangan WHERE user_id = ANY($1::text[])
+        AND (bukti_keys ? $2::text OR bukti_key = $2::text)
      UNION ALL
      SELECT 1 FROM laporan_docx WHERE user_id = ANY($1::text[]) AND file_key = $2::text
      UNION ALL
@@ -561,7 +574,8 @@ export async function listKeuangan(userId) {
   return rows.map(petaKeuangan);
 }
 
-export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, bukti_key }) {
+export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, bukti_keys }) {
+  const keys = Array.isArray(bukti_keys) ? bukti_keys.filter(Boolean) : [];
   const e = {
     id: newId(),
     userId,
@@ -571,14 +585,15 @@ export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_
     satuan_suffix,
     jumlah,
     total: harga_satuan * jumlah,
-    bukti_key,
+    bukti_keys: keys,
+    bukti_key: keys[0] || "",
     createdAt: nowIso(),
   };
   await q(
-    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [e.id, e.userId, e.tanggal, e.item, e.harga_satuan, e.satuan_suffix,
-     e.jumlah, e.total, e.bukti_key || "", e.createdAt]
+     e.jumlah, e.total, e.bukti_key, JSON.stringify(e.bukti_keys), e.createdAt]
   );
   return e;
 }
@@ -592,13 +607,15 @@ export async function updateKeuangan(userId, id, patch) {
   const e = await getKeuangan(userId, id);
   if (!e) return null;
   Object.assign(e, patch);
+  e.bukti_keys = (e.bukti_keys || []).filter(Boolean);
+  e.bukti_key = e.bukti_keys[0] || ""; // kolom lama tetap sinkron
   e.total = e.harga_satuan * e.jumlah;
   await q(
     `UPDATE keuangan SET tanggal = $1, item = $2, harga_satuan = $3, satuan_suffix = $4,
-            jumlah = $5, total = $6, bukti_key = $7
-      WHERE id = $8 AND user_id = $9`,
+            jumlah = $5, total = $6, bukti_key = $7, bukti_keys = $8
+      WHERE id = $9 AND user_id = $10`,
     [e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total,
-     e.bukti_key || "", id, userId]
+     e.bukti_key, JSON.stringify(e.bukti_keys), id, userId]
   );
   await hapusPersetujuan("keuangan", id); // entri berubah → ACC batal
   return e;
