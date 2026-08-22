@@ -106,6 +106,53 @@ function imgSize(buf) {
   return { w: 4, h: 3 };
 }
 
+/* ---------------- ukuran foto SERAGAM di dokumen ---------------- */
+// Semua foto dipangkas (crop tengah) ke rasio tetap — LANDSCAPE 4:3,
+// POTRET 3:4 — lalu ditampilkan dengan ukuran sentimeter yang sama per
+// orientasi, sehingga kolom foto rapi dan enak dilihat.
+const RASIO_FOTO = 4 / 3;
+const LEBAR_FOTO = {
+  kegiatan: { landscape: 2.6, potret: 2.0 },   // cm
+  keuangan: { landscape: 2.2, potret: 1.7 },
+};
+const cmKeEmu = (cm) => Math.round(cm * 360000);
+
+/** Ukuran tampil (EMU) foto seragam menurut orientasi. */
+function ukuranSeragam(lebar, potret) {
+  const cx = cmKeEmu(potret ? lebar.potret : lebar.landscape);
+  const cy = Math.round(cx * (potret ? RASIO_FOTO : 1 / RASIO_FOTO));
+  return { cx, cy };
+}
+
+/**
+ * Pangkas foto ke rasio seragam (crop tengah, tanpa distorsi):
+ * landscape → 620×465 (4:3), potret → 465×620 (3:4).
+ * Dimensi kelipatan eksak rasio dipilih agar kompresi budget (fit inside)
+ * tetap menghasilkan rasio yang persis sama.
+ * @returns {{buf: Buffer, potret: boolean}|null} null bila format tak didukung.
+ */
+async function cropSeragam(buf) {
+  const isJpeg = buf?.[0] === 0xff && buf[1] === 0xd8;
+  const isPng = buf?.[0] === 0x89 && buf[1] === 0x50;
+  if (!isJpeg && !isPng) return null;
+  try {
+    const md = await sharp(buf).metadata();
+    let w = md.width, h = md.height;
+    if (!w || !h) return null;
+    if (md.orientation >= 5) [w, h] = [h, w]; // EXIF rotasi 90°
+    const potret = h > w;
+    const [tw, th] = potret ? [465, 620] : [620, 465];
+    let s = sharp(buf, { failOn: "none" }).rotate()
+      .resize(tw, th, { fit: "cover", position: "centre" });
+    s = isPng
+      ? s.png({ compressionLevel: 9 })
+      : s.jpeg({ quality: 68, progressive: true, mozjpeg: true });
+    return { buf: await s.toBuffer(), potret };
+  } catch {
+    return null;
+  }
+}
+
 /** Bangun XML gambar inline (drawing) untuk sel tabel. */
 function drawingXml(rid, docPrId, cx, cy) {
   return (
@@ -145,8 +192,8 @@ function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap, sizeMap, docXml =
     if (n >= docPrN) docPrN = n + 1;
   }
   return {
-    /** Sisipkan gambar; kembalikan XML drawing atau null. */
-    add(fileKey, widthCm = 2.6) {
+    /** Sisipkan gambar; `lebar` = { landscape, potret } dalam cm. */
+    add(fileKey, lebar = LEBAR_FOTO.kegiatan) {
       try {
         const buf = bufferMap.get(fileKey);
         if (!buf) return null;
@@ -165,10 +212,18 @@ function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap, sizeMap, docXml =
           "</Relationships>",
           `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${name}"/></Relationships>`
         );
-        // dimensi dari sharp; parser header manual hanya cadangan
-        const { w, h } = sizeMap?.get(fileKey) || imgSize(buf);
-        const cx = Math.round(widthCm * 360000);
-        const cy = Math.round(cx * (h / w));
+        // foto sudah dipangkas ke rasio seragam → ukuran tampil TETAP per
+        // orientasi; fallback rasio asli hanya untuk format yang tak
+        // didukung sharp (mis. gif)
+        const info = sizeMap?.get(fileKey);
+        let cx, cy;
+        if (info?.seragam) {
+          ({ cx, cy } = ukuranSeragam(lebar, info.potret));
+        } else {
+          const { w, h } = info || imgSize(buf);
+          cx = cmKeEmu(h > w ? lebar.potret : lebar.landscape);
+          cy = Math.round(cx * (h / w));
+        }
         return drawingXml(rid, docPrN++, cx, cy);
       } catch {
         return null;
@@ -448,20 +503,56 @@ export async function buildDocx(userId) {
   const relsRef = { value: await zip.file("word/_rels/document.xml.rels").async("string") };
   const ctRef = { value: await zip.file("[Content_Types].xml").async("string") };
 
-  // Kecilkan media bawaan template (foto lama tampil ±2,6 cm — 640px cukup).
-  // Ukuran tampilan diatur XML dokumen, jadi layout tidak berubah; ini menjaga
-  // hasil ekspor tetap jauh di bawah batas response serverless (±4,5 MB).
+  // Kenali dua tabel utama & foto lama di dalamnya SEBELUM memproses media,
+  // supaya foto lama bawaan template ikut diseragamkan ukurannya.
+  const tblRe = /<w:tbl>[\s\S]*?<\/w:tbl>/g;
+  const tables = docXml.match(tblRe) || [];
+  if (tables.length < 2) throw new Error("Struktur template tidak dikenali (butuh 2 tabel)");
+
+  // rId gambar yang dipakai di kedua tabel + peta rId → nama media
+  const ridDiTabel = new Set();
+  for (const t of tables.slice(0, 2)) {
+    for (const m of t.match(/r:embed="(rId\d+)"/g) || []) ridDiTabel.add(m.match(/rId\d+/)[0]);
+  }
+  const relTarget = new Map();
+  for (const m of relsRef.value.matchAll(/<Relationship[^>]*Id="(rId\d+)"[^>]*Target="([^"]+)"/g)) {
+    relTarget.set(m[1], m[2]);
+  }
+  const normTarget = (t) => "word/" + String(t || "").replace(/^\//, "").replace(/^word\//, "");
+  const mediaTabel = new Set([...ridDiTabel].map((r) => normTarget(relTarget.get(r))));
+
+  // Media bawaan template: foto tabel dipangkas ke rasio seragam; media lain
+  // (logo/kop) hanya dikompresi (foto lama tampil kecil — 640px cukup).
+  // Ukuran tampilan foto tabel disetel ulang lewat extentSeragam di bawah;
+  // ini juga menjaga hasil ekspor di bawah batas respons serverless (±4,5 MB).
+  const mediaSeragam = new Map(); // nama media → potret?
   await Promise.all(
     Object.keys(zip.files)
       .filter((n) => /^word\/media\//i.test(n) && !zip.files[n].dir)
       .map(async (n) => {
         try {
           const buf = await zip.file(n).async("nodebuffer");
+          if (mediaTabel.has(n)) {
+            const r = await cropSeragam(buf);
+            if (r) { zip.file(n, r.buf); mediaSeragam.set(n, r.potret); return; }
+          }
           const kecil = await compressForEmbed(buf);
           if (kecil.length < buf.length) zip.file(n, kecil);
         } catch {}
       })
   );
+
+  /** Setel ulang ukuran tampil drawing lama di tabel ke ukuran seragam. */
+  const extentSeragam = (tblXml, lebar) =>
+    tblXml.replace(/<w:drawing>[\s\S]*?<\/w:drawing>/g, (d) => {
+      const rid = (d.match(/r:embed="(rId\d+)"/) || [])[1];
+      const potret = rid ? mediaSeragam.get(normTarget(relTarget.get(rid))) : undefined;
+      if (potret === undefined) return d; // media tak dipangkas → biarkan
+      const { cx, cy } = ukuranSeragam(lebar, potret);
+      return d
+        .replace(/<wp:extent cx="\d+" cy="\d+"\/>/, `<wp:extent cx="${cx}" cy="${cy}"/>`)
+        .replace(/<a:ext cx="\d+" cy="\d+"\/>/, `<a:ext cx="${cx}" cy="${cy}"/>`);
+    });
 
   // Ambil data & seluruh foto dari cloud SEKALIGUS (paralel) sebelum menyusun XML
   const [pemilikTemplate, kegList, keuList] = await Promise.all([
@@ -482,6 +573,23 @@ export async function buildDocx(userId) {
     })
   );
 
+  // Pangkas semua foto baru ke rasio seragam (landscape 4:3 / potret 3:4).
+  // Dilakukan SEBELUM penjaga budget: kompresi lanjutan memakai fit-inside
+  // sehingga rasio hasil pangkas tetap persis sama.
+  const sizeMap = new Map();
+  await Promise.all([...bufferMap.entries()].map(async ([k, b]) => {
+    const r = await cropSeragam(b);
+    if (r) {
+      bufferMap.set(k, r.buf);
+      sizeMap.set(k, { potret: r.potret, seragam: true });
+    } else {
+      try {
+        const md = await sharp(b).metadata();
+        if (md.width && md.height) sizeMap.set(k, { w: md.width, h: md.height });
+      } catch {}
+    }
+  }));
+
   // PENJAGA UKURAN — logbook dengan puluhan foto bisa menembus batas respons
   // serverless Vercel (±4,5 MB) dan unduhan gagal tanpa pesan jelas.
   // Bila total sematan masih di atas anggaran, kompresi diperketat bertahap.
@@ -494,23 +602,14 @@ export async function buildDocx(userId) {
     }));
   }
 
-  // Dimensi asli tiap foto via sharp — rasio di dokumen selalu benar
-  // (dulu memakai parser header JPEG manual yang bisa jatuh ke fallback 4:3
-  // sehingga foto tampil gepeng/melar).
-  const sizeMap = new Map();
-  await Promise.all([...bufferMap.entries()].map(async ([k, b]) => {
-    try {
-      const md = await sharp(b).metadata();
-      if (md.width && md.height) sizeMap.set(k, { w: md.width, h: md.height });
-    } catch {}
-  }));
+  // Dimensi & orientasi sudah dicatat di sizeMap oleh cropSeragam di atas.
   const imgs = makeImageStore(zip, relsRef, ctRef, bufferMap, sizeMap, docXml);
 
-  // Pisahkan dua tabel utama
-  const tblRe = /<w:tbl>[\s\S]*?<\/w:tbl>/g;
-  const tables = docXml.match(tblRe) || [];
-  if (tables.length < 2) throw new Error("Struktur template tidak dikenali (butuh 2 tabel)");
+  // Dua tabel utama sudah dikenali di awal (tblRe/tables); langsung pakai.
   let [tblKeg, tblKeu] = tables;
+  // Foto lama bawaan template ikut diseragamkan ukur tampilnya
+  tblKeg = extentSeragam(tblKeg, LEBAR_FOTO.kegiatan);
+  tblKeu = extentSeragam(tblKeu, LEBAR_FOTO.keuangan);
 
   // Akun selain pemilik template: buang isi lama → dokumen hanya berisi data akun ini
   const stKeg = cellStyles(tblKeg);  // gaya sel diambil SEBELUM isi lama dibuang
@@ -526,7 +625,7 @@ export async function buildDocx(userId) {
     normalizeTableDates(tblKeg, stKeg[0]), kegEntries, stKeg[0]);
   const hasilKeg = fillTable(tblKegRapi, kegEntries, (e) => {
     const fotoXml = e.foto_keys
-      .map((k) => imgs.add(k, 2.6))
+      .map((k) => imgs.add(k, LEBAR_FOTO.kegiatan))
       .filter(Boolean)
       .map((d) => `<w:p>${stKeg[4]?.pPr || ""}<w:r>${d}</w:r></w:p>`)
       .join("") || emptyP();
@@ -544,7 +643,7 @@ export async function buildDocx(userId) {
   const tblKeuRapi = fillMissingDates(
     normalizeTableDates(tblKeu, stKeu[0]), keuEntries, stKeu[0]);
   const hasilKeu = fillTable(tblKeuRapi, keuEntries, (e) => {
-    const bukti = e.bukti_key ? imgs.add(e.bukti_key, 2.2) : null;
+    const bukti = e.bukti_key ? imgs.add(e.bukti_key, LEBAR_FOTO.keuangan) : null;
     return [
       P(fmtTgl(e.tanggal), stKeu[0]), P(e.item, stKeu[1]),
       P(`${fmtRupiah(e.harga_satuan)}${e.satuan_suffix || ""}`, stKeu[2]),

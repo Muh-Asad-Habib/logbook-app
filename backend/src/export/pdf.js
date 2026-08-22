@@ -181,7 +181,13 @@ export async function buildPdf(userId, namaTim = "") {
               fy += fh + gap;
               if (fy + fh > BATAS_BAWAH()) { doc.addPage(); fy = doc.y; }
             }
-            doc.image(buf, fx, fy, { fit: [fw, fh], align: "center", valign: "center" });
+            // cover + clip → semua thumbnail berukuran PENUH 88×66 yang
+            // seragam (bukan letterbox yang menyisakan ruang kosong dalam
+            // bingkai saat fotonya potret)
+            doc.save();
+            doc.roundedRect(fx, fy, fw, fh, 4).clip();
+            doc.image(buf, fx, fy, { cover: [fw, fh], align: "center", valign: "center" });
+            doc.restore();
             doc.roundedRect(fx, fy, fw, fh, 4).lineWidth(0.8).stroke(LINE);
             fx += fw + gap;
           } catch {}
@@ -247,10 +253,15 @@ export async function buildPdf(userId, namaTim = "") {
         if (vi === 4) doc.font("Helvetica");
         cx += cols[vi].w * W;
       });
-      // bukti thumbnail
+      // bukti thumbnail — cover + clip agar seragam memenuhi kotaknya
       try {
         if (adaBukti) {
-          doc.image(bufferMap.get(e.bukti_key), cx + 4, ry + 3, { fit: [cols[5].w * W - 12, 30] });
+          const bw = cols[5].w * W - 12, bh = 30;
+          doc.save();
+          doc.roundedRect(cx + 4, ry + 3, bw, bh, 3).clip();
+          doc.image(bufferMap.get(e.bukti_key), cx + 4, ry + 3, { cover: [bw, bh] });
+          doc.restore();
+          doc.roundedRect(cx + 4, ry + 3, bw, bh, 3).lineWidth(0.6).stroke(LINE);
         }
       } catch {}
       doc.y = ry + maxH + 8;
