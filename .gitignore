@@ -16,6 +16,7 @@ uploads/
 
 # alat bantu lokal
 tools/cloudflared.exe
+diag.txt
 
 # referensi desain (gambar lokal, tidak dipakai aplikasi)
 Referensi Desain UI/
