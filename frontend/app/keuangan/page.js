@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Save, Wallet, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Save, Wallet } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
@@ -24,6 +24,10 @@ const labelBulan = (kunci) => {
   const [y, m] = kunci.split("-").map(Number);
   return `${NAMA_BULAN[m - 1]} ${y}`;
 };
+
+/** Daftar key bukti sebuah entri — kompatibel dengan data lama (bukti_key). */
+const buktiKeys = (e) =>
+  e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
 
 /** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
 function useJumlahKomentar(jenis, timId, aktif = true) {
@@ -122,10 +126,12 @@ function KeuanganFasilitator() {
     rows.push({ jenis: "entri", e });
   }
 
-  const bukaBukti = (e) =>
+  const bukaBukti = (e, idx = 0) =>
     setLb({
-      items: [{ src: fotoUrl(e.bukti_key), judul: fmtTgl(e.tanggal), ket: e.item }],
-      index: 0,
+      items: buktiKeys(e).map((k) => ({
+        src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.item,
+      })),
+      index: idx,
     });
 
   return (
@@ -184,11 +190,16 @@ function KeuanganFasilitator() {
                     <td className="num">{r.e.jumlah}</td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
-                      {r.e.bukti_key ? (
-                        <img src={fotoUrl(r.e.bukti_key)} alt={`Bukti belanja: ${r.e.item}`} loading="lazy"
-                             onError={retryFoto} onClick={() => bukaBukti(r.e)}
-                             style={{ width: 44, height: 44, objectFit: "cover",
-                                      borderRadius: 8, cursor: "zoom-in" }} />
+                      {buktiKeys(r.e).length ? (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {buktiKeys(r.e).map((k, i) => (
+                            <img key={k} src={thumbUrl(k, 120)}
+                                 alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
+                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)}
+                                 style={{ width: 44, height: 44, objectFit: "cover",
+                                          borderRadius: 8, cursor: "zoom-in" }} />
+                          ))}
+                        </div>
                       ) : "—"}
                     </td>
                     <td className="aksi">
@@ -216,10 +227,13 @@ function KeuanganFasilitator() {
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
-                  {e.bukti_key && (
+                  {buktiKeys(e).length > 0 && (
                     <div className="foto-row">
-                      <img src={fotoUrl(e.bukti_key)} alt={`Bukti belanja: ${e.item}`} loading="lazy"
-                           onError={retryFoto} onClick={() => bukaBukti(e)} />
+                      {buktiKeys(e).map((k, i) => (
+                        <img key={k} src={thumbUrl(k, 240)}
+                             alt={`Bukti belanja ${i + 1}: ${e.item}`} loading="lazy"
+                             onError={retryFoto} onClick={() => bukaBukti(e, i)} />
+                      ))}
                     </div>
                   )}
                   <AccPanel jenis="keuangan" targetId={e.id} timId={timId}
@@ -277,10 +291,12 @@ function KeuanganTim() {
     }
   };
 
-  const bukaBukti = (e) =>
+  const bukaBukti = (e, idx = 0) =>
     setLb({
-      items: [{ src: fotoUrl(e.bukti_key), judul: fmtTgl(e.tanggal), ket: e.item }],
-      index: 0,
+      items: buktiKeys(e).map((k) => ({
+        src: fotoUrl(k), judul: fmtTgl(e.tanggal), ket: e.item,
+      })),
+      index: idx,
     });
 
   if (items === undefined && !loadErr) return <div className="skel mt" style={{ height: 220 }} />;
@@ -371,11 +387,16 @@ function KeuanganTim() {
                     <td className="num">{r.e.jumlah}</td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
-                      {r.e.bukti_key ? (
-                        <img src={fotoUrl(r.e.bukti_key)} alt={`Bukti belanja: ${r.e.item}`} loading="lazy"
-                             onError={retryFoto} onClick={() => bukaBukti(r.e)}
-                             style={{ width: 44, height: 44, objectFit: "cover",
-                                      borderRadius: 8, cursor: "zoom-in" }} />
+                      {buktiKeys(r.e).length ? (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {buktiKeys(r.e).map((k, i) => (
+                            <img key={k} src={thumbUrl(k, 120)}
+                                 alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
+                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)}
+                                 style={{ width: 44, height: 44, objectFit: "cover",
+                                          borderRadius: 8, cursor: "zoom-in" }} />
+                          ))}
+                        </div>
                       ) : "—"}
                     </td>
                     <td className="aksi">
@@ -410,10 +431,13 @@ function KeuanganTim() {
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
-                  {e.bukti_key && (
+                  {buktiKeys(e).length > 0 && (
                     <div className="foto-row">
-                      <img src={fotoUrl(e.bukti_key)} alt={`Bukti belanja: ${e.item}`} loading="lazy"
-                           onError={retryFoto} onClick={() => bukaBukti(e)} />
+                      {buktiKeys(e).map((k, i) => (
+                        <img key={k} src={thumbUrl(k, 240)}
+                             alt={`Bukti belanja ${i + 1}: ${e.item}`} loading="lazy"
+                             onError={retryFoto} onClick={() => bukaBukti(e, i)} />
+                      ))}
                     </div>
                   )}
                   <AccPanel jenis="keuangan" targetId={e.id} acc={acc[e.id]} onChange={muatAcc} />
@@ -454,22 +478,26 @@ function KeuanganTim() {
 }
 
 const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, ref) {
+  const [keep, setKeep] = useState(() => (entri ? buktiKeys(entri) : []));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [harga, setHarga] = useState(entri?.harga_satuan ?? 0);
   const [jumlah, setJumlah] = useState(entri?.jumlah ?? 1);
+  const lama = entri ? buktiKeys(entri) : [];
 
   const submit = async (ev) => {
     ev.preventDefault();
     setBusy(true);
     setErr("");
     const fd = new FormData(ev.target);
+    if (entri) fd.set("keep_keys", JSON.stringify(keep));
     try {
       // Kompres bukti di browser — hindari 413 (limit body ±4,5 MB di Vercel)
       const totalBukti = await kompresFormFoto(fd, "bukti");
       if (totalBukti > BATAS_UPLOAD) {
         throw new Error(
-          `Bukti masih ${fmtUkuran(totalBukti)} setelah dikompres — maksimal ±4 MB.`
+          `Total bukti masih ${fmtUkuran(totalBukti)} setelah dikompres — ` +
+          `maksimal ±4 MB per simpan. Kurangi jumlahnya, lalu tambahkan sisanya lewat Edit.`
         );
       }
       if (entri) await api.updateKeuangan(entri.id, fd);
@@ -521,14 +549,28 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           </b>
         </p>
 
-        {entri?.bukti_key && (
-          <p className="muted mts">
-            <Eye className="lucide" /> Bukti saat ini sudah ada — unggah file baru untuk mengganti.
-          </p>
+        {lama.length > 0 && (
+          <>
+            <p className="muted mt">Hilangkan centang untuk menghapus bukti lama:</p>
+            <div className="foto-row">
+              {lama.map((k) => (
+                <label key={k} style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600 }}>
+                  <img src={thumbUrl(k, 240)} alt="bukti" onError={retryFoto} style={{ cursor: "default" }} />
+                  <br />
+                  <input
+                    type="checkbox" checked={keep.includes(k)}
+                    onChange={(ev) =>
+                      setKeep((old) => ev.target.checked ? [...old, k] : old.filter((x) => x !== k))
+                    }
+                  /> simpan
+                </label>
+              ))}
+            </div>
+          </>
         )}
         <label className="field mt">
-          Bukti/nota
-          <input type="file" name="bukti" accept="image/png,image/jpeg,image/webp" />
+          {entri ? "Tambah bukti baru" : "Bukti/nota (boleh lebih dari satu)"}
+          <input type="file" name="bukti" accept="image/png,image/jpeg,image/webp" multiple />
         </label>
 
         {err && <div className="error-box mt">{err}</div>}

@@ -612,7 +612,7 @@ export async function buildDocx(userId) {
   ]);
   const semuaKey = [
     ...kegList.flatMap((e) => e.foto_keys || []),
-    ...keuList.map((e) => e.bukti_key).filter(Boolean),
+    ...keuList.flatMap((e) => e.bukti_keys || []),
   ];
   const bufferMap = new Map();
   await Promise.all(
@@ -696,12 +696,16 @@ export async function buildDocx(userId) {
   const tblKeuRapi = fillMissingDates(
     normalizeTableDates(tblKeu, stKeu[0]), keuEntries, stKeu[0]);
   const hasilKeu = fillTable(tblKeuRapi, keuEntries, (e) => {
-    const bukti = e.bukti_key ? imgs.add(e.bukti_key, lebarKeu) : null;
+    const buktiXml = (e.bukti_keys || [])
+      .map((k) => imgs.add(k, lebarKeu))
+      .filter(Boolean)
+      .map((d) => `<w:p>${stKeu[5]?.pPr || ""}<w:r>${d}</w:r></w:p>`)
+      .join("") || emptyP();
     return [
       P(fmtTgl(e.tanggal), stKeu[0]), P(e.item, stKeu[1]),
       P(`${fmtRupiah(e.harga_satuan)}${e.satuan_suffix || ""}`, stKeu[2]),
       P(String(e.jumlah), stKeu[3]), P(fmtRupiah(e.total), stKeu[4]),
-      bukti ? `<w:p>${stKeu[5]?.pPr || ""}<w:r>${bukti}</w:r></w:p>` : emptyP(),
+      buktiXml,
     ];
   }, (row, e) => replaceCells(row, {
     // baris lama yang cocok → segarkan tanggal/harga/jumlah/total (bukti dibiarkan)

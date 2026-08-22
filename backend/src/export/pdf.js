@@ -37,7 +37,7 @@ export async function buildPdf(userId, namaTim = "") {
 
   const semuaKey = [
     ...kegiatan.flatMap((e) => (e.foto_keys || []).slice(0, 8)),
-    ...keuangan.map((e) => e.bukti_key).filter(Boolean),
+    ...keuangan.flatMap((e) => e.bukti_keys || []),
   ];
   const bufferMap = new Map();
   await Promise.all(
@@ -239,8 +239,11 @@ export async function buildPdf(userId, namaTim = "") {
         const h = doc.heightOfString(v, { width: cols[vi].w * W - 12 });
         maxH = Math.max(maxH, h);
       });
-      const adaBukti = e.bukti_key && bufferMap.get(e.bukti_key);
-      if (adaBukti) maxH = Math.max(maxH, 32);
+      const buktiBufs = (e.bukti_keys || [])
+        .map((k) => bufferMap.get(k))
+        .filter(Boolean);
+      // thumbnail 30pt + jarak 4pt, bertumpuk vertikal di kolom Bukti
+      if (buktiBufs.length) maxH = Math.max(maxH, buktiBufs.length * 34 - 2);
       if (genap) doc.rect(X, ry - 1, W, maxH + 9).fill(ZEBRA);
       genap = !genap;
 
@@ -253,15 +256,18 @@ export async function buildPdf(userId, namaTim = "") {
         if (vi === 4) doc.font("Helvetica");
         cx += cols[vi].w * W;
       });
-      // bukti thumbnail — cover + clip agar seragam memenuhi kotaknya
+      // bukti thumbnail — cover + clip agar seragam memenuhi kotaknya;
+      // lebih dari satu bukti ditumpuk vertikal dalam kolom
       try {
-        if (adaBukti) {
-          const bw = cols[5].w * W - 12, bh = 30;
+        const bw = cols[5].w * W - 12, bh = 30;
+        let by = ry + 3;
+        for (const buf of buktiBufs) {
           doc.save();
-          doc.roundedRect(cx + 4, ry + 3, bw, bh, 3).clip();
-          doc.image(bufferMap.get(e.bukti_key), cx + 4, ry + 3, { cover: [bw, bh] });
+          doc.roundedRect(cx + 4, by, bw, bh, 3).clip();
+          doc.image(buf, cx + 4, by, { cover: [bw, bh] });
           doc.restore();
-          doc.roundedRect(cx + 4, ry + 3, bw, bh, 3).lineWidth(0.6).stroke(LINE);
+          doc.roundedRect(cx + 4, by, bw, bh, 3).lineWidth(0.6).stroke(LINE);
+          by += bh + 4;
         }
       } catch {}
       doc.y = ry + maxH + 8;

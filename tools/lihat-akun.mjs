@@ -31,12 +31,14 @@ for (const e of keg) {
 }
 
 const keu = await q(
-  "SELECT id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key FROM keuangan WHERE user_id = $1 ORDER BY tanggal, created_at",
+  "SELECT id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys FROM keuangan WHERE user_id = $1 ORDER BY tanggal, created_at",
   [u.id]
 );
 console.log(`\n=== KEUANGAN (${keu.length}) ===`);
 for (const e of keu) {
-  console.log(`[${e.id}] ${e.tanggal} | ${e.item} | Rp${e.harga_satuan}${e.satuan_suffix || ""} x ${e.jumlah} = Rp${e.total} | bukti: ${e.bukti_key || "-"}`);
+  const keys = Array.isArray(e.bukti_keys) ? e.bukti_keys : JSON.parse(e.bukti_keys || "[]");
+  if (!keys.length && e.bukti_key) keys.push(e.bukti_key);
+  console.log(`[${e.id}] ${e.tanggal} | ${e.item} | Rp${e.harga_satuan}${e.satuan_suffix || ""} x ${e.jumlah} = Rp${e.total} | bukti: ${keys.join(", ") || "-"}`);
 }
 
 const set = await q("SELECT kunci, nilai FROM pengaturan WHERE user_id = $1", [u.id]);
