@@ -125,6 +125,56 @@ function ukuranSeragam(lebar, potret) {
 }
 
 /**
+ * Hitung lebar foto dari LEBAR KOLOM terakhir tabel (kolom Foto/Bukti)
+ * pada <w:tblGrid> — foto landscape MEMENUHI lebar kolom (− margin sel),
+ * potret memakai dimensi sama diputar (tinggi potret = lebar landscape)
+ * agar serasi, tidak terlalu besar/kecil. Fallback bila grid tak terbaca.
+ */
+function lebarFotoDariGrid(tblXml, fallback) {
+  const grid = (tblXml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || [])
+    .map((g) => Number(g.match(/w:w="(\d+)"/)[1]));
+  if (grid.length < 2) return fallback;
+  const cm = grid[grid.length - 1] / 567 - 0.42; // − margin sel kiri+kanan
+  if (!(cm >= 1.2 && cm <= 12)) return fallback;
+  const landscape = Math.round(cm * 100) / 100;
+  return { landscape, potret: Math.round(landscape * 75) / 100 };
+}
+
+/**
+ * Percantik baris judul tabel: latar indigo (selaras UI aplikasi),
+ * teks putih tebal rata tengah, vertikal tengah, dan diulang otomatis
+ * di tiap halaman (tblHeader).
+ */
+function percantikHeader(tblXml) {
+  let xml = tblXml;
+  for (const row of rowsOf(tblXml)) {
+    if (!isHeaderRow(row)) continue;
+    let baru = row.replace(/<w:tc>[\s\S]*?<\/w:tc>/g, (cell) => {
+      const teks = textOf(cell).replace(/\s+/g, " ").trim();
+      let tcPr = (cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || ["<w:tcPr></w:tcPr>"])[0];
+      tcPr = tcPr
+        .replace(/<w:shd [^>]*\/>/g, "")
+        .replace(/<w:vAlign [^>]*\/>/g, "")
+        .replace("</w:tcPr>",
+          `<w:shd w:val="clear" w:color="auto" w:fill="4F46E5"/>` +
+          `<w:vAlign w:val="center"/></w:tcPr>`);
+      const p =
+        `<w:p><w:pPr><w:spacing w:before="60" w:after="60"/><w:jc w:val="center"/></w:pPr>` +
+        `<w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="20"/></w:rPr>` +
+        `<w:t xml:space="preserve">${esc(teks)}</w:t></w:r></w:p>`;
+      return `<w:tc>${tcPr}${p}</w:tc>`;
+    });
+    if (!/<w:tblHeader\b/.test(baru)) {
+      baru = /<w:trPr>/.test(baru)
+        ? baru.replace("<w:trPr>", "<w:trPr><w:tblHeader/><w:cantSplit/>")
+        : baru.replace(/<w:tr( [^>]*)?>/, (m) => `${m}<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>`);
+    }
+    xml = xml.replace(row, () => baru);
+  }
+  return xml;
+}
+
+/**
  * Pangkas foto ke rasio seragam (crop tengah, tanpa distorsi):
  * landscape → 620×465 (4:3), potret → 465×620 (3:4).
  * Dimensi kelipatan eksak rasio dipilih agar kompresi budget (fit inside)
@@ -607,9 +657,12 @@ export async function buildDocx(userId) {
 
   // Dua tabel utama sudah dikenali di awal (tblRe/tables); langsung pakai.
   let [tblKeg, tblKeu] = tables;
-  // Foto lama bawaan template ikut diseragamkan ukur tampilnya
-  tblKeg = extentSeragam(tblKeg, LEBAR_FOTO.kegiatan);
-  tblKeu = extentSeragam(tblKeu, LEBAR_FOTO.keuangan);
+  // Lebar foto mengikuti lebar kolom Foto/Bukti masing-masing tabel
+  const lebarKeg = lebarFotoDariGrid(tblKeg, LEBAR_FOTO.kegiatan);
+  const lebarKeu = lebarFotoDariGrid(tblKeu, LEBAR_FOTO.keuangan);
+  // Foto lama bawaan template ikut diseragamkan ukuran tampilnya
+  tblKeg = extentSeragam(tblKeg, lebarKeg);
+  tblKeu = extentSeragam(tblKeu, lebarKeu);
 
   // Akun selain pemilik template: buang isi lama → dokumen hanya berisi data akun ini
   const stKeg = cellStyles(tblKeg);  // gaya sel diambil SEBELUM isi lama dibuang
@@ -625,7 +678,7 @@ export async function buildDocx(userId) {
     normalizeTableDates(tblKeg, stKeg[0]), kegEntries, stKeg[0]);
   const hasilKeg = fillTable(tblKegRapi, kegEntries, (e) => {
     const fotoXml = e.foto_keys
-      .map((k) => imgs.add(k, LEBAR_FOTO.kegiatan))
+      .map((k) => imgs.add(k, lebarKeg))
       .filter(Boolean)
       .map((d) => `<w:p>${stKeg[4]?.pPr || ""}<w:r>${d}</w:r></w:p>`)
       .join("") || emptyP();
@@ -643,7 +696,7 @@ export async function buildDocx(userId) {
   const tblKeuRapi = fillMissingDates(
     normalizeTableDates(tblKeu, stKeu[0]), keuEntries, stKeu[0]);
   const hasilKeu = fillTable(tblKeuRapi, keuEntries, (e) => {
-    const bukti = e.bukti_key ? imgs.add(e.bukti_key, LEBAR_FOTO.keuangan) : null;
+    const bukti = e.bukti_key ? imgs.add(e.bukti_key, lebarKeu) : null;
     return [
       P(fmtTgl(e.tanggal), stKeu[0]), P(e.item, stKeu[1]),
       P(`${fmtRupiah(e.harga_satuan)}${e.satuan_suffix || ""}`, stKeu[2]),
@@ -660,9 +713,10 @@ export async function buildDocx(userId) {
 
   // Susun ulang dokumen (ganti kedua tabel sesuai urutan) —
   // baris data diurutkan kronologis lebih dulu agar entri baru tidak
-  // sekadar menumpuk di akhir tabel.
-  const kegXml = sortRowsByDate(hasilKeg.xml);
-  const keuXml = sortRowsByDate(hasilKeu.xml);
+  // sekadar menumpuk di akhir tabel; baris judul dipercantik (latar indigo,
+  // teks putih tebal, diulang tiap halaman).
+  const kegXml = sortRowsByDate(percantikHeader(hasilKeg.xml));
+  const keuXml = sortRowsByDate(percantikHeader(hasilKeu.xml));
   let idx = 0;
   docXml = docXml.replace(tblRe, (m) => {
     idx += 1;

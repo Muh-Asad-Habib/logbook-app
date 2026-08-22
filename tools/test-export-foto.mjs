@@ -97,6 +97,84 @@ for (const dim of [480, 360, 260]) {
     md.width * 4 === md.height * 3);
 }
 
+/* ---------------- lebar foto dari grid tabel ---------------- */
+function lebarFotoDariGrid(tblXml, fallback) {
+  const grid = (tblXml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || [])
+    .map((g) => Number(g.match(/w:w="(\d+)"/)[1]));
+  if (grid.length < 2) return fallback;
+  const cm = grid[grid.length - 1] / 567 - 0.42;
+  if (!(cm >= 1.2 && cm <= 12)) return fallback;
+  const landscape = Math.round(cm * 100) / 100;
+  return { landscape, potret: Math.round(landscape * 75) / 100 };
+}
+
+const FALLBACK = { landscape: 2.6, potret: 2.0 };
+// grid 5 kolom, kolom foto terakhir 1985 twips ≈ 3,5 cm → 3,08 cm setelah margin
+const tblGrid = `<w:tbl><w:tblGrid><w:gridCol w:w="1520"/><w:gridCol w:w="3260"/>` +
+  `<w:gridCol w:w="1100"/><w:gridCol w:w="1100"/><w:gridCol w:w="1985"/></w:tblGrid></w:tbl>`;
+const lg = lebarFotoDariGrid(tblGrid, FALLBACK);
+cek("lebar landscape dari grid = kolom − margin (3,08 cm)", lg.landscape === 3.08);
+cek("lebar potret = 3/4 landscape (2,31 cm)", lg.potret === 2.31);
+cek("tinggi potret = lebar landscape (footprint diputar)",
+  Math.abs(lg.potret * (4 / 3) - lg.landscape) < 0.01);
+cek("grid tak terbaca → fallback",
+  lebarFotoDariGrid("<w:tbl></w:tbl>", FALLBACK) === FALLBACK);
+cek("kolom terlalu sempit (<1,2 cm) → fallback",
+  lebarFotoDariGrid(`<w:tbl><w:tblGrid><w:gridCol w:w="500"/><w:gridCol w:w="600"/></w:tblGrid></w:tbl>`, FALLBACK) === FALLBACK);
+
+/* ---------------- percantik header tabel ---------------- */
+const esc = (s) => String(s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+const rowsOf = (t) => t.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [];
+const textOf = (xml) => (xml.match(/<w:t[^>]*>[\s\S]*?<\/w:t>/g) || [])
+  .map((x) => x.replace(/<[^>]+>/g, "")).join(" ");
+const isHeaderRow = (tr) => {
+  const t = textOf(tr).toLowerCase();
+  return t.includes("tanggal") && (t.includes("kegiatan") || t.includes("item") || t.includes("harga"));
+};
+function percantikHeader(tblXml) {
+  let xml = tblXml;
+  for (const row of rowsOf(tblXml)) {
+    if (!isHeaderRow(row)) continue;
+    let baru = row.replace(/<w:tc>[\s\S]*?<\/w:tc>/g, (cell) => {
+      const teks = textOf(cell).replace(/\s+/g, " ").trim();
+      let tcPr = (cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || ["<w:tcPr></w:tcPr>"])[0];
+      tcPr = tcPr
+        .replace(/<w:shd [^>]*\/>/g, "")
+        .replace(/<w:vAlign [^>]*\/>/g, "")
+        .replace("</w:tcPr>",
+          `<w:shd w:val="clear" w:color="auto" w:fill="4F46E5"/>` +
+          `<w:vAlign w:val="center"/></w:tcPr>`);
+      const p =
+        `<w:p><w:pPr><w:spacing w:before="60" w:after="60"/><w:jc w:val="center"/></w:pPr>` +
+        `<w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="20"/></w:rPr>` +
+        `<w:t xml:space="preserve">${esc(teks)}</w:t></w:r></w:p>`;
+      return `<w:tc>${tcPr}${p}</w:tc>`;
+    });
+    if (!/<w:tblHeader\b/.test(baru)) {
+      baru = /<w:trPr>/.test(baru)
+        ? baru.replace("<w:trPr>", "<w:trPr><w:tblHeader/><w:cantSplit/>")
+        : baru.replace(/<w:tr( [^>]*)?>/, (m) => `${m}<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>`);
+    }
+    xml = xml.replace(row, () => baru);
+  }
+  return xml;
+}
+
+const tcU = (t) => `<w:tc><w:tcPr><w:tcW w:w="1000"/><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
+const tblHdr = `<w:tbl><w:tr>${tcU("Tanggal")}${tcU("Kegiatan")}${tcU("Foto")}</w:tr>` +
+  `<w:tr>${tcU("16 Juni 2026")}${tcU("Rapat")}${tcU("")}</w:tr></w:tbl>`;
+const hasilHdr = percantikHeader(tblHdr);
+const barisHdr = rowsOf(hasilHdr)[0];
+cek("header dapat latar indigo 4F46E5", barisHdr.includes('w:fill="4F46E5"'));
+cek("shading abu lama terganti (tidak dobel)", !barisHdr.includes('w:fill="D9D9D9"'));
+cek("teks header putih tebal", barisHdr.includes("<w:b/>") && barisHdr.includes('w:val="FFFFFF"'));
+cek("teks header rata tengah", barisHdr.includes('<w:jc w:val="center"/>'));
+cek("header diulang tiap halaman (tblHeader)", barisHdr.includes("<w:tblHeader/>"));
+cek("teks header tetap utuh", textOf(barisHdr).includes("Tanggal") && textOf(barisHdr).includes("Foto"));
+cek("baris data TIDAK tersentuh", rowsOf(hasilHdr)[1].includes('w:fill="D9D9D9"'));
+
 console.log(gagal ? `\n${gagal} PENGUJIAN GAGAL` : "\nSEMUA PENGUJIAN LULUS");
 process.exit(gagal ? 1 : 0);
 
