@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import {
   FileText, Printer, Sheet, Download, Upload, FileOutput, Lightbulb, TriangleAlert,
+  Images,
 } from "lucide-react";
 import { api, exportUrl, useApi, refreshData } from "@/lib/api";
+import { unduhZipFoto, susunDaftarZip } from "@/lib/unduh";
 import { toast } from "@/components/Toast";
 
 const KARTU = [
@@ -35,6 +37,32 @@ export default function EksporPage() {
   const [busyImpor, setBusyImpor] = useState(false);
   const [progres, setProgres] = useState(0);
   const [hasilImpor, setHasilImpor] = useState(null);
+  const [busyZip, setBusyZip] = useState(false);
+  const [progresZip, setProgresZip] = useState("");
+
+  // Unduh SEMUA foto (kegiatan + bukti keuangan) sebagai satu ZIP dengan
+  // folder per tanggal — dirakit di browser agar bebas batas respons Vercel.
+  const unduhSemuaFoto = async () => {
+    setBusyZip(true);
+    setProgresZip("Menyiapkan daftar…");
+    try {
+      const [keg, keu] = await Promise.all([api.listKegiatan(), api.listKeuangan()]);
+      const daftar = susunDaftarZip(keg, keu);
+      if (!daftar.length) {
+        toast.err("Belum ada foto untuk diunduh");
+        return;
+      }
+      const n = await unduhZipFoto(daftar, "foto-logbook.zip", (selesai, total) =>
+        setProgresZip(`Mengunduh ${selesai}/${total} foto…`)
+      );
+      toast.ok(`${n} foto tersimpan di foto-logbook.zip`);
+    } catch (e) {
+      toast.err(`Gagal mengunduh: ${e.message}`);
+    } finally {
+      setBusyZip(false);
+      setProgresZip("");
+    }
+  };
 
   const loadErr = e1 || e2;
   useEffect(() => {
@@ -102,6 +130,19 @@ export default function EksporPage() {
             </a>
           </div>
         ))}
+        <div className="card" style={{ display: "flex", flexDirection: "column" }}>
+          <div className="metric" style={{ marginBottom: 10 }}>
+            <div className="metric-ic v2"><Images className="lucide" /></div>
+            <div className="metric-value" style={{ fontSize: "1.02rem" }}>Semua Foto (.zip)</div>
+          </div>
+          <p className="muted" style={{ flex: 1 }}>
+            Seluruh foto kegiatan &amp; bukti keuangan dalam format JPG, tersusun dalam
+            folder per tanggal (mis. <code>kegiatan/2026-06-03/foto-1.jpg</code>).
+          </p>
+          <button className="btn primary mt" onClick={unduhSemuaFoto} disabled={busyZip}>
+            <Download className="lucide" /> {busyZip ? (progresZip || "Menyiapkan…") : "Unduh ZIP Foto"}
+          </button>
+        </div>
       </div>
 
       <div className="card mt">

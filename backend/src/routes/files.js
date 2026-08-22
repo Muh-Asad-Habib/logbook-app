@@ -1,6 +1,9 @@
 import { Router } from "express";
 import fs from "node:fs";
-import { safePath, contentType, signedUrl, pakaiCloud, thumbLokal } from "../files.js";
+import sharp from "sharp";
+import {
+  safePath, contentType, signedUrl, pakaiCloud, thumbLokal, getFileBuffer,
+} from "../files.js";
 import { authRequired } from "../auth.js";
 import * as store from "../storage.js";
 
@@ -40,6 +43,11 @@ function lebarDiminta(req) {
  *         name: key
  *         required: true
  *         schema: { type: string, example: "keg_2026-07-11_1720680000-ab12cd.jpg" }
+ *       - in: query
+ *         name: dl
+ *         required: false
+ *         description: "1 = unduh sebagai lampiran JPG (PNG/WebP dikonversi otomatis)"
+ *         schema: { type: string, enum: ["1"] }
  *     responses:
  *       302: { description: Dialihkan ke signed URL CDN (mode cloud) }
  *       200:
@@ -72,6 +80,40 @@ router.get(/^\/(.+)/, async (req, res) => {
     }
 
     const lebar = lebarDiminta(req);
+
+    // ---- MODE UNDUH (?dl=1): kirim sebagai lampiran JPG resolusi penuh ----
+    // Dipakai tombol ⬇ di Lightbox & unduhan ZIP di frontend. PNG/WebP
+    // dikonversi ke JPG (sharp); GIF dilewatkan apa adanya agar animasi
+    // tidak rusak. Di mode cloud byte diproksikan (bukan redirect) karena
+    // unduhan butuh header Content-Disposition dari kita sendiri.
+    if (req.query.dl === "1") {
+      const buf = pakaiCloud()
+        ? await getFileBuffer(key)
+        : (fs.existsSync(safePath(key)) ? fs.readFileSync(safePath(key)) : null);
+      if (!buf) return res.status(404).json({ error: "berkas tidak ditemukan" });
+
+      let out = buf;
+      let ext = ".jpg";
+      let ct = "image/jpeg";
+      if (/\.gif$/i.test(key)) {
+        ext = ".gif";
+        ct = "image/gif";
+      } else if (!/\.jpe?g$/i.test(key)) {
+        try {
+          out = await sharp(buf, { failOn: "none" })
+            .rotate()
+            .jpeg({ quality: 90, progressive: true, mozjpeg: true })
+            .toBuffer();
+        } catch {
+          out = buf; // konversi gagal → kirim byte asli (tetap terunduh)
+        }
+      }
+      const nama = key.replace(/\.[^.]+$/, "") + ext;
+      res.setHeader("Content-Type", ct);
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(nama)}"`);
+      res.setHeader("Cache-Control", "private, max-age=0");
+      return res.end(out);
+    }
 
     if (pakaiCloud()) {
       // Backend hanya jadi "satpam": cek token + kepemilikan, lalu alihkan

@@ -2,13 +2,14 @@
 
 import { forwardRef, useEffect, useRef, useState } from "react";
 import {
-  Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange,
+  Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange, Download,
 } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtDurasi, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
+import { unduhFotoEntri } from "@/lib/unduh";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
@@ -31,6 +32,29 @@ function DateTile({ iso }) {
       <span className="d">{d}</span>
       <span className="m">{BULAN[m - 1]} {y}</span>
     </div>
+  );
+}
+
+/** Tombol unduh semua foto sebuah entri (1 foto → JPG, lebih → ZIP). */
+function TombolUnduhFoto({ keys, tanggal, awalan = "kegiatan", label = "foto" }) {
+  const [busy, setBusy] = useState(false);
+  if (!keys?.length) return null;
+  const unduh = async () => {
+    setBusy(true);
+    try {
+      await unduhFotoEntri(keys, tanggal, awalan, label);
+      if (keys.length > 1) toast.ok(`${keys.length} foto diunduh sebagai ZIP`);
+    } catch (e) {
+      toast.err(`Gagal mengunduh: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button className="btn sm" onClick={unduh} disabled={busy}
+            title={keys.length > 1 ? `Unduh ${keys.length} foto (ZIP)` : "Unduh foto (JPG)"}>
+      <Download className="lucide" /> {busy ? "Mengunduh…" : `Unduh foto${keys.length > 1 ? ` (${keys.length})` : ""}`}
+    </button>
   );
 }
 
@@ -189,6 +213,11 @@ function KegiatanFasilitator() {
                         ))}
                       </div>
                     )}
+                    {e.foto_keys.length > 0 && (
+                      <div className="mts">
+                        <TombolUnduhFoto keys={e.foto_keys} tanggal={e.tanggal} />
+                      </div>
+                    )}
                     <AccPanel jenis="kegiatan" targetId={e.id} timId={timId}
                               acc={acc[e.id]} onChange={muatAcc} />
                     <KomentarPanel jenis="kegiatan" targetId={e.id} timId={timId}
@@ -341,6 +370,7 @@ function KegiatanTim() {
                     <button className="btn sm danger" onClick={() => hapus(e)}>
                       <Trash2 className="lucide" /> Hapus
                     </button>
+                    <TombolUnduhFoto keys={e.foto_keys} tanggal={e.tanggal} />
                   </div>
                 </div>
               </div>

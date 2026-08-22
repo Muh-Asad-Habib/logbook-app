@@ -692,6 +692,7 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 .lb-btn:hover { background: rgba(255, 255, 255, 0.25); transform: scale(1.08); }
 .lb-btn:active { transform: scale(0.94); }
 .lb-close { top: calc(14px + env(safe-area-inset-top)); right: 14px; }
+.lb-dl { top: calc(14px + env(safe-area-inset-top)); right: 66px; }
 .lb-prev { left: 10px; top: 50%; transform: translateY(-50%); }
 .lb-next { right: 10px; top: 50%; transform: translateY(-50%); }
 .lb-prev:hover, .lb-next:hover { transform: translateY(-50%) scale(1.08); }

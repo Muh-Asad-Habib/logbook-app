@@ -11,7 +11,7 @@
  *   {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { retryFoto } from "@/lib/foto";
 
 export default function Lightbox({ items, index = 0, onClose }) {
@@ -24,7 +24,7 @@ export default function Lightbox({ items, index = 0, onClose }) {
   const prev = useCallback(() => setI((v) => (v - 1 + n) % n), [n]);
   const next = useCallback(() => setI((v) => (v + 1) % n), [n]);
 
-  // Keyboard: Esc tutup, panah pindah, Tab terkunci di dalam dialog (focus-trap)
+  // Keyboard: Esc tutup, panah pindah, D unduh, Tab terkunci di dialog (focus-trap)
   useEffect(() => {
     const pemicu = document.activeElement; // fokus dikembalikan ke sini saat tutup
     // Pindahkan fokus ke dialog (tombol tutup) begitu terbuka
@@ -33,9 +33,11 @@ export default function Lightbox({ items, index = 0, onClose }) {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft" && n > 1) prev();
       else if (e.key === "ArrowRight" && n > 1) next();
-      else if (e.key === "Tab") {
-        // Focus-trap: Tab berputar di antara tombol-tombol lightbox saja
-        const fokusable = boxRef.current?.querySelectorAll("button");
+      else if (e.key === "d" || e.key === "D") {
+        boxRef.current?.querySelector(".lb-dl")?.click(); // unduh foto aktif
+      } else if (e.key === "Tab") {
+        // Focus-trap: Tab berputar di antara tombol & tautan lightbox saja
+        const fokusable = boxRef.current?.querySelectorAll("button, a[href]");
         if (!fokusable?.length) return;
         const daftar = [...fokusable];
         const idx = daftar.indexOf(document.activeElement);
@@ -85,6 +87,16 @@ export default function Lightbox({ items, index = 0, onClose }) {
       aria-label="Pratinjau foto"
     >
       {n > 1 && <span className="lb-count">{i + 1} / {n}</span>}
+      {/* Unduh foto aktif sebagai JPG — server yang mengonversi & menamai */}
+      <a
+        className="lb-btn lb-dl"
+        href={`${it.src}${it.src.includes("?") ? "&" : "?"}dl=1`}
+        download
+        aria-label="Unduh foto (JPG)"
+        title="Unduh foto (JPG) — tombol D"
+      >
+        <Download className="lucide" />
+      </a>
       <button type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Tutup">
         <X className="lucide" />
       </button>

@@ -1,12 +1,13 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Save, Wallet } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Save, Wallet, Download } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
+import { unduhFotoEntri } from "@/lib/unduh";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
@@ -28,6 +29,32 @@ const labelBulan = (kunci) => {
 /** Daftar key bukti sebuah entri — kompatibel dengan data lama (bukti_key). */
 const buktiKeys = (e) =>
   e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
+
+/** Tombol unduh semua bukti sebuah entri (1 → JPG, lebih → ZIP). */
+function TombolUnduhBukti({ e, ringkas = false }) {
+  const [busy, setBusy] = useState(false);
+  const keys = buktiKeys(e);
+  if (!keys.length) return null;
+  const unduh = async () => {
+    setBusy(true);
+    try {
+      await unduhFotoEntri(keys, e.tanggal, "bukti", "bukti");
+      if (keys.length > 1) toast.ok(`${keys.length} bukti diunduh sebagai ZIP`);
+    } catch (err) {
+      toast.err(`Gagal mengunduh: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button className="btn sm" onClick={unduh} disabled={busy}
+            aria-label={`Unduh bukti (${keys.length})`}
+            title={keys.length > 1 ? `Unduh ${keys.length} bukti (ZIP)` : "Unduh bukti (JPG)"}>
+      <Download className="lucide" />
+      {!ringkas && <> {busy ? "Mengunduh…" : `Unduh bukti${keys.length > 1 ? ` (${keys.length})` : ""}`}</>}
+    </button>
+  );
+}
 
 /** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
 function useJumlahKomentar(jenis, timId, aktif = true) {
@@ -203,6 +230,7 @@ function KeuanganFasilitator() {
                       ) : "—"}
                     </td>
                     <td className="aksi">
+                      <TombolUnduhBukti e={r.e} ringkas />
                       <AccPanel jenis="keuangan" targetId={r.e.id} timId={timId}
                                 acc={acc[r.e.id]} onChange={muatAcc} />
                       <KomentarPanel jenis="keuangan" targetId={r.e.id} timId={timId}
@@ -235,6 +263,9 @@ function KeuanganFasilitator() {
                              onError={retryFoto} onClick={() => bukaBukti(e, i)} />
                       ))}
                     </div>
+                  )}
+                  {buktiKeys(e).length > 0 && (
+                    <div className="mts"><TombolUnduhBukti e={e} /></div>
                   )}
                   <AccPanel jenis="keuangan" targetId={e.id} timId={timId}
                             acc={acc[e.id]} onChange={muatAcc} />
@@ -406,7 +437,8 @@ function KeuanganTim() {
                         </button>{" "}
                         <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
                           <Trash2 className="lucide" />
-                        </button>
+                        </button>{" "}
+                        <TombolUnduhBukti e={r.e} ringkas />
                       </div>
                       <AccBadge acc={acc[r.e.id]} />
                       <KomentarPanel jenis="keuangan" targetId={r.e.id}
@@ -451,6 +483,7 @@ function KeuanganTim() {
                   <button className="btn sm danger" onClick={() => hapus(e)}>
                     <Trash2 className="lucide" /> Hapus
                   </button>
+                  <TombolUnduhBukti e={e} />
                 </div>
               </div>
             </div>
