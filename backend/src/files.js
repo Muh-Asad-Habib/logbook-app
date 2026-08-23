@@ -116,6 +116,60 @@ export async function compressForEmbed(buffer, maxDim = 640, quality = 72) {
   }
 }
 
+/* Batas resolusi unduhan JPG (?dl=1). Foto tersimpan bisa sangat kecil
+ * (mis. hasil impor DOCX ±220–420 px) sehingga blur saat dibuka — saat
+ * diunduh, foto kecil di-upscale dan foto raksasa diturunkan. */
+const UNDUH_MIN = 1280;     // sisi terpanjang minimal — di bawah ini di-upscale
+const UNDUH_MAX = 1600;     // sisi terpanjang maksimal (selaras batas upload)
+const UNDUH_FAKTOR_MAX = 4; // pembesaran maksimal 4× agar tidak jadi "bubur"
+
+/**
+ * Siapkan buffer untuk unduhan sebagai JPG (?dl=1) dengan resolusi
+ * ternormalisasi ("tidak terlalu besar, tidak terlalu kecil"):
+ *  - sisi terpanjang < UNDUH_MIN → upscale (lanczos3, maks UNDUH_FAKTOR_MAX×)
+ *    lalu dipertegas dengan sharpen ringan;
+ *  - sisi terpanjang > UNDUH_MAX → diturunkan ke UNDUH_MAX;
+ *  - JPEG yang sudah dalam rentang → byte asli (tanpa rekompresi).
+ * Non-JPEG (PNG/WebP) selalu dikonversi ke JPEG q90 (chroma 4:4:4 agar teks
+ * pada tangkapan layar tetap tajam). GIF TIDAK lewat sini (animasi
+ * dipertahankan pemanggil).
+ * @returns {Promise<{buffer: Buffer, jpeg: boolean}>} jpeg=false hanya bila
+ *   konversi gagal total pada sumber non-JPEG (kirim byte asli apa adanya).
+ */
+export async function jpgUnduhan(buffer) {
+  const isJpeg = buffer?.[0] === 0xff && buffer[1] === 0xd8;
+  try {
+    const md = await sharp(buffer, { failOn: "none" }).metadata();
+    let w = md.width, h = md.height;
+    if (!w || !h) throw new Error("dimensi tidak terbaca");
+    if (md.orientation >= 5) [w, h] = [h, w]; // EXIF rotasi 90°
+    const sisi = Math.max(w, h);
+
+    let target = 0; // 0 = tanpa resize
+    if (sisi < UNDUH_MIN) target = Math.min(UNDUH_MIN, Math.round(sisi * UNDUH_FAKTOR_MAX));
+    else if (sisi > UNDUH_MAX) target = UNDUH_MAX;
+
+    // JPEG yang sudah pas → kirim byte asli, tanpa penurunan kualitas
+    if (!target && isJpeg) return { buffer, jpeg: true };
+
+    let s = sharp(buffer, { failOn: "none" }).rotate();
+    if (target) {
+      s = s.resize(target, target, {
+        fit: "inside",
+        withoutEnlargement: false,
+        kernel: "lanczos3",
+      });
+      if (sisi < UNDUH_MIN) s = s.sharpen(); // hasil upscale dipertegas
+    }
+    const out = await s
+      .jpeg({ quality: 90, progressive: true, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    return { buffer: out, jpeg: true };
+  } catch {
+    return { buffer, jpeg: isJpeg };
+  }
+}
+
 /* ---------------- adapter LOKAL (fallback dev) ---------------- */
 
 /** Path absolut yang aman (tolak path traversal seperti ../../). */

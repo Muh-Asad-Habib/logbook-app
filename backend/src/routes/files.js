@@ -1,8 +1,8 @@
 import { Router } from "express";
 import fs from "node:fs";
-import sharp from "sharp";
 import {
   safePath, contentType, signedUrl, pakaiCloud, thumbLokal, getFileBuffer,
+  jpgUnduhan,
 } from "../files.js";
 import { authRequired } from "../auth.js";
 import * as store from "../storage.js";
@@ -46,7 +46,7 @@ function lebarDiminta(req) {
  *       - in: query
  *         name: dl
  *         required: false
- *         description: "1 = unduh sebagai lampiran JPG (PNG/WebP dikonversi otomatis)"
+ *         description: "1 = unduh sebagai lampiran JPG resolusi ternormalisasi (foto kecil di-upscale; PNG/WebP dikonversi otomatis)"
  *         schema: { type: string, enum: ["1"] }
  *     responses:
  *       302: { description: Dialihkan ke signed URL CDN (mode cloud) }
@@ -81,11 +81,13 @@ router.get(/^\/(.+)/, async (req, res) => {
 
     const lebar = lebarDiminta(req);
 
-    // ---- MODE UNDUH (?dl=1): kirim sebagai lampiran JPG resolusi penuh ----
-    // Dipakai tombol ⬇ di Lightbox & unduhan ZIP di frontend. PNG/WebP
-    // dikonversi ke JPG (sharp); GIF dilewatkan apa adanya agar animasi
-    // tidak rusak. Di mode cloud byte diproksikan (bukan redirect) karena
-    // unduhan butuh header Content-Disposition dari kita sendiri.
+    // ---- MODE UNDUH (?dl=1): kirim sebagai lampiran JPG ----
+    // Dipakai tombol ⬇ di Lightbox & unduhan ZIP di frontend. Resolusi
+    // dinormalisasi (jpgUnduhan): foto kecil di-upscale supaya tidak blur,
+    // foto raksasa diturunkan; PNG/WebP dikonversi ke JPG; GIF dilewatkan
+    // apa adanya agar animasi tidak rusak. Di mode cloud byte diproksikan
+    // (bukan redirect) karena unduhan butuh header Content-Disposition
+    // dari kita sendiri.
     if (req.query.dl === "1") {
       const buf = pakaiCloud()
         ? await getFileBuffer(key)
@@ -98,14 +100,13 @@ router.get(/^\/(.+)/, async (req, res) => {
       if (/\.gif$/i.test(key)) {
         ext = ".gif";
         ct = "image/gif";
-      } else if (!/\.jpe?g$/i.test(key)) {
-        try {
-          out = await sharp(buf, { failOn: "none" })
-            .rotate()
-            .jpeg({ quality: 90, progressive: true, mozjpeg: true })
-            .toBuffer();
-        } catch {
-          out = buf; // konversi gagal → kirim byte asli (tetap terunduh)
+      } else {
+        const r = await jpgUnduhan(buf);
+        out = r.buffer;
+        if (!r.jpeg) {
+          // konversi gagal & sumber bukan JPEG → kirim byte asli dengan tipe aslinya
+          ext = (key.match(/\.[^.]+$/) || [".jpg"])[0].toLowerCase();
+          ct = contentType(key);
         }
       }
       const nama = key.replace(/\.[^.]+$/, "") + ext;

@@ -7,7 +7,8 @@
  * bisa berukuran belasan MB — jauh melebihi batas respons serverless Vercel
  * (±4,5 MB). Tiap foto diambil lewat /api/files/:key?dl=1 (cookie HttpOnly
  * ikut otomatis; proteksi kepemilikan/anti-IDOR tetap berlaku di server,
- * dan server yang mengonversi PNG/WebP → JPG).
+ * dan server yang menormalkan resolusi — foto kecil di-upscale — serta
+ * mengonversi PNG/WebP → JPG).
  */
 import JSZip from "jszip";
 import { fotoUrl } from "@/lib/api";
