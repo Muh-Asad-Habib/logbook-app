@@ -29,15 +29,25 @@ router.use((_req, res, next) => {
   next();
 });
 
-/* ---------- halaman & login (tanpa sesi) ---------- */
+/* ---------- halaman & login (tanpa sesi) ----------
+ *
+ * Panel adalah SATU dokumen HTML yang berpindah halaman lewat History API
+ * (tanpa reload). Supaya URL rapi tetap bisa dibuka/di-refresh/di-bookmark
+ * langsung — mis. /pusat-kendali/sesi — setiap sub-path yang dikenal
+ * disajikan dokumen yang sama; skrip di dalamnya membaca path dan langsung
+ * membuka halaman yang sesuai. */
+const HALAMAN = ["akun", "sesi", "audit", "pengaturan"];
 
-router.get("/", (_req, res) => {
+function kirimPanel(_req, res) {
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' https:"
   );
   res.type("html").send(PANEL_HTML);
-});
+}
+
+router.get("/", kirimPanel);
+for (const h of HALAMAN) router.get("/" + h, kirimPanel);
 
 router.post("/auth", async (req, res, next) => {
   try {
@@ -160,9 +170,11 @@ router.get("/berkas/:key", (req, res) => {
   }
 });
 
-router.get("/data/audit", async (_req, res, next) => {
+/** Jejak audit — jumlah baris & saringan aksi diatur dari halaman /audit. */
+router.get("/data/audit", async (req, res, next) => {
   try {
-    res.json({ rows: await adminStore.readAudit(60) });
+    const n = Number(req.query.n) || 60;
+    res.json({ rows: await adminStore.readAudit(n, String(req.query.aksi || "")) });
   } catch (err) {
     next(err);
   }

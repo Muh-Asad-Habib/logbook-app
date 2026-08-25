@@ -182,6 +182,12 @@ const SKEMA = [
   // Peran akun: 'tim' (default, perilaku lama), 'fasilitator', atau 'dosen'
   // (Dosen Pendamping = fasilitator + wewenang ACC/pengesahan).
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'tim'`,
+  // Kapan akun ini TERAKHIR berhasil login (diisi saat sesi baru dibuat).
+  // Berbeda dengan tabel `sessions` yang ikut terhapus saat logout/kedaluwarsa,
+  // kolom ini bertahan — sehingga pusat kendali bisa menjawab "kapan terakhir
+  // akun ini dipakai?" walau sekarang sedang tidak login. Hanya SATU stempel
+  // waktu (bukan riwayat lengkap) supaya tidak menumpuk jejak berumur panjang.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TEXT NOT NULL DEFAULT ''`,
   // Assignment many-to-many: 1 tim ↔ banyak pendamping (fasilitator/dosen),
   // 1 pendamping ↔ banyak tim. Nama tabel dipertahankan agar data lama utuh.
   `CREATE TABLE IF NOT EXISTS fasilitator_tim (

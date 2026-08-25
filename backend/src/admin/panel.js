@@ -13,7 +13,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>Panel Admin</title>
+<title>Pusat Kendali</title>
 <style>
   :root{
     --bg:#070a14;--bg2:#0b0f1e;
@@ -155,7 +155,115 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   /* ---------- area utama ---------- */
   .main{margin-left:236px;min-height:100vh;transition:margin-left .25s ease}
   .wrap{max-width:1160px;margin:0 auto;padding:0 22px 64px}
-  #statistik,#sec-akun,#sec-audit,#sec-pengaturan{scroll-margin-top:96px}
+
+  /* ---------- halaman (History API — pindah tanpa reload) ----------
+     Setiap layar panel adalah satu <section class="page">. Hanya satu yang
+     memakai kelas .on pada satu waktu; sisanya benar-benar tidak dirender
+     sehingga tabel besar di halaman lain tidak membebani scroll. */
+  .page{display:none}
+  .page.on{display:block;animation:up .3s ease both}
+
+  /* kepala halaman: ikon, judul, penjelasan singkat, aksi khas halaman */
+  .hero{display:flex;align-items:flex-start;gap:15px;flex-wrap:wrap;padding:24px 2px 4px}
+  .hero-ic{width:52px;height:52px;border-radius:16px;flex:0 0 52px;display:flex;align-items:center;
+    justify-content:center;color:#fff;background:var(--grad);
+    box-shadow:0 14px 34px -12px rgba(109,124,255,.6),inset 0 0 0 1px rgba(255,255,255,.18)}
+  .hero-ic .i{width:23px;height:23px;stroke-width:1.7}
+  .hero-tx{min-width:0;flex:1 1 240px}
+  .hero-tx h2{font-size:1.3rem;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .hero-tx p{color:var(--mut);font-size:.8rem;margin-top:6px;max-width:76ch;line-height:1.6}
+  .hero-act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* ---------- kartu pintasan (halaman Ringkasan) ---------- */
+  .tiles{display:grid;gap:13px;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));margin-top:18px}
+  .tile{
+    position:relative;overflow:hidden;text-align:left;cursor:pointer;font:inherit;color:var(--ink);
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;
+    display:flex;flex-direction:column;gap:9px;transition:.18s;animation:pop .4s ease both;
+  }
+  .tile::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;
+    background:linear-gradient(90deg,var(--a),transparent 78%)}
+  .tile:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--a) 48%,var(--line));
+    box-shadow:0 24px 48px -22px color-mix(in srgb,var(--a) 50%,transparent)}
+  .tile .th-row{display:flex;align-items:center;gap:11px}
+  .tile .ic{width:38px;height:38px;border-radius:12px;flex:0 0 38px;display:flex;align-items:center;
+    justify-content:center;color:var(--a);background:color-mix(in srgb,var(--a) 13%,#0c1124);
+    border:1px solid color-mix(in srgb,var(--a) 32%,transparent)}
+  .tile .ic .i{width:17px;height:17px}
+  .tile b{font-size:.92rem;letter-spacing:-.01em}
+  .tile span{color:var(--mut);font-size:.76rem;line-height:1.55}
+  .tile .go{margin-top:auto;color:#a5b4fc;font-size:.72rem;font-weight:800;letter-spacing:.05em;
+    text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .tile .go .i{width:13px;height:13px;transform:rotate(180deg);transition:transform .18s}
+  .tile:hover .go .i{transform:rotate(180deg) translateX(-3px)}
+
+  /* ---------- segmented control & chip penyaring ---------- */
+  .seg{display:inline-flex;gap:4px;background:#0b1024;padding:5px;border-radius:12px;border:1px solid var(--line)}
+  .seg button{border:none;background:transparent;color:var(--mut);font:inherit;font-size:.78rem;
+    font-weight:700;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.15s;
+    display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .seg button .i{width:14px;height:14px}
+  .seg button:hover{color:var(--ink)}
+  .seg button.on{background:var(--grad);color:#fff;box-shadow:0 6px 16px -4px rgba(109,124,255,.5)}
+  .fchips{display:flex;gap:7px;flex-wrap:wrap}
+  .fchip{cursor:pointer;font:inherit;font-size:.74rem;font-weight:700;color:var(--mut);
+    background:#0c1124;border:1px solid var(--line);border-radius:99px;padding:6px 14px;transition:.15s;
+    display:inline-flex;align-items:center;gap:6px}
+  .fchip:hover{color:var(--ink);border-color:var(--line2)}
+  .fchip.on{color:#fff;background:rgba(109,124,255,.18);border-color:rgba(109,124,255,.5);
+    box-shadow:0 6px 18px -8px rgba(109,124,255,.6)}
+  .fchip .n{font:800 .66rem var(--mono);opacity:.8}
+
+  /* ---------- kartu akun pada halaman Perangkat & sesi ---------- */
+  .asx{background:var(--panel);border:1px solid var(--line);border-radius:15px;margin-top:11px;
+    overflow:hidden;transition:.18s;animation:up .3s ease both}
+  .asx:hover{border-color:var(--line2)}
+  .asx.aktif{border-color:rgba(52,211,153,.34);
+    box-shadow:0 0 0 1px rgba(52,211,153,.1),0 18px 40px -28px rgba(52,211,153,.5)}
+  .asx-h{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;flex-wrap:wrap}
+  .asx-h:hover{background:rgba(109,124,255,.05)}
+  .asx-nm{min-width:0;flex:1 1 190px}
+  .asx-nm b{font-size:.88rem;display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .asx-meta{color:var(--mut);font-size:.72rem;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;
+    align-items:center}
+  .asx-meta .dot{width:3px;height:3px;border-radius:50%;background:#39406e;flex:0 0 auto}
+  .asx-act{display:flex;gap:7px;align-items:center;margin-left:auto;flex-wrap:wrap}
+  .asx-tgl{width:28px;height:28px;border-radius:9px;flex:0 0 28px;display:flex;align-items:center;
+    justify-content:center;border:1px solid var(--line2);background:#0c1128;color:var(--mut);
+    cursor:pointer;transition:.16s}
+  .asx-tgl .i{width:13px;height:13px;transform:rotate(-90deg);transition:transform .2s}
+  .asx.buka .asx-tgl .i{transform:rotate(90deg)}
+  .asx-tgl:hover{color:#fff;border-color:var(--p);background:rgba(109,124,255,.2)}
+  .asx-b{border-top:1px solid var(--line);padding:4px 16px 14px;background:#0b1024}
+  /* judul kelompok di dalam kartu (mis. "Perangkat tim" / "Pendamping") */
+  .grp{font:800 .64rem var(--mono);color:#5d668f;letter-spacing:.1em;text-transform:uppercase;
+    padding:13px 2px 5px;display:flex;align-items:center;gap:8px}
+  .grp::after{content:"";flex:1 1 auto;height:1px;background:linear-gradient(90deg,#1b2242,transparent)}
+  .dev{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px dashed #1b2242;flex-wrap:wrap}
+  .dev:last-child{border-bottom:none}
+  .dev-ic{font-size:1.15rem;flex:0 0 auto}
+  .dev-nm{min-width:0;flex:1 1 180px}
+  .dev-nm b{font-size:.8rem}
+  .dev-nm .mut{font-size:.7rem;margin-top:2px}
+  .dev-ip{font:700 .72rem var(--mono);color:#a5b4fc;background:#0c1124;border:1px solid var(--line);
+    border-radius:8px;padding:4px 10px;flex:0 0 auto}
+  .dev-tm{color:var(--mut);font-size:.72rem;text-align:right;flex:0 0 auto;min-width:110px}
+  .dev-act{margin-left:auto;flex:0 0 auto}
+
+  /* titik status online / offline */
+  .st{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:800;
+    letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:99px;white-space:nowrap}
+  .st i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+  .st.on{color:#4ade80;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.34)}
+  .st.on i{animation:blink 1.9s infinite}
+  .st.off{color:#8891bb;background:rgba(136,145,187,.08);border:1px solid rgba(136,145,187,.24)}
+
+  /* ---------- skeleton saat memuat pertama kali ---------- */
+  @keyframes shimmer{from{background-position:-420px 0}to{background-position:420px 0}}
+  .skel{border-radius:9px;background:linear-gradient(90deg,#131a35 8%,#1c2447 20%,#131a35 32%);
+    background-size:820px 100%;animation:shimmer 1.25s linear infinite;height:13px;display:block}
+  .skel.row{height:52px;border-radius:12px;margin-top:9px}
+  .skel.stat{height:78px;border-radius:16px}
 
   /* ---------- topbar ---------- */
   .top{position:sticky;top:0;z-index:50;backdrop-filter:blur(16px) saturate(1.4);
@@ -190,8 +298,10 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     box-shadow:0 26px 60px -26px rgba(0,0,0,.7)}
   .card h2{font-size:.95rem;display:flex;align-items:center;gap:9px}
   .card h2 .i{width:16px;height:16px;color:var(--p)}
-  .card h2 .tag{font:700 .62rem var(--mono);color:var(--mut);background:#0c1124;
-    border:1px solid var(--line);padding:2.5px 10px;border-radius:99px;letter-spacing:.04em}
+  /* Lencana kecil di samping judul — dipakai di kartu MAUPUN kepala halaman. */
+  .tag{font:700 .62rem var(--mono);color:var(--mut);background:#0c1124;
+    border:1px solid var(--line);padding:2.5px 10px;border-radius:99px;letter-spacing:.04em;
+    white-space:nowrap}
   .mut{color:var(--mut);font-size:.78rem}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .spread{justify-content:space-between}
@@ -412,15 +522,11 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .audit .t{color:#707aa8;flex:0 0 auto;font-size:.68rem}
   .audit .badge{flex:0 0 auto;font-size:.64rem;padding:2px 8px;font-family:"Segoe UI",system-ui,sans-serif}
   .audit .tg{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* Kartu audit mengisi tinggi kolom penuh — daftar melebar sampai border
-     bawah kartu (tidak menyisakan ruang kosong), digulir bila lebih panjang. */
-  #sec-audit{display:flex;flex-direction:column;max-height:860px}
-  #sec-audit h2{flex:0 0 auto}
-  #sec-audit .audit{flex:1 1 auto;min-height:0;max-height:none}
-  @media(max-width:860px){
-    #sec-audit{max-height:none}
-    #sec-audit .audit{max-height:56vh}
-  }
+  .audit .ip{margin-left:auto;flex:0 0 auto;color:#5d668f;font-size:.66rem}
+  /* Halaman Jejak audit memakai seluruh tinggi yang tersedia; pratinjau di
+     halaman Ringkasan sengaja pendek (hanya cuplikan terbaru). */
+  #audit{max-height:none}
+  #audit-mini{max-height:none}
 
   /* ---------- linimasa aktivitas per pengguna ---------- */
   .tline{margin-top:14px;max-height:52vh;overflow:auto;padding-right:4px}
@@ -554,6 +660,24 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .tabs{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
     .tabs::-webkit-scrollbar{display:none}
     .tabs button{white-space:nowrap;flex:1 0 auto;padding:9px 13px}
+    /* --- kepala halaman & kontrol khas halaman --- */
+    .hero{padding:16px 0 2px;gap:12px}
+    .hero-ic{width:44px;height:44px;flex:0 0 44px;border-radius:14px}
+    .hero-ic .i{width:20px;height:20px}
+    .hero-tx h2{font-size:1.08rem}
+    .hero-tx p{font-size:.76rem}
+    .hero-act{margin-left:0;width:100%}
+    .seg{display:flex;max-width:100%;overflow-x:auto;scrollbar-width:none}
+    .seg::-webkit-scrollbar{display:none}
+    .seg button{flex:1 0 auto;padding:9px 13px;font-size:.74rem}
+    .tiles{grid-template-columns:1fr;gap:11px}
+    /* --- kartu akun di halaman sesi --- */
+    .asx-h{padding:12px 13px;gap:10px}
+    .asx-act{width:100%;margin-left:0}
+    .asx-b{padding:2px 13px 12px}
+    .dev{gap:9px;padding:10px 0}
+    .dev-tm{text-align:left;min-width:0}
+    .dev-act{margin-left:0}
     .chips{gap:7px}
     .chip{flex:1 1 calc(50% - 7px);min-width:0}
     .login-body{padding:22px 20px 0}
@@ -640,7 +764,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     <div class="win-dots"><i></i><i></i><i></i><span>akses-terbatas · teraudit</span></div>
     <div class="login-body">
       <div class="logo"><svg class="i"><use href="#i-shield"/></svg></div>
-      <h1>Panel Admin</h1>
+      <h1>Pusat Kendali</h1>
       <div class="mut">Area terbatas — seluruh aktivitas tercatat di jejak audit</div>
       <form id="f-login">
         <label>Username
@@ -672,17 +796,17 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     </button>
     <div class="side-top">
       <div class="side-logo" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></div>
-      <div class="side-brand"><b>Panel Admin</b><span>kelola akun &amp; data</span></div>
+      <div class="side-brand"><b>Pusat Kendali</b><span>kelola akun &amp; data</span></div>
     </div>
     <nav class="side-nav">
-      <a href="#statistik" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
-      <a href="#sec-akun" data-tip="Akun pengguna" data-m="Akun"><svg class="i"><use href="#i-users"/></svg><span>Akun pengguna</span></a>
-      <a href="#sec-sesi" data-tip="Perangkat &amp; sesi aktif" data-m="Sesi"><svg class="i"><use href="#i-device"/></svg><span>Perangkat &amp; sesi</span></a>
-      <a href="#sec-audit" data-tip="Jejak audit" data-m="Audit"><svg class="i"><use href="#i-scroll"/></svg><span>Jejak audit</span></a>
-      <a href="#sec-pengaturan" data-tip="Pengaturan" data-m="Setelan"><svg class="i"><use href="#i-cog"/></svg><span>Pengaturan</span></a>
+      <a href="#" data-page="ringkas" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
+      <a href="#" data-page="akun" data-tip="Akun pengguna" data-m="Akun"><svg class="i"><use href="#i-users"/></svg><span>Akun pengguna</span></a>
+      <a href="#" data-page="sesi" data-tip="Perangkat &amp; sesi" data-m="Sesi"><svg class="i"><use href="#i-device"/></svg><span>Perangkat &amp; sesi</span></a>
+      <a href="#" data-page="audit" data-tip="Jejak audit" data-m="Audit"><svg class="i"><use href="#i-scroll"/></svg><span>Jejak audit</span></a>
+      <a href="#" data-page="pengaturan" data-tip="Pengaturan" data-m="Setelan"><svg class="i"><use href="#i-cog"/></svg><span>Pengaturan</span></a>
     </nav>
     <div class="side-foot">
-      <div class="side-note">tekan / untuk cari akun</div>
+      <div class="side-note">tekan / untuk cari</div>
       <button class="side-out" data-act="keluar" data-tip="Keluar" data-m="Keluar" aria-label="Keluar dari panel">
         <svg class="i"><use href="#i-logout"/></svg><span>Keluar</span>
       </button>
@@ -692,12 +816,14 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <div class="main">
     <header class="top">
       <div class="top-in">
-        <div>
+        <div style="min-width:0">
           <div class="crumb">
-            <svg class="i"><use href="#i-clock"/></svg><span id="jam">—</span>
+            <svg class="i"><use href="#i-shield"/></svg><span>Pusat kendali</span>
+            <i class="sep"></i><span id="crumb-hal">Ringkasan</span>
+            <i class="sep"></i><svg class="i"><use href="#i-clock"/></svg><span id="jam">—</span>
             <i class="sep"></i><span id="upd">memuat data…</span>
           </div>
-          <h1>Panel Admin <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
+          <h1><span id="judul-hal">Ringkasan</span> <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
         </div>
         <div class="top-act">
           <button class="btn sm" id="btn-muat" data-act="muat" aria-label="Segarkan data"><svg class="i"><use href="#i-refresh"/></svg><span class="btn-txt"> Segarkan</span></button>
@@ -706,119 +832,227 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     </header>
 
     <div class="wrap">
-      <div class="stats" id="statistik"></div>
 
-      <div class="card" id="sec-akun">
-        <div class="row spread">
-          <h2><svg class="i"><use href="#i-users"/></svg> Akun pengguna <span class="tag" id="jml-user"></span></h2>
-          <div class="row" style="gap:10px;align-items:center">
+      <!-- ============ HALAMAN: RINGKASAN ============ -->
+      <section class="page on" id="hal-ringkas">
+        <div class="hero">
+          <div class="hero-ic"><svg class="i"><use href="#i-gauge"/></svg></div>
+          <div class="hero-tx">
+            <h2>Ringkasan sistem</h2>
+            <p>Sekilas keadaan seluruh logbook: jumlah akun, entri kegiatan &amp; belanja,
+            berkas yang sudah masuk, dan berapa perangkat yang sedang login saat ini.
+            Angka menyegarkan diri otomatis — tidak perlu memuat ulang halaman.</p>
+          </div>
+        </div>
+
+        <div class="stats" id="statistik"></div>
+
+        <div class="tiles" id="pintasan"></div>
+
+        <div class="card">
+          <div class="row spread">
+            <h2><svg class="i"><use href="#i-scroll"/></svg> Aktivitas panel terbaru</h2>
+            <button class="btn sm" data-page="audit"><svg class="i"><use href="#i-scroll"/></svg> Lihat semua</button>
+          </div>
+          <div class="audit" id="audit-mini"></div>
+        </div>
+
+        <div class="foot">Pusat kendali · akses terbatas &amp; teraudit</div>
+      </section>
+
+      <!-- ============ HALAMAN: AKUN PENGGUNA ============ -->
+      <section class="page" id="hal-akun">
+        <div class="hero">
+          <div class="hero-ic"><svg class="i"><use href="#i-users"/></svg></div>
+          <div class="hero-tx">
+            <h2>Akun pengguna <span class="tag" id="jml-user"></span></h2>
+            <p>Semua akun terdaftar — tim, fasilitator, dan dosen pendamping. Dari sini kamu bisa
+            membuka seluruh datanya, mengatur pendamping tim, mengganti username, menyetel ulang
+            password, mengeluarkan perangkat, sampai menghapus akun.</p>
+          </div>
+          <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
             <input id="cari" placeholder="Cari username…"><kbd>/</kbd></span>
-            <button class="btn sm p" data-act="baru" title="Buat akun baru tanpa kode pendaftaran">
-              <svg class="i"><use href="#i-user"/></svg><span class="btn-txt"> Akun baru</span>
+            <button class="btn p" data-act="baru" title="Buat akun baru tanpa kode pendaftaran">
+              <svg class="i"><use href="#i-user"/></svg> Akun baru
             </button>
           </div>
         </div>
-        <div class="tabs" style="margin-top:12px">
-          <button class="on" data-role-tab="tim">👥 Tim</button>
-          <button data-role-tab="fasilitator">🎓 Fasilitator</button>
-          <button data-role-tab="dosen">👨‍🏫 Dosen Pendamping</button>
-        </div>
-        <div class="tbl">
-          <table>
-            <thead><tr id="t-users-head">
-              <th>Akun</th><th class="num">Kegiatan</th><th class="num">Belanja</th>
-              <th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th>
-              <th style="text-align:right">Aksi</th>
-            </tr></thead>
-            <tbody id="t-users"></tbody>
-          </table>
-        </div>
-      </div>
 
-      <!-- Perangkat & sesi aktif — SEMUA peran (tim, fasilitator, dosen).
-           Hanya di panel ini IP ditampilkan penuh; pemilik akun di halaman
+        <div class="card" id="sec-akun">
+          <div class="tabs">
+            <button class="on" data-role-tab="tim">👥 Tim</button>
+            <button data-role-tab="fasilitator">🎓 Fasilitator</button>
+            <button data-role-tab="dosen">👨‍🏫 Dosen Pendamping</button>
+          </div>
+          <div class="tbl">
+            <table>
+              <thead><tr id="t-users-head">
+                <th>Akun</th><th class="num">Kegiatan</th><th class="num">Belanja</th>
+                <th class="num">Foto</th><th>Sesi</th><th>Aktivitas</th>
+                <th style="text-align:right">Aksi</th>
+              </tr></thead>
+              <tbody id="t-users"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="foot">Pusat kendali · akses terbatas &amp; teraudit</div>
+      </section>
+
+      <!-- ============ HALAMAN: PERANGKAT & SESI ============
+           Berlaku untuk SEMUA peran (tim, fasilitator, dosen pendamping).
+           Hanya di panel inilah IP ditampilkan penuh; pemilik akun di halaman
            Profil tetap melihat versi tersamar (114.120.•.•). -->
-      <div class="card" id="sec-sesi">
-        <div class="row spread">
-          <h2><svg class="i"><use href="#i-device"/></svg> Perangkat &amp; sesi aktif <span class="tag" id="jml-sesi"></span></h2>
-          <div class="row" style="gap:10px;align-items:center">
+      <section class="page" id="hal-sesi">
+        <div class="hero">
+          <div class="hero-ic"><svg class="i"><use href="#i-device"/></svg></div>
+          <div class="hero-tx">
+            <h2>Perangkat &amp; sesi</h2>
+            <p>Siapa saja yang sedang login, dari perangkat apa, dan sejak kapan — bisa dilihat
+            menyeluruh atau ditelusuri per akun. Alamat IP tampil penuh di sini dan hanya tersimpan
+            selama sesinya hidup (ikut terhapus saat dicabut atau kedaluwarsa 30 hari menganggur).
+            <b>Alamat MAC tidak bisa dilihat</b> aplikasi web mana pun — ia tidak pernah ikut
+            melewati internet.</p>
+          </div>
+          <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
             <input id="cari-sesi" placeholder="Cari akun / perangkat / IP…"></span>
           </div>
         </div>
-        <p class="mut" style="margin-top:8px">Setiap perangkat yang sedang dalam keadaan login —
-        tim, fasilitator, maupun dosen pendamping. Alamat IP ditampilkan penuh di sini dan hanya
-        tersimpan selama sesinya hidup (ikut terhapus saat dicabut atau kedaluwarsa 30 hari
-        menganggur). <b>Alamat MAC tidak bisa dilihat</b> aplikasi web mana pun — ia tidak pernah
-        ikut melewati internet.</p>
-        <div class="tbl">
-          <table>
-            <thead><tr>
-              <th>Akun</th><th>Perangkat</th><th>Alamat IP</th>
-              <th>Terakhir aktif</th><th>Mulai login</th>
-              <th style="text-align:right">Aksi</th>
-            </tr></thead>
-            <tbody id="t-sesi"></tbody>
-          </table>
-        </div>
-      </div>
 
-      <div class="grid2">
-        <div class="card" id="sec-audit">
-          <h2><svg class="i"><use href="#i-scroll"/></svg> Jejak audit <span class="tag">60 terakhir</span></h2>
+        <div class="stats" id="stat-sesi"></div>
+
+        <div class="card">
+          <div class="row spread" style="gap:12px">
+            <div class="seg" id="seg-sesi">
+              <button class="on" data-mode-sesi="semua"><svg class="i"><use href="#i-device"/></svg> Keseluruhan</button>
+              <button data-mode-sesi="akun"><svg class="i"><use href="#i-users"/></svg> Per akun</button>
+              <button data-mode-sesi="tim"><svg class="i"><use href="#i-folder"/></svg> Per tim</button>
+            </div>
+            <div class="fchips" id="fil-peran"></div>
+          </div>
+
+          <!-- mode: keseluruhan (satu baris per perangkat) -->
+          <div id="sesi-semua">
+            <div class="tbl">
+              <table>
+                <thead><tr>
+                  <th>Akun</th><th>Perangkat</th><th>Alamat IP</th>
+                  <th>Terakhir aktif</th><th>Mulai login</th>
+                  <th style="text-align:right">Aksi</th>
+                </tr></thead>
+                <tbody id="t-sesi"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- mode: per akun (termasuk akun yang sedang TIDAK login) -->
+          <div id="sesi-akun" class="hide">
+            <div id="daftar-akun-sesi"></div>
+          </div>
+
+          <!-- mode: per tim (tim + pendamping yang mengampunya) -->
+          <div id="sesi-tim" class="hide">
+            <div id="daftar-tim-sesi"></div>
+          </div>
+        </div>
+
+        <div class="foot">Pusat kendali · akses terbatas &amp; teraudit</div>
+      </section>
+
+      <!-- ============ HALAMAN: JEJAK AUDIT ============ -->
+      <section class="page" id="hal-audit">
+        <div class="hero">
+          <div class="hero-ic"><svg class="i"><use href="#i-scroll"/></svg></div>
+          <div class="hero-tx">
+            <h2>Jejak audit <span class="tag" id="jml-audit"></span></h2>
+            <p>Catatan setiap aksi yang pernah dilakukan lewat pusat kendali — termasuk percobaan
+            login yang gagal. Tersimpan di database dan tidak bisa diubah dari panel.</p>
+          </div>
+          <div class="hero-act">
+            <select id="audit-n" style="width:auto;margin:0">
+              <option value="60">60 baris</option>
+              <option value="200" selected>200 baris</option>
+              <option value="500">500 baris</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="fchips" id="fil-audit"></div>
           <div class="audit" id="audit"></div>
         </div>
-        <div id="sec-pengaturan">
-          <div class="card" style="margin-top:16px">
-            <h2>🎓 Kode pendaftaran fasilitator <span class="tag" id="kode-status">—</span></h2>
-            <p class="mut" style="margin-top:8px">Kode ini wajib dimasukkan saat seseorang mendaftar
-            sebagai fasilitator. Disimpan sebagai hash — tidak bisa dilihat lagi, hanya bisa diganti.</p>
-            <form id="f-kode">
-              <label>Kode baru (min. 6 karakter)
-                <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
-                <input id="k-val" autocomplete="off" placeholder="kode rahasia fasilitator"></span>
-              </label>
-              <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
-            </form>
-          </div>
-          <div class="card">
-            <h2>👨‍🏫 Kode pendaftaran dosen pendamping <span class="tag" id="kode-status-dosen">—</span></h2>
-            <p class="mut" style="margin-top:8px">Dosen pendamping bisa melihat &amp; mengomentari seperti
-            fasilitator, <b>plus memberi ACC / meminta revisi</b> pada kegiatan, belanja, dan laporan tim
-            yang ditugaskan. Kode disimpan sebagai hash — hanya bisa diganti.</p>
-            <form id="f-kode-dosen">
-              <label>Kode baru (min. 6 karakter)
-                <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
-                <input id="k-val-dosen" autocomplete="off" placeholder="kode rahasia dosen"></span>
-              </label>
-              <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
-            </form>
-          </div>
-          <div class="card">
-            <h2><svg class="i"><use href="#i-lock"/></svg> Akun admin</h2>
-            <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
-            hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
-            <form id="f-self">
-              <label>Username baru (opsional)
-                <span class="in-wrap"><svg class="i"><use href="#i-user"/></svg>
-                <input id="s-u" autocomplete="off"></span>
-              </label>
-              <label>Password baru (opsional, min. 10)
-                <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
-                <input id="s-p" type="password" autocomplete="off"></span>
-              </label>
-              <label>Password saat ini (wajib)
-                <span class="in-wrap"><svg class="i"><use href="#i-lock"/></svg>
-                <input id="s-cur" type="password" autocomplete="off"></span>
-              </label>
-              <button class="btn p" style="margin-top:16px"><svg class="i"><use href="#i-save"/></svg> Simpan kredensial</button>
-            </form>
+
+        <div class="foot">Pusat kendali · akses terbatas &amp; teraudit</div>
+      </section>
+
+      <!-- ============ HALAMAN: PENGATURAN ============ -->
+      <section class="page" id="hal-pengaturan">
+        <div class="hero">
+          <div class="hero-ic"><svg class="i"><use href="#i-cog"/></svg></div>
+          <div class="hero-tx">
+            <h2>Pengaturan</h2>
+            <p>Kode pendaftaran pendamping dan kredensial panel ini. Semua nilai disimpan sebagai
+            hash satu arah — tidak pernah bisa dibaca lagi, hanya bisa diganti.</p>
           </div>
         </div>
-      </div>
 
-      <div class="foot">Panel Admin · akses terbatas &amp; teraudit</div>
+        <div class="grid2">
+          <div>
+            <div class="card">
+              <h2>🎓 Kode pendaftaran fasilitator <span class="tag" id="kode-status">—</span></h2>
+              <p class="mut" style="margin-top:8px">Kode ini wajib dimasukkan saat seseorang mendaftar
+              sebagai fasilitator. Disimpan sebagai hash — tidak bisa dilihat lagi, hanya bisa diganti.</p>
+              <form id="f-kode">
+                <label>Kode baru (min. 6 karakter)
+                  <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+                  <input id="k-val" autocomplete="off" placeholder="kode rahasia fasilitator"></span>
+                </label>
+                <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
+              </form>
+            </div>
+            <div class="card">
+              <h2>👨‍🏫 Kode pendaftaran dosen pendamping <span class="tag" id="kode-status-dosen">—</span></h2>
+              <p class="mut" style="margin-top:8px">Dosen pendamping bisa melihat &amp; mengomentari seperti
+              fasilitator, <b>plus memberi ACC / meminta revisi</b> pada kegiatan, belanja, dan laporan tim
+              yang ditugaskan. Kode disimpan sebagai hash — hanya bisa diganti.</p>
+              <form id="f-kode-dosen">
+                <label>Kode baru (min. 6 karakter)
+                  <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+                  <input id="k-val-dosen" autocomplete="off" placeholder="kode rahasia dosen"></span>
+                </label>
+                <button class="btn p" style="margin-top:14px"><svg class="i"><use href="#i-save"/></svg> Simpan kode</button>
+              </form>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h2><svg class="i"><use href="#i-lock"/></svg> Akun admin</h2>
+              <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
+              hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
+              <form id="f-self">
+                <label>Username baru (opsional)
+                  <span class="in-wrap"><svg class="i"><use href="#i-user"/></svg>
+                  <input id="s-u" autocomplete="off"></span>
+                </label>
+                <label>Password baru (opsional, min. 10)
+                  <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+                  <input id="s-p" type="password" autocomplete="off"></span>
+                </label>
+                <label>Password saat ini (wajib)
+                  <span class="in-wrap"><svg class="i"><use href="#i-lock"/></svg>
+                  <input id="s-cur" type="password" autocomplete="off"></span>
+                </label>
+                <button class="btn p" style="margin-top:16px"><svg class="i"><use href="#i-save"/></svg> Simpan kredensial</button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="foot">Pusat kendali · akses terbatas &amp; teraudit</div>
+      </section>
+
     </div>
   </div>
 </div>
@@ -949,15 +1183,48 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 
 <script>
 "use strict";
+
+/* ---------- alamat dasar panel & halaman aktif ----------
+ * Panel dipasang di path rahasia yang bisa diganti (mis. /pusat-kendali),
+ * dan setiap layar punya URL sendiri (/pusat-kendali/sesi, /audit, dst).
+ * Karena itu B (alamat dasar untuk seluruh panggilan API) harus dihitung
+ * dengan MEMBUANG nama halaman dari path — kalau tidak, membuka
+ * /pusat-kendali/sesi langsung akan membuat semua fetch menembak
+ * /pusat-kendali/sesi/data/... dan gagal. */
+var HALAMAN = ["ringkas", "akun", "sesi", "audit", "pengaturan"];
 var B = location.pathname.replace(/\\/+$/, "");
+var HAL = "ringkas";
+(function(){
+  var m = B.match(/\\/(akun|sesi|audit|pengaturan)$/);
+  if (m) { HAL = m[1]; B = B.slice(0, B.length - m[1].length - 1); }
+})();
+/** URL rapi sebuah halaman — halaman ringkasan memakai akar panel. */
+function urlHal(id){ return id === "ringkas" ? (B || "/") : B + "/" + id; }
+
+var JUDUL = {
+  ringkas:    ["Ringkasan", "gauge"],
+  akun:       ["Akun pengguna", "users"],
+  sesi:       ["Perangkat & sesi", "device"],
+  audit:      ["Jejak audit", "scroll"],
+  pengaturan: ["Pengaturan", "cog"]
+};
+
 var TOK = sessionStorage.getItem("mx") || "";
 var USERS = [];
 var DETAIL = null;
 var AKTIVITAS = [];
-var SESI = [];          // semua sesi aktif lintas akun (kartu Perangkat & sesi)
+var SESI = [];          // semua sesi aktif lintas akun (halaman Perangkat & sesi)
 var SESI_USER = [];     // sesi milik akun yang dialog detailnya sedang dibuka
+var AUDIT = [];         // baris audit terakhir (halaman Jejak audit + pratinjau)
+var RINGKAS = null;     // hasil /data/ringkas terakhir
 var TAB = "keg";
-var VIEW_ROLE = "tim";  // tab aktif tabel akun: 'tim' | 'fasilitator'
+var VIEW_ROLE = "tim";  // tab aktif tabel akun: 'tim' | 'fasilitator' | 'dosen'
+var MODE_SESI = "semua";// 'semua' (per perangkat) | 'akun' (dikelompokkan)
+var PERAN_SESI = "";    // saringan peran di halaman sesi ("" = semua peran)
+var BUKA_SESI = {};     // id akun yang kartunya sedang dibentangkan
+var AUDIT_N = 200;      // jumlah baris audit yang diminta
+var AUDIT_F = "";       // saringan awalan aksi audit ("" = semua)
+var PERTAMA = true;     // data pertama belum tiba → tampilkan skeleton
 var ES = null;          // EventSource siaran langsung
 var muatTimer = null;   // debounce pembaruan live
 
@@ -997,8 +1264,6 @@ function setHTML(el, html, kunci){
   if (wy) window.scrollTo(0, wy);
   return true;
 }
-/** Kosongkan tanda tangan agar render berikutnya dipaksa ulang. */
-function lupakanSig(kunci){ delete SIG[kunci]; }
 
 function esc(s){
   return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
@@ -1085,9 +1350,44 @@ function lihatLogin(){
 function lihatApp(){
   $("#v-login").classList.add("hide");
   $("#v-app").classList.remove("hide");
+  keHalaman(HAL, false);   // hormati URL yang dibuka (mis. /pusat-kendali/sesi)
   muat();
   mulaiLive();
 }
+
+/* ---------- perpindahan halaman (History API) ----------
+ * Panel tetap SATU dokumen, tetapi setiap layar punya URL sendiri sehingga
+ * bisa di-bookmark, dibuka langsung, dan tombol Back/Forward peramban
+ * bekerja seperti situs biasa — tanpa memuat ulang apa pun.
+ * Data tidak ikut diminta ulang saat berpindah: halaman baru langsung
+ * digambar dari data terakhir, lalu tetap disegarkan otomatis oleh SSE. */
+function halDariPath(){
+  var m = location.pathname.replace(/\\/+$/, "").match(/\\/(akun|sesi|audit|pengaturan)$/);
+  return m ? m[1] : "ringkas";
+}
+function keHalaman(id, dorong){
+  if (HALAMAN.indexOf(id) < 0) id = "ringkas";
+  HAL = id;
+  HALAMAN.forEach(function(h){
+    var el = document.getElementById("hal-" + h);
+    if (el) el.classList.toggle("on", h === id);
+  });
+  document.querySelectorAll(".side-nav a").forEach(function(a){
+    a.classList.toggle("on", a.dataset.page === id);
+  });
+  var info = JUDUL[id] || JUDUL.ringkas;
+  var jd = $("#judul-hal");   if (jd) jd.textContent = info[0];
+  var cr = $("#crumb-hal");   if (cr) cr.textContent = info[0];
+  document.title = info[0] + " · Pusat Kendali";
+  if (dorong !== false && location.pathname.replace(/\\/+$/, "") !== urlHal(id)) {
+    try { history.pushState({ hal: id }, "", urlHal(id)); } catch(e){}
+  }
+  window.scrollTo(0, 0);
+  render();
+}
+window.addEventListener("popstate", function(e){
+  keHalaman((e.state && e.state.hal) || halDariPath(), false);
+});
 
 /* ---------- siaran langsung (SSE + fallback polling) ---------- */
 var pollTimer = null; // polling berkala — dipakai bila SSE tak tersedia (mis. Vercel)
@@ -1138,47 +1438,31 @@ function segarkanDetail(){
   }).catch(function(){});
 }
 
-/* ---------- muat data ---------- */
+/* ---------- muat data ---------- *
+ * SATU sumber kebenaran: semua halaman digambar dari variabel hasil muat()
+ * di bawah. Pemuatan ini dipanggil manual (tombol Segarkan) MAUPUN otomatis
+ * oleh siaran langsung SSE / polling — jadi halaman mana pun yang sedang
+ * dibuka selalu memperlihatkan keadaan terkini tanpa perlu di-refresh. */
+var KODE = { fas: { ada: false }, dosen: { ada: false } };
+
 function muat(){
   var rb = $("#btn-muat"); if (rb) rb.classList.add("memuat");
-  Promise.all([
-    call("/data/ringkas"), call("/data/pengguna"), call("/data/audit"),
+  return Promise.all([
+    call("/data/ringkas"),
+    call("/data/pengguna"),
+    call("/data/audit?n=" + AUDIT_N + (AUDIT_F ? "&aksi=" + encodeURIComponent(AUDIT_F) : "")),
     call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; }),
     call("/data/kode-dosen").catch(function(){ return { ada:false, updatedAt:"" }; }),
     call("/data/sesi").catch(function(){ return { rows: [] }; })
   ])
     .then(function(rs){
-      var ov = rs[0]; USERS = rs[1].users; SESI = rs[5].rows || [];
-      var nPendamping = (ov.fasilitator || 0) + (ov.dosen || 0);
-      var htmlStat =
-        stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
-        stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
-        stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("user","Dosen pendamping",(ov.dosen||0),"s2") +
-        stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6") +
-        stat("folder","Presentasi tim",(ov.presentasi||0),"s5");
-      // Angka hanya dianimasikan ulang bila nilainya memang berubah
-      if (setHTML($("#statistik"), htmlStat, "statistik")) {
-        document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
-          hitungNaik(b, Number(b.dataset.n));
-        });
-      }
-      $("#jml-user").textContent = ov.users + " akun";
-      renderUsers();
-      renderSesi();
-      function statusKode(el, j){
-        if (!el) return;
-        el.textContent = j.ada
-          ? "diset" + (j.updatedAt ? " · " + tgl(j.updatedAt) : "")
-          : "belum diset";
-      }
-      statusKode($("#kode-status"), rs[3]);
-      statusKode($("#kode-status-dosen"), rs[4]);
-      setHTML($("#audit"), rs[2].rows.map(function(r){
-        var aksi = r.aksi || r.raw || "";
-        return '<div class="row-a"><span class="t">' + esc(tglJam(r.ts)) + '</span>' +
-          '<span class="badge ' + auditCls(aksi) + '">' + esc(aksi) + '</span>' +
-          '<span class="tg">' + esc(namaTarget(r)) + '</span></div>';
-      }).join("") || '<div class="mut">Belum ada catatan.</div>', "audit");
+      RINGKAS = rs[0];
+      USERS   = rs[1].users || [];
+      AUDIT   = rs[2].rows || [];
+      KODE    = { fas: rs[3], dosen: rs[4] };
+      SESI    = rs[5].rows || [];
+      PERTAMA = false;
+      render();
       var up = $("#upd");
       if (up) {
         var d = new Date();
@@ -1188,6 +1472,109 @@ function muat(){
     .catch(function(e){ toast(e.message, true); })
     .finally(function(){ if (rb) rb.classList.remove("memuat"); });
 }
+
+/** Gambar ulang seluruh panel dari data terakhir (murah — lihat setHTML). */
+function render(){
+  if (PERTAMA) { renderSkeleton(); return; }
+  renderStat();
+  renderPintasan();
+  renderAuditMini();
+  renderKode();
+  if (HAL === "akun")  renderUsers();
+  if (HAL === "sesi")  renderSesi();
+  if (HAL === "audit") renderAudit();
+}
+
+/** Kerangka abu-abu saat data pertama belum tiba (menghindari layar kosong). */
+function renderSkeleton(){
+  var s = "";
+  for (var i = 0; i < 6; i++) s += '<div class="skel stat"></div>';
+  setHTML($("#statistik"), s, "statistik");
+  var baris = '<tr><td colspan="7" style="padding:14px"><span class="skel row"></span>' +
+    '<span class="skel row"></span><span class="skel row"></span></td></tr>';
+  setHTML($("#t-users"), baris, "t-users");
+  setHTML($("#t-sesi"), baris.replace('colspan="7"', 'colspan="6"'), "t-sesi");
+}
+
+function renderStat(){
+  var ov = RINGKAS; if (!ov) return;
+  var nPendamping = (ov.fasilitator || 0) + (ov.dosen || 0);
+  var html =
+    stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
+    stat("coins","Total belanja",ov.keuangan,"s3") + stat("zap","Sesi aktif",ov.sesi,"s4") +
+    stat("user","Fasilitator",(ov.fasilitator||0),"s5") + stat("user","Dosen pendamping",(ov.dosen||0),"s2") +
+    stat("save","Entri ter-ACC",(ov.acc||0),"s3") + stat("folder","Laporan tim",(ov.laporan||0),"s6") +
+    stat("folder","Presentasi tim",(ov.presentasi||0),"s5");
+  // Angka hanya dianimasikan ulang bila nilainya memang berubah
+  if (setHTML($("#statistik"), html, "statistik")) {
+    document.querySelectorAll("#statistik b[data-n]").forEach(function(b){
+      hitungNaik(b, Number(b.dataset.n));
+    });
+  }
+  var ju = $("#jml-user"); if (ju) ju.textContent = ov.users + " akun";
+}
+
+/** Kartu pintasan di halaman Ringkasan — pintu masuk ke tiap halaman. */
+function renderPintasan(){
+  var online = akunOnline();
+  var nTim = USERS.filter(function(u){ return !isPendamping(u.role || "tim"); }).length;
+  var html =
+    tile("users","s1","akun","Akun pengguna",
+      USERS.length + " akun terdaftar · " + nTim + " di antaranya akun tim") +
+    tile("device","s4","sesi","Perangkat & sesi",
+      online.length + " akun sedang login di " + SESI.length + " perangkat") +
+    tile("scroll","s3","audit","Jejak audit",
+      "Riwayat setiap aksi yang pernah dilakukan lewat pusat kendali") +
+    tile("cog","s5","pengaturan","Pengaturan",
+      "Kode pendaftaran pendamping & kredensial panel ini");
+  setHTML($("#pintasan"), html, "pintasan");
+}
+function tile(ic, cls, page, judul, ket){
+  return '<button class="tile ' + cls + '" data-page="' + page + '">' +
+    '<div class="th-row"><span class="ic">' + sv(ic) + "</span><b>" + esc(judul) + "</b></div>" +
+    "<span>" + esc(ket) + "</span>" +
+    '<span class="go">Buka ' + sv("chev") + "</span></button>";
+}
+
+function renderKode(){
+  function status(el, j){
+    if (!el) return;
+    el.textContent = j && j.ada
+      ? "diset" + (j.updatedAt ? " · " + tgl(j.updatedAt) : "")
+      : "belum diset";
+  }
+  status($("#kode-status"), KODE.fas);
+  status($("#kode-status-dosen"), KODE.dosen);
+}
+
+/* ---------- jejak audit ---------- */
+var FILTER_AUDIT = [
+  ["", "Semua"], ["login.", "Login panel"], ["user.", "Akun"],
+  ["panel.", "Kredensial panel"], ["fasilitator.", "Fasilitator"],
+  ["dosen.", "Dosen"], ["tim.", "Tim"]
+];
+function renderAudit(){
+  var tag = $("#jml-audit");
+  if (tag) tag.textContent = AUDIT.length + " baris ditampilkan";
+  setHTML($("#fil-audit"), FILTER_AUDIT.map(function(f){
+    return '<button class="fchip' + (AUDIT_F === f[0] ? " on" : "") +
+      '" data-fil-audit="' + f[0] + '">' + esc(f[1]) + "</button>";
+  }).join(""), "fil-audit");
+  setHTML($("#audit"), AUDIT.map(barisAudit).join("") ||
+    '<div class="kosong"><div class="big">📜</div>Belum ada catatan untuk saringan ini.</div>', "audit");
+}
+function renderAuditMini(){
+  setHTML($("#audit-mini"), AUDIT.slice(0, 10).map(barisAudit).join("") ||
+    '<div class="mut" style="padding:10px 2px">Belum ada catatan.</div>', "audit-mini");
+}
+function barisAudit(r){
+  var aksi = r.aksi || r.raw || "";
+  return '<div class="row-a"><span class="t">' + esc(tglJam(r.ts)) + "</span>" +
+    '<span class="badge ' + auditCls(aksi) + '">' + esc(aksi) + "</span>" +
+    '<span class="tg">' + esc(namaTarget(r)) + "</span>" +
+    (r.ip ? '<span class="ip">' + esc(r.ip) + "</span>" : "") + "</div>";
+}
+
 function stat(ic, lbl, v, cls){
   return '<div class="stat ' + cls + '"><div class="ic">' + sv(ic) + '</div><div class="tx">' +
     '<b data-n="' + Number(v || 0) + '">0</b><span class="lbl">' + lbl + '</span></div></div>';
@@ -1259,7 +1646,9 @@ function barisUser(u){
       (u.n_dosen ? ' <span class="badge c">👨‍🏫 ' + u.n_dosen + '</span>' : "") +
       (u.n_acc ? ' <span class="badge g">✔ ' + u.n_acc + ' ACC</span>' : "") +
       (u.n_revisi ? ' <span class="badge r">↺ ' + u.n_revisi + ' revisi</span>' : "") +
-      '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
+      '<div class="mut">dibuat ' + tgl(u.createdAt) +
+        (u.loginTerakhir ? " · login terakhir " + sejak(u.loginTerakhir) : " · belum pernah login") +
+      "</div>" +
     "</div></div></td>" +
     '<td class="num">' + u.kegiatan + "</td>" +
     '<td class="num">' + u.keuangan + "</td>" +
@@ -1284,7 +1673,9 @@ function barisPendamping(u){
       "<b>" + esc(u.username) + "</b> <span class='badge " + (role === "dosen" ? "c" : "y") + "'>" +
       labelPeran(role) + "</span>" +
       (role === "dosen" ? ' <span class="badge g" title="Boleh memberi ACC / minta revisi">✔ ACC</span>' : "") +
-      '<div class="mut">dibuat ' + tgl(u.createdAt) + "</div>" +
+      '<div class="mut">dibuat ' + tgl(u.createdAt) +
+        (u.loginTerakhir ? " · login terakhir " + sejak(u.loginTerakhir) : " · belum pernah login") +
+      "</div>" +
     "</div></div></td>" +
     "<td>" + (u.n_tim_diampu
       ? '<span class="badge b">' + u.n_tim_diampu + " tim</span>"
@@ -1335,20 +1726,313 @@ function catatanPerangkat(label){
   }
   return "";
 }
+/* ---------- halaman Perangkat & sesi ----------
+ * Dua sudut pandang atas data yang sama:
+ *   • "Keseluruhan" — satu baris per PERANGKAT yang sedang login.
+ *   • "Per akun"    — dikelompokkan per AKUN, termasuk akun yang sedang
+ *                     offline, lengkap dengan kapan ia terakhir login dan
+ *                     (untuk tim) siapa saja pendampingnya.
+ * Keduanya ikut menyegarkan diri lewat siaran langsung/polling. */
+
+/** Kata kunci pencarian di halaman sesi (huruf kecil). */
+function cariSesi(){ return ($("#cari-sesi") && $("#cari-sesi").value || "").toLowerCase(); }
+
+/** Sesi setelah saringan peran + pencarian diterapkan. */
+function sesiTersaring(){
+  var cari = cariSesi();
+  return SESI.filter(function(s){
+    if (PERAN_SESI && (s.role || "tim") !== PERAN_SESI) return false;
+    if (!cari) return true;
+    return ((s.username || "") + " " + (s.perangkat || "") + " " + (s.ip || ""))
+      .toLowerCase().indexOf(cari) >= 0;
+  });
+}
+/** Sesi aktif dikelompokkan per id akun. */
+function sesiPerAkun(){
+  var peta = {};
+  SESI.forEach(function(s){ (peta[s.user_id] = peta[s.user_id] || []).push(s); });
+  return peta;
+}
+/** Daftar id akun yang punya minimal satu perangkat login. */
+function akunOnline(){
+  var peta = {};
+  SESI.forEach(function(s){ peta[s.user_id] = true; });
+  return Object.keys(peta);
+}
+
 function renderSesi(){
+  renderStatSesi();
+  renderFilterPeran();
+  var a = $("#sesi-semua"), b = $("#sesi-akun"), c = $("#sesi-tim");
+  if (a) a.classList.toggle("hide", MODE_SESI !== "semua");
+  if (b) b.classList.toggle("hide", MODE_SESI !== "akun");
+  if (c) c.classList.toggle("hide", MODE_SESI !== "tim");
+  // Saringan peran tidak relevan pada tampilan per tim (satu kartu sudah
+  // memuat tim beserta seluruh pendampingnya).
+  var fp = $("#fil-peran");
+  if (fp) fp.classList.toggle("hide", MODE_SESI === "tim");
+  document.querySelectorAll("[data-mode-sesi]").forEach(function(x){
+    x.classList.toggle("on", x.dataset.modeSesi === MODE_SESI);
+  });
+  if (MODE_SESI === "semua") renderTabelSesi();
+  else if (MODE_SESI === "akun") renderAkunSesi();
+  else renderTimSesi();
+}
+
+/** Kartu ringkas di kepala halaman: berapa perangkat & siapa yang online. */
+function renderStatSesi(){
+  var peta = sesiPerAkun();
+  var online = { tim: 0, fasilitator: 0, dosen: 0 };
+  var total = 0;
+  USERS.forEach(function(u){
+    if (!(peta[u.id] && peta[u.id].length)) return;
+    var role = u.role || "tim";
+    if (online[role] == null) role = "tim";
+    online[role]++; total++;
+  });
+  var html =
+    stat("device","Perangkat login", SESI.length, "s4") +
+    stat("users","Akun online", total, "s1") +
+    stat("user","Tim online", online.tim, "s2") +
+    stat("user","Fasilitator online", online.fasilitator, "s5") +
+    stat("user","Dosen online", online.dosen, "s3") +
+    stat("power","Akun offline", Math.max(0, USERS.length - total), "s6");
+  if (setHTML($("#stat-sesi"), html, "stat-sesi")) {
+    document.querySelectorAll("#stat-sesi b[data-n]").forEach(function(b){
+      hitungNaik(b, Number(b.dataset.n));
+    });
+  }
+}
+
+/** Chip penyaring peran — angkanya mengikuti jumlah perangkat login. */
+function renderFilterPeran(){
+  var n = { "": SESI.length, tim: 0, fasilitator: 0, dosen: 0 };
+  SESI.forEach(function(s){
+    var r = s.role || "tim";
+    if (n[r] == null) r = "tim";
+    n[r]++;
+  });
+  var daftar = [["", "Semua peran"], ["tim", "👥 Tim"],
+    ["fasilitator", "🎓 Fasilitator"], ["dosen", "👨‍🏫 Dosen"]];
+  setHTML($("#fil-peran"), daftar.map(function(f){
+    return '<button class="fchip' + (PERAN_SESI === f[0] ? " on" : "") +
+      '" data-peran-sesi="' + f[0] + '">' + esc(f[1]) +
+      '<span class="n">' + (n[f[0]] || 0) + "</span></button>";
+  }).join(""), "fil-peran");
+}
+
+/** Mode "Keseluruhan": satu baris per perangkat. */
+function renderTabelSesi(){
   var el = $("#t-sesi");
   if (!el) return;
-  var cari = ($("#cari-sesi") && $("#cari-sesi").value || "").toLowerCase();
-  var rows = SESI.filter(function(s){
-    if (!cari) return true;
-    return (s.username + " " + s.perangkat + " " + s.ip).toLowerCase().indexOf(cari) >= 0;
-  });
-  var tag = $("#jml-sesi");
-  if (tag) tag.textContent = SESI.length + " sesi aktif";
+  var rows = sesiTersaring();
   setHTML(el, rows.map(barisSesi).join("") ||
     '<tr><td colspan="6"><div class="kosong"><div class="big">🖥️</div>' +
-    (cari ? "Tidak ada sesi yang cocok." : "Belum ada perangkat yang sedang login.") +
+    (cariSesi() || PERAN_SESI ? "Tidak ada sesi yang cocok dengan saringan ini."
+                              : "Belum ada perangkat yang sedang login.") +
     "</div></td></tr>", "t-sesi");
+}
+
+/** Mode "Per akun": semua akun — yang online lebih dulu. */
+function renderAkunSesi(){
+  var peta = sesiPerAkun();
+  var cari = cariSesi();
+  var rows = USERS.filter(function(u){
+    var role = u.role || "tim";
+    if (PERAN_SESI && role !== PERAN_SESI) return false;
+    if (!cari) return true;
+    var teks = u.username + " " + (peta[u.id] || []).map(function(s){
+      return (s.perangkat || "") + " " + (s.ip || "");
+    }).join(" ");
+    return teks.toLowerCase().indexOf(cari) >= 0;
+  });
+  // Urutan: sedang login dulu, lalu yang paling baru login.
+  rows.sort(function(a, b){
+    var na = (peta[a.id] || []).length, nb = (peta[b.id] || []).length;
+    if (!!na !== !!nb) return nb ? 1 : -1;
+    if (na !== nb) return nb - na;
+    return String(b.loginTerakhir || "").localeCompare(String(a.loginTerakhir || ""));
+  });
+  setHTML($("#daftar-akun-sesi"), rows.map(function(u){
+    return kartuAkunSesi(u, peta[u.id] || []);
+  }).join("") ||
+    '<div class="kosong"><div class="big">👥</div>Tidak ada akun yang cocok dengan saringan ini.</div>',
+    "akun-sesi");
+}
+
+/** Satu kartu akun: status online, login terakhir, pendamping, perangkatnya. */
+function kartuAkunSesi(u, list){
+  var role = u.role || "tim";
+  var online = list.length > 0;
+  var buka = !!BUKA_SESI[u.id];
+  var ini = (u.username || "?").charAt(0).toUpperCase();
+  var kelas = role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b";
+
+  var meta = [];
+  meta.push(online
+    ? "aktif " + sejak((list[0] || {}).terakhir)
+    : (u.loginTerakhir ? "login terakhir " + sejak(u.loginTerakhir) : "belum pernah login"));
+  if (isPendamping(role)) {
+    meta.push(u.n_tim_diampu ? "mengampu " + u.n_tim_diampu + " tim" : "belum di-assign tim");
+  } else {
+    var p = u.pengampu || [];
+    meta.push(p.length
+      ? "pendamping: " + p.map(function(x){ return x.username; }).join(", ")
+      : "belum punya pendamping");
+  }
+  meta.push("dibuat " + tgl(u.createdAt));
+
+  var isi = "";
+  if (buka) {
+    isi = '<div class="asx-b">' + (list.length
+      ? list.map(barisPerangkat).join("")
+      : '<div class="mut" style="padding:13px 2px">Akun ini sedang tidak login di perangkat mana pun.' +
+        (u.loginTerakhir ? " Terakhir login " + esc(tglJam(u.loginTerakhir)) + "." : "") + "</div>") +
+      "</div>";
+  }
+
+  return '<div class="asx' + (online ? " aktif" : "") + (buka ? " buka" : "") + '">' +
+    '<div class="asx-h" data-act="lipat" data-id="' + u.id + '">' +
+      '<span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + "</span>" +
+      '<div class="asx-nm"><b>' + esc(u.username) +
+        ' <span class="badge ' + kelas + '">' + labelPeran(role) + "</span>" +
+        (role === "dosen" ? ' <span class="badge g" title="Boleh memberi ACC / minta revisi">✔ ACC</span>' : "") +
+      "</b>" +
+      '<div class="asx-meta">' + meta.map(function(m, i){
+        return (i ? '<i class="dot"></i>' : "") + "<span>" + esc(m) + "</span>";
+      }).join("") + "</div></div>" +
+      '<div class="asx-act">' +
+        '<span class="st ' + (online ? "on" : "off") + '"><i></i>' +
+          (online ? list.length + " perangkat" : "offline") + "</span>" +
+        '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + " Data</button>" +
+        (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
+          u.id + '">' + sv("power") + "</button>" : "") +
+        '<button class="asx-tgl" data-act="lipat" data-id="' + u.id +
+          '" title="' + (buka ? "Sembunyikan" : "Lihat") + ' perangkat" aria-expanded="' + buka + '">' +
+          sv("chev") + "</button>" +
+      "</div></div>" + isi + "</div>";
+}
+
+/** Satu perangkat di dalam kartu akun. */
+function barisPerangkat(s){
+  return '<div class="dev">' +
+    '<span class="dev-ic">' + ikonSesi(s.perangkat) + "</span>" +
+    '<div class="dev-nm"><b>' +
+      (s.perangkat ? esc(s.perangkat) : '<span class="mut">Perangkat tidak dikenal</span>') + "</b>" +
+      catatanPerangkat(s.perangkat) + "</div>" +
+    '<span class="dev-ip">' + (s.ip ? esc(s.ip) : "IP tidak terekam") + "</span>" +
+    '<div class="dev-tm">' + esc(sejak(s.terakhir)) +
+      '<div class="mut">mulai ' + esc(tgl(s.dibuat)) + "</div></div>" +
+    '<div class="dev-act">' +
+      '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
+      'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + "</button>" +
+    "</div></div>";
+}
+
+/* ---------- mode "Per tim" ----------
+ * Sudut pandang paling menjawab pertanyaan sehari-hari: "tim ini sedang
+ * dikerjakan siapa, dan pendampingnya sudah masuk belum?" Satu kartu = satu
+ * tim, berisi perangkat tim itu SEKALIGUS daftar fasilitator/dosen yang
+ * mengampunya beserta status login masing-masing. */
+function renderTimSesi(){
+  var peta = sesiPerAkun();
+  var cari = cariSesi();
+  var tim = USERS.filter(function(u){ return !isPendamping(u.role || "tim"); });
+  var rows = tim.filter(function(t){
+    if (!cari) return true;
+    var teks = t.username + " " +
+      (t.pengampu || []).map(function(p){ return p.username; }).join(" ") + " " +
+      (peta[t.id] || []).map(function(s){ return (s.perangkat || "") + " " + (s.ip || ""); }).join(" ");
+    return teks.toLowerCase().indexOf(cari) >= 0;
+  });
+  rows.sort(function(a, b){
+    var na = (peta[a.id] || []).length, nb = (peta[b.id] || []).length;
+    if (!!na !== !!nb) return nb ? 1 : -1;
+    return String(b.loginTerakhir || "").localeCompare(String(a.loginTerakhir || ""));
+  });
+  setHTML($("#daftar-tim-sesi"), rows.map(function(t){
+    return kartuTimSesi(t, peta);
+  }).join("") ||
+    '<div class="kosong"><div class="big">👥</div>' +
+    (cari ? "Tidak ada tim yang cocok dengan pencarian ini."
+          : "Belum ada akun tim terdaftar.") + "</div>",
+    "tim-sesi");
+}
+
+function kartuTimSesi(t, peta){
+  var list = peta[t.id] || [];
+  var online = list.length > 0;
+  var buka = !!BUKA_SESI[t.id];
+  var ini = (t.username || "?").charAt(0).toUpperCase();
+  var pend = t.pengampu || [];
+  var pendOnline = pend.filter(function(p){ return (peta[p.id] || []).length > 0; }).length;
+
+  var meta = [];
+  meta.push(online
+    ? list.length + " perangkat aktif " + sejak((list[0] || {}).terakhir)
+    : (t.loginTerakhir ? "login terakhir " + sejak(t.loginTerakhir) : "belum pernah login"));
+  meta.push(pend.length
+    ? pend.length + " pendamping · " + pendOnline + " sedang online"
+    : "belum punya pendamping");
+
+  var isi = "";
+  if (buka) {
+    isi = '<div class="asx-b">' +
+      '<div class="grp">Perangkat tim</div>' +
+      (list.length ? list.map(barisPerangkat).join("")
+        : '<div class="mut" style="padding:9px 2px">Tim ini sedang tidak login di perangkat mana pun.' +
+          (t.loginTerakhir ? " Terakhir login " + esc(tglJam(t.loginTerakhir)) + "." : "") + "</div>") +
+      '<div class="grp">Pendamping tim (' + pend.length + ")</div>" +
+      (pend.length ? pend.map(function(p){ return barisPendampingSesi(p, peta); }).join("")
+        : '<div class="mut" style="padding:9px 2px">Belum ada fasilitator/dosen yang mengampu tim ini. ' +
+          'Atur lewat halaman Akun pengguna → tombol 🎓 pada baris tim.</div>') +
+      "</div>";
+  }
+
+  return '<div class="asx' + (online ? " aktif" : "") + (buka ? " buka" : "") + '">' +
+    '<div class="asx-h" data-act="lipat" data-id="' + t.id + '">' +
+      '<span class="ava" style="' + avaStyle(t.username) + '">' + esc(ini) + "</span>" +
+      '<div class="asx-nm"><b>' + esc(t.username) + ' <span class="badge b">👥 tim</span>' +
+        (t.n_acc ? ' <span class="badge g">✔ ' + t.n_acc + " ACC</span>" : "") +
+      "</b>" +
+      '<div class="asx-meta">' + meta.map(function(m, i){
+        return (i ? '<i class="dot"></i>' : "") + "<span>" + esc(m) + "</span>";
+      }).join("") + "</div></div>" +
+      '<div class="asx-act">' +
+        '<span class="st ' + (online ? "on" : "off") + '"><i></i>' +
+          (online ? list.length + " perangkat" : "offline") + "</span>" +
+        '<button class="btn sm p" data-act="detail" data-id="' + t.id + '">' + sv("folder") + " Data</button>" +
+        '<button class="btn sm ic" title="Atur pendamping tim ini" data-act="fas" data-id="' + t.id + '">🎓</button>' +
+        (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
+          t.id + '">' + sv("power") + "</button>" : "") +
+        '<button class="asx-tgl" data-act="lipat" data-id="' + t.id +
+          '" title="' + (buka ? "Sembunyikan" : "Lihat") + ' rincian" aria-expanded="' + buka + '">' +
+          sv("chev") + "</button>" +
+      "</div></div>" + isi + "</div>";
+}
+
+/** Baris pendamping di dalam kartu tim: status login + pintasan aksinya. */
+function barisPendampingSesi(p, peta){
+  var akun = USERS.find(function(x){ return x.id === p.id; }) || p;
+  var list = peta[p.id] || [];
+  var online = list.length > 0;
+  var role = p.role || "fasilitator";
+  var ini = (p.username || "?").charAt(0).toUpperCase();
+  var ket = online
+    ? list.length + " perangkat · " + (list[0].perangkat || "perangkat tidak dikenal") +
+      " · aktif " + sejak(list[0].terakhir)
+    : (akun.loginTerakhir ? "login terakhir " + sejak(akun.loginTerakhir) : "belum pernah login");
+  return '<div class="dev">' +
+    '<span class="ava" style="width:30px;height:30px;flex:0 0 30px;font-size:.76rem;' +
+      avaStyle(p.username) + '">' + esc(ini) + "</span>" +
+    '<div class="dev-nm"><b>' + esc(p.username) + "</b> " +
+      '<span class="badge ' + (role === "dosen" ? "c" : "y") + '">' + labelPeran(role) + "</span>" +
+      '<div class="mut">' + esc(ket) + "</div></div>" +
+    '<span class="st ' + (online ? "on" : "off") + '"><i></i>' + (online ? "online" : "offline") + "</span>" +
+    '<div class="dev-act">' +
+      '<button class="btn sm ic" title="Buka data pendamping" data-act="detail" data-id="' +
+        p.id + '">' + sv("folder") + "</button>" +
+    "</div></div>";
 }
 function barisSesi(s){
   var ini = (s.username || "?").charAt(0).toUpperCase();
@@ -1860,8 +2544,38 @@ document.addEventListener("click", function(e){
 
 /* ---------- event delegation ---------- */
 document.addEventListener("click", function(ev){
-  var el = ev.target.closest("[data-act],[data-tab],[data-role-tab]");
+  var el = ev.target.closest(
+    "[data-act],[data-tab],[data-role-tab],[data-page],[data-mode-sesi],[data-peran-sesi],[data-fil-audit]");
   if (!el) return;
+
+  // pindah halaman (link sidebar, kartu pintasan, tombol "Lihat semua")
+  if (el.dataset.page) {
+    // Ctrl/Cmd/Shift-klik pada tautan sidebar tetap dibiarkan peramban
+    // (buka di tab baru) — hanya klik biasa yang ditangani router.
+    if (el.tagName === "A" && (ev.metaKey || ev.ctrlKey || ev.shiftKey)) return;
+    ev.preventDefault();
+    keHalaman(el.dataset.page, true);
+    return;
+  }
+  // halaman sesi: ganti sudut pandang
+  if (el.dataset.modeSesi) {
+    MODE_SESI = el.dataset.modeSesi;
+    renderSesi();
+    return;
+  }
+  // halaman sesi: saring peran
+  if (el.dataset.peranSesi != null && el.hasAttribute("data-peran-sesi")) {
+    PERAN_SESI = el.dataset.peranSesi;
+    renderSesi();
+    return;
+  }
+  // halaman audit: saring jenis aksi (dilakukan di server)
+  if (el.dataset.filAudit != null && el.hasAttribute("data-fil-audit")) {
+    AUDIT_F = el.dataset.filAudit;
+    renderAudit();
+    muat();
+    return;
+  }
   if (el.dataset.roleTab) {
     VIEW_ROLE = el.dataset.roleTab;
     document.querySelectorAll("[data-role-tab]").forEach(function(b){
@@ -1894,6 +2608,13 @@ document.addEventListener("click", function(ev){
     case "hapus": hapusUser(el.dataset.id); break;
     case "tim": assignTim(el.dataset.id); break;
     case "fas": assignFasilitator(el.dataset.id); break;
+    case "lipat":
+      // bentangkan/lipat rincian sebuah kartu (keadaan diingat, jadi
+      // pembaruan otomatis tidak menutupnya kembali)
+      if (BUKA_SESI[el.dataset.id]) delete BUKA_SESI[el.dataset.id];
+      else BUKA_SESI[el.dataset.id] = true;
+      renderSesi();
+      break;
     case "tutup-detail": tutupDialog($("#d-detail")); break;
     case "foto": window.open(fotoUrl(el.dataset.key), "_blank"); break;
   }
@@ -1901,6 +2622,10 @@ document.addEventListener("click", function(ev){
 
 $("#cari").addEventListener("input", renderUsers);
 $("#cari-sesi").addEventListener("input", renderSesi);
+$("#audit-n").addEventListener("change", function(e){
+  AUDIT_N = Number(e.target.value) || 200;
+  muat();
+});
 
 $("#f-login").addEventListener("submit", function(e){
   e.preventDefault();
@@ -1969,30 +2694,32 @@ $("#f-kode-dosen").addEventListener("submit", function(e){
   });
 })();
 
-/* ---------- sidebar: scrollspy + pintasan keyboard ---------- */
+/* ---------- pintasan keyboard ---------- */
 (function(){
-  var ids = ["statistik", "sec-akun", "sec-audit", "sec-pengaturan"];
-  var links = {};
-  document.querySelectorAll(".side-nav a").forEach(function(a){
-    links[(a.getAttribute("href") || "").slice(1)] = a;
+  // Tautan sidebar memakai URL sungguhan (bisa diklik-tengah / disalin);
+  // klik biasa tetap ditangani router agar tidak memuat ulang halaman.
+  document.querySelectorAll(".side-nav a[data-page]").forEach(function(a){
+    a.setAttribute("href", urlHal(a.dataset.page));
   });
-  function spy(){
-    var best = ids[0], garis = window.scrollY + 150;
-    ids.forEach(function(id){
-      var el = document.getElementById(id);
-      if (el && el.offsetTop <= garis) best = id;
-    });
-    ids.forEach(function(id){
-      if (links[id]) links[id].classList.toggle("on", id === best);
-    });
-  }
-  window.addEventListener("scroll", spy, { passive: true });
-  spy();
-  // "/" → langsung fokus ke kotak cari akun (seperti dashboard modern)
   document.addEventListener("keydown", function(e){
-    if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) {
-      var c = $("#cari");
-      if (c && !$("#v-app").classList.contains("hide")) { e.preventDefault(); c.focus(); }
+    if (document.querySelector("dialog[open]")) return;
+    if ($("#v-app").classList.contains("hide")) return;
+    var diKetikan = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "");
+    // "/" → kotak cari halaman yang sedang dibuka
+    if (e.key === "/" && !diKetikan) {
+      var c = HAL === "sesi" ? $("#cari-sesi") : $("#cari");
+      if (c) {
+        e.preventDefault();
+        if (HAL !== "sesi" && HAL !== "akun") keHalaman("akun", true);
+        c.focus();
+        c.select();
+      }
+      return;
+    }
+    // g lalu 1..5 → lompat antar halaman (pola dashboard modern)
+    if (!diKetikan && e.key >= "1" && e.key <= "5" && (e.altKey || e.metaKey)) {
+      e.preventDefault();
+      keHalaman(HALAMAN[Number(e.key) - 1], true);
     }
   });
 })();
