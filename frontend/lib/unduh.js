@@ -11,7 +11,7 @@
  * mengonversi PNG/WebP → JPG).
  */
 import JSZip from "jszip";
-import { fotoUrl } from "@/lib/api";
+import { api, exportUrl, fotoUrl } from "@/lib/api";
 
 /** URL unduhan satu foto (Content-Disposition: attachment dari server). */
 export const unduhUrl = (key) => `${fotoUrl(key)}?dl=1`;
@@ -118,5 +118,43 @@ export function susunDaftarZip(kegiatan = [], keuangan = []) {
     for (const k of keys) tambah(`keuangan/${e.tanggal}`, k, "bukti");
   }
   return daftar;
+}
+
+/**
+ * Unduh berkas EKSPOR (docx/pdf/xlsx).
+ *
+ * Jalur utama: server hanya membangun berkas lalu menitipkannya ke ImageKit
+ * dan membalas tautan CDN — byte-nya ditarik browser LANGSUNG dari CDN,
+ * tidak melewati serverless function Vercel. Berkas jadi bebas dari batas
+ * respons ±4,5 MB (jadi foto di dokumen bisa beresolusi tinggi) dan kuota
+ * bandwidth Vercel nyaris tidak terpakai.
+ *
+ * Jalur cadangan: mode lokal (tanpa ImageKit) atau bila CDN tak terjangkau →
+ * unduhan biasa lewat /api/export/{jenis}.
+ * @returns {Promise<number>} ukuran berkas dalam byte (0 bila lewat cadangan)
+ */
+export async function unduhEkspor(jenis) {
+  const info = await api.eksporTautan(jenis);
+
+  if (info?.mode === "cdn" && info.url) {
+    try {
+      const res = await fetch(info.url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      simpanBlob(blob, info.nama || `logbook.${jenis}`);
+      return blob.size;
+    } catch {
+      /* CDN tak terjangkau → jatuh ke jalur server di bawah */
+    }
+  }
+
+  // Cadangan: unduhan langsung dari server (cookie sesi ikut otomatis).
+  const a = document.createElement("a");
+  a.href = exportUrl(info?.url || `/api/export/${jenis}`);
+  a.download = info?.nama || "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  return 0;
 }
 

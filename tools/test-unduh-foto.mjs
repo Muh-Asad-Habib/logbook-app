@@ -1,7 +1,8 @@
 /**
  * Uji normalisasi resolusi unduhan JPG (?dl=1) — fungsi jpgUnduhan:
  * - foto kecil di-upscale ke sisi terpanjang 1280 px (maks 4×), rasio terjaga
- * - foto raksasa diturunkan ke 1600 px
+ * - foto raksasa diturunkan ke 2000 px (selaras batas kompresi unggahan)
+
  * - JPEG yang sudah dalam rentang dikirim byte asli (tanpa rekompresi)
  * - PNG dikonversi ke JPEG; EXIF orientation diterapkan; buffer rusak aman
  * - seluruh sampel nyata di uploads/ memenuhi invarian di atas
@@ -13,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { jpgUnduhan } from "../backend/src/files.js";
 
-const UNDUH_MIN = 1280, UNDUH_MAX = 1600, FAKTOR = 4;
+const UNDUH_MIN = 1280, UNDUH_MAX = 2000, FAKTOR = 4;
 const targetSisi = (sisi) =>
   sisi < UNDUH_MIN ? Math.min(UNDUH_MIN, Math.round(sisi * FAKTOR))
   : sisi > UNDUH_MAX ? UNDUH_MAX
@@ -47,10 +48,10 @@ const C = await jpgUnduhan(await buatFoto(262, 196));
 const mdC = await sharp(C.buffer).metadata();
 cek("262×196 dibatasi 4× → 1048×784", mdC.width === 1048 && mdC.height === 784);
 
-// 4) raksasa 3000×2000 → turun ke 1600×1067
+// 4) raksasa 3000×2000 → turun ke 2000×1333
 const D = await jpgUnduhan(await buatFoto(3000, 2000));
 const mdD = await sharp(D.buffer).metadata();
-cek("3000×2000 diturunkan ke 1600×1067", mdD.width === 1600 && mdD.height === 1067);
+cek("3000×2000 diturunkan ke 2000×1333", mdD.width === 2000 && mdD.height === 1333);
 
 // 5) JPEG dalam rentang (1400×1000) → byte asli tak disentuh
 const asli = await buatFoto(1400, 1000);

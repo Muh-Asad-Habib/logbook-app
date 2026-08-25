@@ -1,45 +1,24 @@
 /**
- * Uji cepat keseragaman foto ekspor DOCX (tanpa database):
- * - foto landscape → dipangkas 620×465 (4:3), potret → 465×620 (3:4)
- * - ukuran tampil EMU seragam per orientasi (kegiatan & keuangan)
- * - format PNG dipertahankan; buffer non-gambar ditolak dengan aman
+ * Uji perilaku foto pada ekspor DOCX — memakai fungsi ASLI dari kode produksi.
+ *
+ * Yang dijamin di sini:
+ *  - foto TIDAK pernah dipangkas: rasio aslinya utuh (tangkapan layar lebar
+ *    tidak kehilangan bagian tepi seperti pada versi lama yang memakai crop);
+ *  - foto beresolusi rendah (mis. hasil impor .docx) di-UPSCALE agar tidak
+ *    pecah, foto raksasa diturunkan ke batas sematan;
+ *  - ukuran tampil di dokumen mengikuti rasio asli, dibatasi TINGGI_MAKS;
+ *  - lebar foto mengikuti lebar kolom Foto/Bukti pada template.
+ *
  * Jalankan: node tools/test-export-foto.mjs
  */
 import sharp from "sharp";
+import { siapkanEmbed } from "../backend/src/files.js";
+import { ukuranMuat, lebarFotoDariGrid, TINGGI_MAKS } from "../backend/src/export/docx.js";
 
-const RASIO_FOTO = 4 / 3;
-const LEBAR_FOTO = {
-  kegiatan: { landscape: 2.6, potret: 2.0 },
-  keuangan: { landscape: 2.2, potret: 1.7 },
-};
-const cmKeEmu = (cm) => Math.round(cm * 360000);
-function ukuranSeragam(lebar, potret) {
-  const cx = cmKeEmu(potret ? lebar.potret : lebar.landscape);
-  const cy = Math.round(cx * (potret ? RASIO_FOTO : 1 / RASIO_FOTO));
-  return { cx, cy };
-}
-async function cropSeragam(buf) {
-  const isJpeg = buf?.[0] === 0xff && buf[1] === 0xd8;
-  const isPng = buf?.[0] === 0x89 && buf[1] === 0x50;
-  if (!isJpeg && !isPng) return null;
-  try {
-    const md = await sharp(buf).metadata();
-    let w = md.width, h = md.height;
-    if (!w || !h) return null;
-    if (md.orientation >= 5) [w, h] = [h, w];
-    const potret = h > w;
-    const [tw, th] = potret ? [465, 620] : [620, 465];
-    let s = sharp(buf, { failOn: "none" }).rotate()
-      .resize(tw, th, { fit: "cover", position: "centre" });
-    s = isPng
-      ? s.png({ compressionLevel: 9 })
-      : s.jpeg({ quality: 68, progressive: true, mozjpeg: true });
-    return { buf: await s.toBuffer(), potret };
-  } catch {
-    return null;
-  }
-}
+const EMU_PER_CM = 360000;
+const cm = (emu) => emu / EMU_PER_CM;
 
+/** Gambar uji polos berukuran tertentu. */
 const buatFoto = (w, h, format = "jpeg") =>
   sharp({ create: { width: w, height: h, channels: 3, background: { r: 120, g: 140, b: 200 } } })
     [format]().toBuffer();
@@ -49,131 +28,115 @@ const cek = (nama, kondisi) => {
   console.log(`${kondisi ? "✅" : "❌"} ${nama}`);
   if (!kondisi) gagal += 1;
 };
+/** Bandingkan dua pecahan dengan toleransi (pembulatan EMU/piksel). */
+const dekat = (a, b, tol = 0.02) => Math.abs(a - b) <= tol;
 
-// landscape 1600×900 → 620×465
-const L = await cropSeragam(await buatFoto(1600, 900));
-const mdL = await sharp(L.buf).metadata();
-cek("landscape terdeteksi (potret=false)", L.potret === false);
-cek("landscape dipangkas ke 620×465 (4:3)", mdL.width === 620 && mdL.height === 465);
-cek("landscape tetap JPEG", mdL.format === "jpeg");
+/* ============ 1. Penyiapan foto: utuh, tanpa dipangkas ============ */
 
-// potret 900×1600 → 465×620
-const Pt = await cropSeragam(await buatFoto(900, 1600));
-const mdP = await sharp(Pt.buf).metadata();
-cek("potret terdeteksi (potret=true)", Pt.potret === true);
-cek("potret dipangkas ke 465×620 (3:4)", mdP.width === 465 && mdP.height === 620);
+// Tangkapan layar lebar 1920×620 (rasio 3,1:1) — kasus yang dulu terpotong.
+const lebarBuf = await buatFoto(1920, 620);
+const lebarHasil = await siapkanEmbed(lebarBuf);
+const mdLebar = await sharp(lebarHasil.buffer).metadata();
+cek("gambar lebar dikenali (ok)", lebarHasil.ok === true);
+cek("dimensi asli dilaporkan apa adanya (1920×620)",
+  lebarHasil.w === 1920 && lebarHasil.h === 620);
+cek("rasio 3,1:1 dipertahankan — TIDAK dipangkas",
+  dekat(mdLebar.width / mdLebar.height, 1920 / 620, 0.05));
+cek("sisi terpanjang diturunkan ke batas sematan (1000px)", mdLebar.width === 1000);
 
-// persegi (1000×1000) → dianggap landscape
-const Sq = await cropSeragam(await buatFoto(1000, 1000));
-cek("persegi dianggap landscape", Sq.potret === false);
+// Potret 900×1600
+const potretHasil = await siapkanEmbed(await buatFoto(900, 1600));
+const mdPotret = await sharp(potretHasil.buffer).metadata();
+cek("potret: rasio 9:16 tetap utuh",
+  dekat(mdPotret.width / mdPotret.height, 900 / 1600, 0.02));
+cek("potret: sisi terpanjang 1000px", mdPotret.height === 1000);
 
-// PNG dipertahankan sebagai PNG
-const Png = await cropSeragam(await buatFoto(800, 1200, "png"));
-const mdPng = await sharp(Png.buf).metadata();
-cek("PNG tetap PNG setelah dipangkas", mdPng.format === "png");
-cek("PNG potret 465×620", mdPng.width === 465 && mdPng.height === 620);
+// Foto kecil hasil impor .docx (mis. 320×240) → di-upscale
+const kecilHasil = await siapkanEmbed(await buatFoto(320, 240));
+const mdKecil = await sharp(kecilHasil.buffer).metadata();
+cek("foto kecil di-upscale (320px → 1000px, maks 4×)", mdKecil.width === 1000);
+cek("foto kecil: rasio 4:3 tetap", dekat(mdKecil.width / mdKecil.height, 4 / 3));
+cek("dimensi ASLI foto kecil tetap dilaporkan (320×240)",
+  kecilHasil.w === 320 && kecilHasil.h === 240);
 
-// buffer bukan gambar → null (fallback aman)
-cek("buffer non-gambar ditolak (null)", (await cropSeragam(Buffer.from("bukan gambar"))) === null);
+// Terlalu kecil untuk 1000px → dibatasi faktor 4×
+const mungilHasil = await siapkanEmbed(await buatFoto(200, 150));
+const mdMungil = await sharp(mungilHasil.buffer).metadata();
+cek("pembesaran dibatasi 4× (200px → 800px, bukan 1000px)", mdMungil.width === 800);
 
-// ukuran tampil EMU seragam
-const kegL = ukuranSeragam(LEBAR_FOTO.kegiatan, false);
-const kegP = ukuranSeragam(LEBAR_FOTO.kegiatan, true);
-cek("kegiatan landscape 2,6×1,95 cm", kegL.cx === 936000 && kegL.cy === 702000);
-cek("kegiatan potret 2,0×2,67 cm", kegP.cx === 720000 && kegP.cy === 960000);
-const keuL = ukuranSeragam(LEBAR_FOTO.keuangan, false);
-const keuP = ukuranSeragam(LEBAR_FOTO.keuangan, true);
-cek("keuangan landscape 2,2×1,65 cm", keuL.cx === 792000 && keuL.cy === 594000);
-cek("keuangan potret 1,7×2,27 cm", keuP.cx === 612000 && keuP.cy === 816000);
-cek("rasio EMU landscape persis 4:3", kegL.cx / kegL.cy === RASIO_FOTO);
-cek("rasio EMU potret persis 3:4", kegP.cy / kegP.cx === RASIO_FOTO);
+// PNG tetap PNG (relationship/content-type dokumen tidak berubah)
+const pngHasil = await siapkanEmbed(await buatFoto(800, 1200, "png"));
+const mdPng = await sharp(pngHasil.buffer).metadata();
+cek("PNG tetap PNG", mdPng.format === "png");
 
-// simulasi penjaga budget: fit-inside 480/360/260 harus mempertahankan rasio EKSAK
-for (const dim of [480, 360, 260]) {
-  const kecil = await sharp(Pt.buf)
-    .resize(dim, dim, { fit: "inside", withoutEnlargement: true }).jpeg().toBuffer();
-  const md = await sharp(kecil).metadata();
-  cek(`budget ${dim}px: rasio potret tetap eksak 3:4 (${md.width}×${md.height})`,
-    md.width * 4 === md.height * 3);
-}
+// Bukan gambar → ditolak dengan aman (buffer asli dikembalikan)
+const bukan = await siapkanEmbed(Buffer.from("bukan gambar"));
+cek("buffer non-gambar ditolak dengan aman (ok=false)", bukan.ok === false);
+cek("buffer non-gambar dikembalikan apa adanya",
+  bukan.buffer.toString() === "bukan gambar");
 
-/* ---------------- lebar foto dari grid tabel ---------------- */
-function lebarFotoDariGrid(tblXml, fallback) {
-  const grid = (tblXml.match(/<w:gridCol[^>]*w:w="(\d+)"/g) || [])
-    .map((g) => Number(g.match(/w:w="(\d+)"/)[1]));
-  if (grid.length < 2) return fallback;
-  const cm = grid[grid.length - 1] / 567 - 0.42;
-  if (!(cm >= 1.2 && cm <= 12)) return fallback;
-  const landscape = Math.round(cm * 100) / 100;
-  return { landscape, potret: Math.round(landscape * 75) / 100 };
-}
+/* ============ 2. Ukuran tampil di dokumen ============ */
 
-const FALLBACK = { landscape: 2.6, potret: 2.0 };
+const LEBAR = 3.08; // cm — lebar kolom Foto contoh
+
+// Gambar lebar: memenuhi kolom, tingginya kecil mengikuti rasio
+const uLebar = ukuranMuat(LEBAR, 1920, 620);
+cek("gambar lebar memenuhi lebar kolom (3,08 cm)", dekat(cm(uLebar.cx), LEBAR));
+cek("gambar lebar: tinggi mengikuti rasio asli",
+  dekat(uLebar.cy / uLebar.cx, 620 / 1920, 0.01));
+
+// Landscape biasa 4:3
+const uLand = ukuranMuat(LEBAR, 1600, 1200);
+cek("landscape 4:3 memenuhi lebar kolom", dekat(cm(uLand.cx), LEBAR));
+cek("landscape 4:3: tinggi = 3/4 lebar", dekat(uLand.cy / uLand.cx, 3 / 4, 0.01));
+
+// Potret 9:16 pada kolom 3,08 cm → tinggi ±5,48 cm, masih di bawah batas
+const uPot = ukuranMuat(LEBAR, 900, 1600);
+cek("potret biasa memenuhi lebar kolom", dekat(cm(uPot.cx), LEBAR));
+cek("potret biasa: tinggi mengikuti rasio (±5,48 cm)", dekat(cm(uPot.cy), 5.48, 0.02));
+cek("potret biasa masih di bawah batas tinggi", cm(uPot.cy) <= TINGGI_MAKS);
+
+// Potret tinggi → dibatasi TINGGI_MAKS, lebarnya menyesuaikan (tetap tanpa potong)
+const uTinggi = ukuranMuat(LEBAR, 900, 2000);
+cek(`potret tinggi dibatasi TINGGI_MAKS (${TINGGI_MAKS} cm)`,
+  dekat(cm(uTinggi.cy), TINGGI_MAKS));
+cek("potret tinggi: lebar menyusut mengikuti rasio (tidak gepeng)",
+  dekat(uTinggi.cx / uTinggi.cy, 900 / 2000, 0.01));
+cek("potret tinggi: lebar tetap di dalam kolom", cm(uTinggi.cx) <= LEBAR + 0.01);
+
+// Foto sangat panjang (potret ekstrem) tetap muat
+const uPanjang = ukuranMuat(LEBAR, 400, 2000);
+cek("potret ekstrem tetap dibatasi tingginya", dekat(cm(uPanjang.cy), TINGGI_MAKS));
+cek("potret ekstrem: rasio tetap benar",
+  dekat(uPanjang.cx / uPanjang.cy, 400 / 2000, 0.01));
+
+// Dimensi tak terbaca → cadangan aman (tetap menghasilkan ukuran wajar)
+const uCadangan = ukuranMuat(LEBAR, 0, 0);
+cek("dimensi tak terbaca → ukuran cadangan wajar",
+  uCadangan.cx > 0 && uCadangan.cy > 0 && cm(uCadangan.cy) <= TINGGI_MAKS + 0.01);
+
+/* ============ 3. Lebar foto dari grid tabel ============ */
+
+const FALLBACK = 2.6;
 // grid 5 kolom, kolom foto terakhir 1985 twips ≈ 3,5 cm → 3,08 cm setelah margin
 const tblGrid = `<w:tbl><w:tblGrid><w:gridCol w:w="1520"/><w:gridCol w:w="3260"/>` +
   `<w:gridCol w:w="1100"/><w:gridCol w:w="1100"/><w:gridCol w:w="1985"/></w:tblGrid></w:tbl>`;
-const lg = lebarFotoDariGrid(tblGrid, FALLBACK);
-cek("lebar landscape dari grid = kolom − margin (3,08 cm)", lg.landscape === 3.08);
-cek("lebar potret = 3/4 landscape (2,31 cm)", lg.potret === 2.31);
-cek("tinggi potret = lebar landscape (footprint diputar)",
-  Math.abs(lg.potret * (4 / 3) - lg.landscape) < 0.01);
+cek("lebar foto = lebar kolom − margin (3,08 cm)",
+  lebarFotoDariGrid(tblGrid, FALLBACK) === 3.08);
 cek("grid tak terbaca → fallback",
   lebarFotoDariGrid("<w:tbl></w:tbl>", FALLBACK) === FALLBACK);
 cek("kolom terlalu sempit (<1,2 cm) → fallback",
-  lebarFotoDariGrid(`<w:tbl><w:tblGrid><w:gridCol w:w="500"/><w:gridCol w:w="600"/></w:tblGrid></w:tbl>`, FALLBACK) === FALLBACK);
+  lebarFotoDariGrid(
+    `<w:tbl><w:tblGrid><w:gridCol w:w="500"/><w:gridCol w:w="600"/></w:tblGrid></w:tbl>`,
+    FALLBACK) === FALLBACK);
 
-/* ---------------- percantik header tabel ---------------- */
-const esc = (s) => String(s)
-  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-const rowsOf = (t) => t.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [];
-const textOf = (xml) => (xml.match(/<w:t[^>]*>[\s\S]*?<\/w:t>/g) || [])
-  .map((x) => x.replace(/<[^>]+>/g, "")).join(" ");
-const isHeaderRow = (tr) => {
-  const t = textOf(tr).toLowerCase();
-  return t.includes("tanggal") && (t.includes("kegiatan") || t.includes("item") || t.includes("harga"));
-};
-function percantikHeader(tblXml) {
-  let xml = tblXml;
-  for (const row of rowsOf(tblXml)) {
-    if (!isHeaderRow(row)) continue;
-    let baru = row.replace(/<w:tc>[\s\S]*?<\/w:tc>/g, (cell) => {
-      const teks = textOf(cell).replace(/\s+/g, " ").trim();
-      let tcPr = (cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/) || ["<w:tcPr></w:tcPr>"])[0];
-      tcPr = tcPr
-        .replace(/<w:shd [^>]*\/>/g, "")
-        .replace(/<w:vAlign [^>]*\/>/g, "")
-        .replace("</w:tcPr>",
-          `<w:shd w:val="clear" w:color="auto" w:fill="4F46E5"/>` +
-          `<w:vAlign w:val="center"/></w:tcPr>`);
-      const p =
-        `<w:p><w:pPr><w:spacing w:before="60" w:after="60"/><w:jc w:val="center"/></w:pPr>` +
-        `<w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="20"/></w:rPr>` +
-        `<w:t xml:space="preserve">${esc(teks)}</w:t></w:r></w:p>`;
-      return `<w:tc>${tcPr}${p}</w:tc>`;
-    });
-    if (!/<w:tblHeader\b/.test(baru)) {
-      baru = /<w:trPr>/.test(baru)
-        ? baru.replace("<w:trPr>", "<w:trPr><w:tblHeader/><w:cantSplit/>")
-        : baru.replace(/<w:tr( [^>]*)?>/, (m) => `${m}<w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>`);
-    }
-    xml = xml.replace(row, () => baru);
-  }
-  return xml;
+/* ============ 4. Penjaga ukuran tetap menjaga rasio ============ */
+for (const dim of [800, 640]) {
+  const r = await siapkanEmbed(lebarHasil.buffer, dim, 80);
+  const md = await sharp(r.buffer).metadata();
+  cek(`penjaga ${dim}px: rasio gambar lebar tetap utuh (${md.width}×${md.height})`,
+    dekat(md.width / md.height, 1920 / 620, 0.05));
 }
-
-const tcU = (t) => `<w:tc><w:tcPr><w:tcW w:w="1000"/><w:shd w:val="clear" w:fill="D9D9D9"/></w:tcPr><w:p><w:r><w:t>${t}</w:t></w:r></w:p></w:tc>`;
-const tblHdr = `<w:tbl><w:tr>${tcU("Tanggal")}${tcU("Kegiatan")}${tcU("Foto")}</w:tr>` +
-  `<w:tr>${tcU("16 Juni 2026")}${tcU("Rapat")}${tcU("")}</w:tr></w:tbl>`;
-const hasilHdr = percantikHeader(tblHdr);
-const barisHdr = rowsOf(hasilHdr)[0];
-cek("header dapat latar indigo 4F46E5", barisHdr.includes('w:fill="4F46E5"'));
-cek("shading abu lama terganti (tidak dobel)", !barisHdr.includes('w:fill="D9D9D9"'));
-cek("teks header putih tebal", barisHdr.includes("<w:b/>") && barisHdr.includes('w:val="FFFFFF"'));
-cek("teks header rata tengah", barisHdr.includes('<w:jc w:val="center"/>'));
-cek("header diulang tiap halaman (tblHeader)", barisHdr.includes("<w:tblHeader/>"));
-cek("teks header tetap utuh", textOf(barisHdr).includes("Tanggal") && textOf(barisHdr).includes("Foto"));
-cek("baris data TIDAK tersentuh", rowsOf(hasilHdr)[1].includes('w:fill="D9D9D9"'));
 
 console.log(gagal ? `\n${gagal} PENGUJIAN GAGAL` : "\nSEMUA PENGUJIAN LULUS");
 process.exit(gagal ? 1 : 0);
