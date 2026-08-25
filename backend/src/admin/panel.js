@@ -616,6 +616,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
   <symbol id="i-power" viewBox="0 0 24 24"><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/><path d="M12 2v10"/></symbol>
+  <symbol id="i-device" viewBox="0 0 24 24"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M7 19h5"/><rect x="16" y="12" width="6" height="10" rx="2"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
   <symbol id="i-edit" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
@@ -676,6 +677,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     <nav class="side-nav">
       <a href="#statistik" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
       <a href="#sec-akun" data-tip="Akun pengguna" data-m="Akun"><svg class="i"><use href="#i-users"/></svg><span>Akun pengguna</span></a>
+      <a href="#sec-sesi" data-tip="Perangkat &amp; sesi aktif" data-m="Sesi"><svg class="i"><use href="#i-device"/></svg><span>Perangkat &amp; sesi</span></a>
       <a href="#sec-audit" data-tip="Jejak audit" data-m="Audit"><svg class="i"><use href="#i-scroll"/></svg><span>Jejak audit</span></a>
       <a href="#sec-pengaturan" data-tip="Pengaturan" data-m="Setelan"><svg class="i"><use href="#i-cog"/></svg><span>Pengaturan</span></a>
     </nav>
@@ -730,6 +732,34 @@ export const PANEL_HTML = /* html */ `<!doctype html>
               <th style="text-align:right">Aksi</th>
             </tr></thead>
             <tbody id="t-users"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Perangkat & sesi aktif — SEMUA peran (tim, fasilitator, dosen).
+           Hanya di panel ini IP ditampilkan penuh; pemilik akun di halaman
+           Profil tetap melihat versi tersamar (114.120.•.•). -->
+      <div class="card" id="sec-sesi">
+        <div class="row spread">
+          <h2><svg class="i"><use href="#i-device"/></svg> Perangkat &amp; sesi aktif <span class="tag" id="jml-sesi"></span></h2>
+          <div class="row" style="gap:10px;align-items:center">
+            <span class="search"><svg class="i"><use href="#i-search"/></svg>
+            <input id="cari-sesi" placeholder="Cari akun / perangkat / IP…"></span>
+          </div>
+        </div>
+        <p class="mut" style="margin-top:8px">Setiap perangkat yang sedang dalam keadaan login —
+        tim, fasilitator, maupun dosen pendamping. Alamat IP ditampilkan penuh di sini dan hanya
+        tersimpan selama sesinya hidup (ikut terhapus saat dicabut atau kedaluwarsa 30 hari
+        menganggur). <b>Alamat MAC tidak bisa dilihat</b> aplikasi web mana pun — ia tidak pernah
+        ikut melewati internet.</p>
+        <div class="tbl">
+          <table>
+            <thead><tr>
+              <th>Akun</th><th>Perangkat</th><th>Alamat IP</th>
+              <th>Terakhir aktif</th><th>Mulai login</th>
+              <th style="text-align:right">Aksi</th>
+            </tr></thead>
+            <tbody id="t-sesi"></tbody>
           </table>
         </div>
       </div>
@@ -810,6 +840,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <button data-tab="keu">💰 Keuangan</button>
       <button data-tab="lap">📄 Laporan</button>
       <button data-tab="pre">📽️ Presentasi</button>
+      <button data-tab="ses">🖥️ Perangkat</button>
       <button data-tab="akt">📜 Aktivitas</button>
     </div>
     <div id="dt-isi"></div>
@@ -923,6 +954,8 @@ var TOK = sessionStorage.getItem("mx") || "";
 var USERS = [];
 var DETAIL = null;
 var AKTIVITAS = [];
+var SESI = [];          // semua sesi aktif lintas akun (kartu Perangkat & sesi)
+var SESI_USER = [];     // sesi milik akun yang dialog detailnya sedang dibuka
 var TAB = "keg";
 var VIEW_ROLE = "tim";  // tab aktif tabel akun: 'tim' | 'fasilitator'
 var ES = null;          // EventSource siaran langsung
@@ -1095,10 +1128,11 @@ function segarkanDetail(){
   var id = DETAIL.user.id;
   Promise.all([
     call("/data/pengguna/" + id + "?senyap=1"),
-    call("/data/pengguna/" + id + "/aktivitas")
+    call("/data/pengguna/" + id + "/aktivitas"),
+    call("/data/pengguna/" + id + "/sesi").catch(function(){ return { rows: [] }; })
   ]).then(function(rs){
     if (!$("#d-detail").open || !DETAIL || DETAIL.user.id !== id) return;
-    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || [];
+    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || []; SESI_USER = rs[2].rows || [];
     isiKepalaDetail();
     renderTab();
   }).catch(function(){});
@@ -1110,10 +1144,11 @@ function muat(){
   Promise.all([
     call("/data/ringkas"), call("/data/pengguna"), call("/data/audit"),
     call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; }),
-    call("/data/kode-dosen").catch(function(){ return { ada:false, updatedAt:"" }; })
+    call("/data/kode-dosen").catch(function(){ return { ada:false, updatedAt:"" }; }),
+    call("/data/sesi").catch(function(){ return { rows: [] }; })
   ])
     .then(function(rs){
-      var ov = rs[0]; USERS = rs[1].users;
+      var ov = rs[0]; USERS = rs[1].users; SESI = rs[5].rows || [];
       var nPendamping = (ov.fasilitator || 0) + (ov.dosen || 0);
       var htmlStat =
         stat("users","Akun tim",(ov.users - nPendamping),"s1") + stat("cal","Total kegiatan",ov.kegiatan,"s2") +
@@ -1129,6 +1164,7 @@ function muat(){
       }
       $("#jml-user").textContent = ov.users + " akun";
       renderUsers();
+      renderSesi();
       function statusKode(el, j){
         if (!el) return;
         el.textContent = j.ada
@@ -1266,6 +1302,102 @@ function barisPendamping(u){
 }
 function findU(id){ return USERS.find(function(x){ return x.id === id; }); }
 
+/* ---------- perangkat & sesi aktif ---------- */
+/** "baru saja" / "32 menit lalu" / "3 hari lalu" — seperti di halaman Profil. */
+function sejak(iso){
+  var t = Date.parse(iso || "");
+  if (!t) return "—";
+  var detik = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (detik < 90) return "baru saja";
+  var menit = Math.round(detik / 60);
+  if (menit < 60) return menit + " menit lalu";
+  var jam = Math.round(menit / 60);
+  if (jam < 24) return jam + " jam lalu";
+  var hari = Math.round(jam / 24);
+  if (hari <= 30) return hari + " hari lalu";
+  return tgl(iso);
+}
+/** Ikon kasar sesuai jenis perangkat yang terbaca dari labelnya. */
+function ikonSesi(label){
+  var s = String(label || "").toLowerCase();
+  if (s.indexOf("android") >= 0 || s.indexOf("iphone") >= 0) return "📱";
+  if (s.indexOf("ipad") >= 0) return "📲";
+  if (s) return "🖥️";
+  return "❔";
+}
+/** Peramban yang sengaja menyamar sebagai Chrome → beri catatan. */
+function catatanPerangkat(label){
+  if (!label) {
+    return '<div class="mut">sesi lama — dibuat sebelum pencatatan perangkat aktif</div>';
+  }
+  if (/^Brave/.test(label)) {
+    return '<div class="mut">Brave (menyamar sebagai Chrome di User-Agent)</div>';
+  }
+  return "";
+}
+function renderSesi(){
+  var el = $("#t-sesi");
+  if (!el) return;
+  var cari = ($("#cari-sesi") && $("#cari-sesi").value || "").toLowerCase();
+  var rows = SESI.filter(function(s){
+    if (!cari) return true;
+    return (s.username + " " + s.perangkat + " " + s.ip).toLowerCase().indexOf(cari) >= 0;
+  });
+  var tag = $("#jml-sesi");
+  if (tag) tag.textContent = SESI.length + " sesi aktif";
+  setHTML(el, rows.map(barisSesi).join("") ||
+    '<tr><td colspan="6"><div class="kosong"><div class="big">🖥️</div>' +
+    (cari ? "Tidak ada sesi yang cocok." : "Belum ada perangkat yang sedang login.") +
+    "</div></td></tr>", "t-sesi");
+}
+function barisSesi(s){
+  var ini = (s.username || "?").charAt(0).toUpperCase();
+  var role = s.role || "tim";
+  return "<tr>" +
+    '<td><div class="u-cell"><span class="ava" style="' + avaStyle(s.username) + '">' + esc(ini) + '</span><div>' +
+      "<b>" + esc(s.username) + "</b> " +
+      '<span class="badge ' + (role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b") + '">' +
+      labelPeran(role) + "</span>" +
+    "</div></div></td>" +
+    "<td>" + ikonSesi(s.perangkat) + " " +
+      (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
+      catatanPerangkat(s.perangkat) + "</td>" +
+    "<td style='white-space:nowrap'>" + (s.ip
+      ? "<code>" + esc(s.ip) + "</code>" + (s.penuh ? "" : ' <span class="badge b" title="Sesi lama: hanya tersimpan versi tersamar">samar</span>')
+      : '<span class="mut">tidak terekam</span>') + "</td>" +
+    "<td style='white-space:nowrap'>" + esc(sejak(s.terakhir)) +
+      '<div class="mut">' + esc(tglJam(s.terakhir)) + "</div></td>" +
+    "<td style='white-space:nowrap'>" + esc(tgl(s.dibuat)) + "</td>" +
+    '<td class="acts-cell"><div class="acts">' +
+      '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
+      'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + '</button>' +
+    "</div></td></tr>";
+}
+/** Tabel sesi di dalam dialog detail satu akun. */
+function tabelSesiUser(list){
+  if (!list.length) {
+    return '<div class="kosong"><div class="big">🖥️</div>Akun ini sedang tidak login di perangkat mana pun.</div>';
+  }
+  var out = '<div class="tbl" style="margin-top:14px"><table><thead><tr>' +
+    "<th>Perangkat</th><th>Alamat IP</th><th>Terakhir aktif</th><th>Mulai login</th>" +
+    '<th style="text-align:right">Aksi</th></tr></thead><tbody>';
+  list.forEach(function(s){
+    out += "<tr>" +
+      "<td>" + ikonSesi(s.perangkat) + " " +
+        (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
+        catatanPerangkat(s.perangkat) + "</td>" +
+      "<td style='white-space:nowrap'>" + (s.ip ? "<code>" + esc(s.ip) + "</code>" : '<span class="mut">tidak terekam</span>') + "</td>" +
+      "<td style='white-space:nowrap'>" + esc(sejak(s.terakhir)) +
+        '<div class="mut">' + esc(tglJam(s.terakhir)) + "</div></td>" +
+      "<td style='white-space:nowrap'>" + esc(tgl(s.dibuat)) + "</td>" +
+      '<td class="acts-cell"><div class="acts">' +
+        '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
+        'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + '</button>' +
+      "</div></td></tr>";
+  });
+  return out + "</tbody></table></div>";
+}
+
 /* ---------- detail data pengguna ---------- */
 /** Gulirkan isi dialog detail kembali ke atas (saat dibuka / ganti tab). */
 function keAtasDetail(){
@@ -1275,9 +1407,11 @@ function keAtasDetail(){
 function bukaDetail(id, tabAwal){
   Promise.all([
     call("/data/pengguna/" + id),
-    call("/data/pengguna/" + id + "/aktivitas").catch(function(){ return { rows: [] }; })
+    call("/data/pengguna/" + id + "/aktivitas").catch(function(){ return { rows: [] }; }),
+    call("/data/pengguna/" + id + "/sesi").catch(function(){ return { rows: [] }; })
   ]).then(function(rs){
-    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || []; TAB = tabAwal || "keg";
+    DETAIL = rs[0]; AKTIVITAS = rs[1].rows || []; SESI_USER = rs[2].rows || [];
+    TAB = tabAwal || "keg";
     isiKepalaDetail();
     var tb = document.querySelectorAll("#d-detail .tabs button");
     tb.forEach(function(b){ b.classList.toggle("on", b.dataset.tab === TAB); });
@@ -1317,6 +1451,7 @@ function renderTab(){
     TAB === "keu" ? tabelKeuangan(DETAIL.keuangan) :
     TAB === "lap" ? tabelLaporan(DETAIL) :
     TAB === "pre" ? tabelPresentasi(DETAIL) :
+    TAB === "ses" ? tabelSesiUser(SESI_USER) :
     tabelAktivitas(AKTIVITAS), "dt-isi");
   if (berubah && tlPos) {
     var tlBaru = box.querySelector(".tline");
@@ -1539,7 +1674,17 @@ function cabutSesi(id){
   var u = findU(id); if (!u) return;
   if (!confirm("Keluarkan " + u.username + " dari semua perangkat?")) return;
   call("/data/pengguna/" + id + "/keluarkan", { method: "POST" })
-    .then(function(j){ toast(j.dicabut + " sesi dicabut"); muat(); })
+    .then(function(j){ toast(j.dicabut + " sesi dicabut"); muat(); segarkanDetail(); })
+    .catch(function(e){ toast(e.message, true); });
+}
+/** Cabut SATU perangkat — sesi lain milik akun itu tetap hidup. */
+function cabutSesiSatu(sid, nama){
+  if (!sid) return;
+  if (!confirm("Keluarkan perangkat ini dari akun " + (nama || "") + "?\\n\\n" +
+    "Perangkat tersebut harus login ulang. Bila kamu tidak mengenalinya, " +
+    "setel ulang juga password akun itu setelah ini.")) return;
+  call("/data/sesi/" + encodeURIComponent(sid), { method: "DELETE" })
+    .then(function(){ toast("Perangkat dikeluarkan"); muat(); segarkanDetail(); })
     .catch(function(e){ toast(e.message, true); });
 }
 function hapusUser(id){
@@ -1745,6 +1890,7 @@ document.addEventListener("click", function(ev){
     case "un": gantiUsername(el.dataset.id); break;
     case "pw": resetPassword(el.dataset.id); break;
     case "sesi": cabutSesi(el.dataset.id); break;
+    case "sesi-satu": cabutSesiSatu(el.dataset.sid, el.dataset.nama); break;
     case "hapus": hapusUser(el.dataset.id); break;
     case "tim": assignTim(el.dataset.id); break;
     case "fas": assignFasilitator(el.dataset.id); break;
@@ -1754,6 +1900,7 @@ document.addEventListener("click", function(ev){
 });
 
 $("#cari").addEventListener("input", renderUsers);
+$("#cari-sesi").addEventListener("input", renderSesi);
 
 $("#f-login").addEventListener("submit", function(e){
   e.preventDefault();

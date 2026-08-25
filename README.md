@@ -211,7 +211,12 @@ tersedia:
   laporan.
 - **Daftar akun** bertab **👥 Tim / 🎓 Fasilitator / 👨‍🏫 Dosen Pendamping**
   lengkap dengan pencarian.
-- **Detail akun** — kegiatan, keuangan, laporan, dan jejak aktivitas satu akun.
+- **Detail akun** — kegiatan, keuangan, laporan, perangkat yang sedang login, dan
+  jejak aktivitas satu akun.
+- **Perangkat & sesi aktif** — seluruh perangkat yang sedang masuk ke aplikasi
+  dari semua peran (tim, fasilitator, dosen pendamping): nama akun, jenis
+  perangkat, alamat IP penuh, sejak kapan, dan terakhir aktif kapan. Setiap
+  perangkat bisa dikeluarkan sendiri-sendiri tanpa mengganggu sesi lain.
 - **Pengelolaan akun** — ganti username, setel ulang password, keluarkan dari
   semua perangkat, hapus akun.
 - **Kode pendaftaran** untuk fasilitator dan dosen (dapat diganti kapan saja).
@@ -543,10 +548,20 @@ ruangnya benar-benar kembali ke kuota.
 - Sesi kedaluwarsa otomatis setelah 30 hari tidak dipakai, dan mengganti password
   langsung mengakhiri sesi di perangkat lain.
 - Halaman **Profil → Perangkat & sesi aktif** memperlihatkan setiap perangkat yang
-  sedang masuk ke akun (mis. “Chrome · Windows”, jaringan `114.120.•.•`, terakhir
+  sedang masuk ke akun (mis. “Brave · Linux”, jaringan `114.120.•.•`, terakhir
   aktif kapan) dan dapat mengeluarkannya satu per satu atau sekaligus — berguna
-  saat lupa keluar di komputer pinjaman. User-Agent dan alamat IP **tidak**
-  disimpan utuh, hanya ringkasannya.
+  saat lupa keluar di komputer pinjaman. User-Agent **tidak** disimpan utuh, dan
+  alamat IP yang diperlihatkan kepada pemilik akun hanya bagian jaringannya.
+- Nama peramban dibaca dari *Client Hints* (`Sec-CH-UA`), sehingga peramban yang
+  sengaja menyamar sebagai Chrome di User-Agent — **Brave** — tetap dikenali
+  dengan nama aslinya.
+- Pusat kendali punya bagian **Perangkat & sesi aktif** untuk seluruh akun (tim,
+  fasilitator, dan dosen pendamping): siapa, perangkat apa, alamat IP **penuh**,
+  sejak kapan, dan terakhir aktif kapan — lengkap dengan tombol mengeluarkan satu
+  perangkat tertentu. IP penuh hanya terlihat di panel ini, hanya tersimpan
+  selama sesinya hidup, dan ikut terhapus begitu sesi dicabut atau kedaluwarsa.
+  (Alamat MAC tidak pernah bisa dilihat aplikasi web mana pun — alamat itu tidak
+  ikut melewati internet.)
 - Tersedia pembatasan percobaan masuk (anti tebak-tebakan password) serta header
   keamanan standar.
 - Gambar disajikan melalui tautan bertanda tangan berumur pendek dan hanya dapat
