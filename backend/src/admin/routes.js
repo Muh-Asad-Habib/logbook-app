@@ -168,6 +168,41 @@ router.get("/data/audit", async (_req, res, next) => {
   }
 });
 
+/* ---------- Perangkat & sesi aktif ----------
+ * Berlaku untuk SEMUA peran: tim, fasilitator, dan dosen pendamping.
+ * Hanya di sinilah IP PENUH pernah keluar dari server — pemilik akun di
+ * halaman Profil tetap melihat versi tersamar (114.120.•.•). */
+
+router.get("/data/sesi", async (_req, res, next) => {
+  try {
+    res.json({ rows: await store.listSesiAktifSemua(300) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/data/pengguna/:id/sesi", async (req, res, next) => {
+  try {
+    res.json({ rows: await store.listSesiAktifUser(req.params.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Cabut SATU perangkat (sesi) — sesi lain milik akun itu tetap hidup. */
+router.delete("/data/sesi/:sid", async (req, res, next) => {
+  try {
+    const hasil = await store.hapusSesiPanelById(req.params.sid);
+    if (!hasil) {
+      return res.status(404).json({ error: "Sesi tidak ditemukan (mungkin sudah kedaluwarsa)" });
+    }
+    adminStore.audit(req, "user.sesi.cabut", { target: hasil.userId, jumlah: 1 });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /* ---------- siaran langsung (SSE) ----------
    Hanya untuk mode lokal (server menyala terus). Di serverless (Vercel)
    koneksi panjang tidak didukung — panel otomatis beralih ke polling

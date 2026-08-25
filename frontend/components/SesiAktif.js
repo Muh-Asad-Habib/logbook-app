@@ -135,6 +135,14 @@ export default function SesiAktif() {
               <span className="ket">
                 {s.ip ? `${s.ip} · ` : ""}aktif {sejak(s.terakhir)}
               </span>
+              {/* Sesi lawas dibuat sebelum pencatatan perangkat ada, jadi
+                  kolomnya kosong — bukan tanda pembajakan. Dijelaskan supaya
+                  pemilik akun tidak panik melihat "tidak dikenal". */}
+              {!s.perangkat && (
+                <span className="ket">
+                  sesi lama — dibuat sebelum pencatatan perangkat aktif
+                </span>
+              )}
             </span>
             <button
               type="button"

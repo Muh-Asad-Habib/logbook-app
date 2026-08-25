@@ -361,14 +361,15 @@ export async function createSession(userId, jejak = {}) {
   const token = newToken();
   const ts = nowIso();
   await q(
-    `INSERT INTO sessions (token, user_id, created_at, last_used_at, perangkat, ip_samar)
-     VALUES ($1, $2, $3, $3, $4, $5)`,
+    `INSERT INTO sessions (token, user_id, created_at, last_used_at, perangkat, ip_samar, ip_penuh)
+     VALUES ($1, $2, $3, $3, $4, $5, $6)`,
     [
       hashToken(token),
       userId,
       ts,
       String(jejak.perangkat || "").slice(0, 40),
       String(jejak.ip || "").slice(0, 45),
+      String(jejak.ipPenuh || "").slice(0, 45),
     ]
   );
   return token; // hanya di sini token asli pernah keluar
@@ -405,12 +406,24 @@ export async function getSession(token, jejak = null) {
   }
 
   // Sesi yang dibuat SEBELUM fitur "Perangkat & Sesi Aktif" ada belum punya
-  // label perangkat. Isi sekali di sini supaya daftar sesi tidak penuh
-  // "Perangkat tidak dikenal" — hanya menulis bila kolomnya masih kosong.
-  if (jejak?.perangkat && !s.perangkat) {
-    q("UPDATE sessions SET perangkat = $1, ip_samar = $2 WHERE token = $3",
-      [jejak.perangkat.slice(0, 40), String(jejak.ip || "").slice(0, 45), hash])
-      .catch(() => {});
+  // label perangkat/IP — begitu pula sesi lama yang belum sempat merekam
+  // ip_penuh. Lengkapi sekali di sini (hanya kolom yang MASIH kosong, supaya
+  // riwayat login pertama tidak tertimpa) agar daftar sesi tidak penuh
+  // "Perangkat tidak dikenal".
+  if (jejak && (!s.perangkat || !s.ip_samar || !s.ip_penuh)) {
+    q(
+      `UPDATE sessions SET
+         perangkat = COALESCE(NULLIF(perangkat, ''), $1),
+         ip_samar  = COALESCE(NULLIF(ip_samar,  ''), $2),
+         ip_penuh  = COALESCE(NULLIF(ip_penuh,  ''), $3)
+       WHERE token = $4`,
+      [
+        String(jejak.perangkat || "").slice(0, 40),
+        String(jejak.ip || "").slice(0, 45),
+        String(jejak.ipPenuh || "").slice(0, 45),
+        hash,
+      ]
+    ).catch(() => {});
   }
   return { userId: s.user_id, createdAt: s.created_at };
 }
@@ -472,6 +485,76 @@ export async function hapusSesiById(userId, id) {
     [userId, kunci.slice(0, ID_PANJANG)]
   );
   return rows[0]?.token || "";
+}
+
+
+/* ---------- Sesi aktif untuk PUSAT KENDALI (admin) ----------
+ *
+ * Berlaku untuk SEMUA peran — tim, fasilitator, dan dosen pendamping —
+ * karena tabel `sessions` memang tidak membedakan peran; peran diambil dari
+ * `users.role` hanya untuk ditampilkan.
+ *
+ * Beda dengan listSessions() milik pemilik akun: di sini IP ditampilkan
+ * PENUH (`ip_penuh`) supaya login asing bisa diselidiki. Baris lama yang
+ * belum sempat merekam IP penuh jatuh ke versi tersamar. Nilai ini tetap
+ * hidup hanya selama sesinya — ikut terhapus saat dicabut/kedaluwarsa.
+ */
+
+/** Bentuk baris sesi untuk panel (IP penuh + identitas pemiliknya). */
+const barisSesiPanel = (r) => ({
+  id: r.id,
+  user_id: r.user_id,
+  username: r.username || "",
+  role: r.role || "tim",
+  perangkat: r.perangkat || "",
+  ip: r.ip_penuh || r.ip_samar || "",
+  ip_samar: r.ip_samar || "",
+  penuh: !!r.ip_penuh,
+  dibuat: r.created_at,
+  terakhir: r.last_used_at || r.created_at,
+});
+
+const SQL_SESI_PANEL =
+  `SELECT LEFT(s.token, ${ID_PANJANG}) AS id, s.user_id, s.created_at,
+          s.last_used_at, s.perangkat, s.ip_samar, s.ip_penuh,
+          u.username, COALESCE(u.role, 'tim') AS role
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id`;
+
+/** Semua sesi aktif lintas akun — yang terakhir dipakai di urutan atas. */
+export async function listSesiAktifSemua(batas = 300) {
+  const rows = await q(
+    `${SQL_SESI_PANEL}
+      ORDER BY COALESCE(NULLIF(s.last_used_at, ''), s.created_at) DESC
+      LIMIT $1`,
+    [Math.min(Math.max(Number(batas) || 300, 1), 1000)]
+  );
+  return rows.map(barisSesiPanel);
+}
+
+/** Sesi aktif milik SATU akun (dipakai dialog detail pengguna di panel). */
+export async function listSesiAktifUser(userId) {
+  const rows = await q(
+    `${SQL_SESI_PANEL}
+      WHERE s.user_id = $1
+      ORDER BY COALESCE(NULLIF(s.last_used_at, ''), s.created_at) DESC`,
+    [String(userId || "")]
+  );
+  return rows.map(barisSesiPanel);
+}
+
+/**
+ * Cabut SATU sesi dari panel — tanpa perlu tahu pemiliknya lebih dulu.
+ * @returns {Promise<{userId: string}|null>} pemilik sesi yang dicabut
+ */
+export async function hapusSesiPanelById(id) {
+  const kunci = String(id || "").toLowerCase();
+  if (!/^[0-9a-f]{4,64}$/.test(kunci)) return null;
+  const rows = await q(
+    `DELETE FROM sessions WHERE LEFT(token, ${ID_PANJANG}) = $1 RETURNING user_id`,
+    [kunci.slice(0, ID_PANJANG)]
+  );
+  return rows[0] ? { userId: rows[0].user_id } : null;
 }
 
 

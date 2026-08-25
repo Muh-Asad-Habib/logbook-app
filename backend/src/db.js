@@ -56,6 +56,10 @@ const SKEMA = [
   // Baris lama bernilai '' dan ditampilkan sebagai "Perangkat tidak dikenal".
   `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS perangkat TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip_samar  TEXT NOT NULL DEFAULT ''`,
+  // IP PENUH — hanya pernah ditampilkan di pusat kendali (admin) untuk
+  // menyelidiki login asing; pemilik akun tetap melihat ip_samar. Ikut
+  // terhapus bersama sesinya, jadi tidak ada jejak IP yang berumur panjang.
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip_penuh  TEXT NOT NULL DEFAULT ''`,
   // Pembersihan sesi menganggur menyaring pada kolom ini.
   `CREATE INDEX IF NOT EXISTS sessions_last_used_idx ON sessions (last_used_at)`,
   // Penghitung brute-force login APLIKASI (bukan panel) — di database supaya
