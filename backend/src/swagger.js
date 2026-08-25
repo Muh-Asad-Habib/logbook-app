@@ -40,8 +40,12 @@ export const swaggerSpec = swaggerJsdoc({
           type: "http",
           scheme: "bearer",
           description:
-            "Token dari /api/auth/login atau /api/auth/register. " +
-            "Bisa juga dikirim sebagai query ?token=... (untuk gambar/unduhan).",
+            "Token dari /api/auth/login atau /api/auth/register, dikirim pada header " +
+            "`Authorization: Bearer <token>`. Untuk gambar & unduhan yang dibuka " +
+            "langsung oleh browser (elemen gambar / tautan unduh), sesi dikenali " +
+            "lewat cookie HttpOnly `logbook_sesi` yang dipasang saat login — token " +
+            "TIDAK pernah diterima melalui query string agar tidak bocor ke riwayat " +
+            "peramban, log server/CDN, maupun header Referer.",
         },
       },
       schemas: {

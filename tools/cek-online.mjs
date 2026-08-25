@@ -2,7 +2,8 @@
  * Cek apakah versi yang ONLINE di Vercel sama dengan commit terakhir di laptop.
  *
  * Dipakai untuk menjawab pertanyaan "sudah ke-deploy belum?" tanpa membuka
- * dashboard: /health kini mengembalikan penanda deploy + commit.
+ * dashboard: /health mengembalikan hash commit yang sedang online (7 karakter)
+ * lalu dibandingkan dengan commit terakhir di repo lokal.
  *
  * Jalankan:  node tools/cek-online.mjs https://alamat-aplikasimu.vercel.app
  *            $env:LOGBOOK_URL="https://alamat-aplikasimu.vercel.app"; npm run cek:online
@@ -49,7 +50,6 @@ try {
   if (status !== 200) throw new Error(`/health membalas HTTP ${status}`);
   const h = await res.json();
   console.log(`server      : ok (${ms} ms, region ${h.region || "-"})`);
-  console.log(`deploy      : ${h.deploy}`);
   console.log(`commit live : ${h.commit || "(tidak tercatat)"}`);
   console.log(`commit lokal: ${commitLokal || "(bukan repo git)"}`);
   if (h.commit && commitLokal) {
@@ -65,11 +65,13 @@ try {
   console.log(`server      : ❌ ${e.message}`);
 }
 
-// Halaman & pagar peran — memastikan build frontend + API benar-benar hidup
+// Halaman & pagar peran — memastikan build frontend + API benar-benar hidup.
+// /openapi.json sengaja diharapkan 404: spesifikasi API hanya terbuka saat
+// aplikasi dijalankan lokal, tidak di produksi (anti-enumerasi endpoint).
 const cek = [
   ["/", 200], ["/login", 200], ["/kegiatan", 200], ["/laporan", 200],
   ["/presentasi", 200],
-  ["/openapi.json", 200], ["/api/fasilitator/tim", 401], ["/api/komentar/belum-dibaca", 401],
+  ["/openapi.json", 404], ["/api/fasilitator/tim", 401], ["/api/komentar/belum-dibaca", 401],
   ["/api/presentasi/info", 401],
 ];
 console.log("");

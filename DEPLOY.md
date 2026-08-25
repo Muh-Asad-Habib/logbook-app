@@ -252,7 +252,9 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 - [ ] **Ekspor DOCX / PDF / Excel** → berkas terunduh dengan nama khas akunmu
       (mis. `Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx`),
       foto ikut di dalamnya
-- [ ] `https://URL-kamu/docs` → dokumentasi API (Swagger) terbuka
+- [ ] `https://URL-kamu/docs` → **404** (benar: dokumentasi API sengaja ditutup di
+      produksi agar daftar endpoint tidak bisa ditelusuri; buka lewat
+      `http://localhost:4000/docs` saat menjalankan aplikasi di komputer sendiri)
 - [ ] panel admin: `https://URL-kamu/<path-panel-kamu>` — alamat & kredensialnya
       dibuat acak saat aplikasi pertama jalan dan **dicetak sekali ke log**:
       buka proyek di Vercel → tab **Logs** → cari baris `[keamanan]` (simpan pribadi)

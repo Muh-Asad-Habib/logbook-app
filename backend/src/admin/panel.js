@@ -333,8 +333,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   dialog.mini{max-width:430px}
   /* Dialog detail memakai TINGGI LAYAR PENUH: kepala tetap di atas, isinya
      mengisi seluruh sisa ruang (satu area scroll saja) sehingga lebih banyak
-     data terlihat sekaligus tanpa scroll bertumpuk. */
-  dialog.besar{
+     data terlihat sekaligus tanpa scroll bertumpuk.
+     PENTING: selektor WAJIB memakai [open]. Tanpa itu aturan display flex
+     menimpa display none bawaan browser untuk dialog yang sedang TERTUTUP,
+     sehingga seluruh isi dialog (tab Kegiatan, Keuangan, Laporan, Presentasi,
+     Aktivitas, dan tombol Tutup) ikut tampil menumpuk di dasar halaman —
+     termasuk pada layar login, karena markup dialog selalu ikut ter-render. */
+  dialog.besar[open]{
     width:calc(100vw - 24px);max-width:1440px;
     height:calc(100vh - 24px);height:calc(100dvh - 24px);
     display:flex;flex-direction:column;

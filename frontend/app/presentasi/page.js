@@ -10,10 +10,14 @@
  *             dirakit di browser. Server hanya mengirim daftar URL.
  *
  * PENAMPIL:
- * - ≤10 MB & host publik → penampil Microsoft Office (view.officeapps.live.com),
- *   hasil render identik dengan membuka file di PowerPoint.
- * - Selain itu (berkas besar / jaringan lokal) → renderer .pptx sisi-klien
- *   (pptx-preview), sehingga slide tetap bisa dilihat tanpa mengunduh manual.
+ * - SATU-SATUNYA penampil .pptx adalah Microsoft Office
+ *   (view.officeapps.live.com) — hasil rendernya identik dengan membuka
+ *   berkas di PowerPoint.
+ * - Penampil Office hanya sanggup berkas ≤10 MB dan butuh URL yang bisa
+ *   dijangkau dari internet. Bila berkas lebih besar (atau server berjalan di
+ *   jaringan lokal), pratinjau TIDAK dirender — diganti panel informasi +
+ *   tombol Unduh agar dibuka langsung di PowerPoint. Renderer .pptx sisi-klien
+ *   sengaja DIHAPUS karena hasilnya tidak setia pada tampilan aslinya.
  * - CANVA : hanya PRATINJAU (iframe embed). Tautan share apa pun dinormalisasi
  *   server ke bentuk `/view?embed`. Tidak ada unduhan.
  *
@@ -128,92 +132,46 @@ function CanvaFrame({ url }) {
 }
 
 /**
- * Renderer .pptx SISI-KLIEN (pptx-preview) — dipakai bila penampil Office
- * tidak bisa dipakai (berkas > 10 MB atau server di jaringan lokal).
- * Byte-nya ditarik langsung dari CDN ImageKit, jadi tidak membebani server.
+ * Logika pratinjau .pptx — HANYA penampil Microsoft Office.
+ *
+ * `alasan` terisi bila pratinjau tidak mungkin dilakukan (berkas >10 MB atau
+ * server di jaringan lokal). Dalam keadaan itu berkas SENGAJA tidak diunduh
+ * untuk pratinjau — hemat kuota CDN; pengguna cukup menekan tombol Unduh.
  */
-function PptxLokal({ buffer, onSiap, onGagal }) {
-  const hostRef = useRef(null);
-
-  useEffect(() => {
-    if (!buffer) return;
-    let mati = false;
-    let inst = null;
-    (async () => {
-      const host = hostRef.current;
-      if (!host) return;
-      try {
-        const { init } = await import("pptx-preview");
-        if (mati) return;
-        host.innerHTML = "";
-        const lebar = Math.max(320, Math.floor(host.clientWidth || 640));
-        inst = init(host, {
-          width: lebar,
-          height: Math.round(lebar * 0.5625), // slide 16:9
-          mode: "list",
-        });
-        // preview() ikut "memakai" ArrayBuffer — kirim salinan agar aman
-        // bila komponen dirender ulang dengan buffer yang sama.
-        await inst.preview(buffer.slice(0));
-        if (!mati) onSiap?.();
-      } catch (e) {
-        if (!mati) onGagal?.(e);
-      }
-    })();
-    return () => {
-      mati = true;
-      try { inst?.destroy?.(); } catch {}
-    };
-  }, [buffer, onSiap, onGagal]);
-
-  return <div ref={hostRef} className="pptx-lokal" />;
-}
-
-/**
- * Logika bersama pratinjau .pptx.
- * - "office" : berkas kecil di host publik → penampil Microsoft Office.
- * - "lokal"  : selain itu → unduh dari CDN lalu render dengan pptx-preview.
- */
-function usePratinjauPptx(fileInfo, mintaTautan, ambilBerkas) {
+function usePratinjauPptx(fileInfo, mintaTautan) {
   const [officeUrl, setOfficeUrl] = useState("");
   const [memuat, setMemuat] = useState(false);
-  const [buffer, setBuffer] = useState(null);
-  const [alasanLokal, setAlasanLokal] = useState("");
-  const [progres, setProgres] = useState(0);
+  const [alasan, setAlasan] = useState("");
   const [err, setErr] = useState("");
 
   const siapkan = useCallback(async () => {
     setErr("");
     setOfficeUrl("");
-    setBuffer(null);
-    setAlasanLokal("");
-    setProgres(0);
+    setAlasan("");
     if (!fileInfo?.ada) return;
 
-    const lokal = hostLokal()
-      ? "server berjalan di jaringan lokal"
+    const halangan = hostLokal()
+      ? "server berjalan di jaringan lokal, sehingga penampil PowerPoint Online tidak dapat menjangkaunya"
       : fileInfo.ukuran > BATAS_OFFICE
-        ? "berkas lebih dari 10 MB"
+        ? "melebihi batas penampil PowerPoint Online (10 MB)"
         : "";
+    if (halangan) {
+      setAlasan(halangan);
+      setMemuat(false);
+      return;
+    }
 
     setMemuat(true);
     try {
-      if (lokal) {
-        // Ditarik dari CDN (bukan dari server) lalu dirender di browser.
-        setAlasanLokal(lokal);
-        const { blob } = await ambilBerkas(setProgres);
-        setBuffer(await blob.arrayBuffer());
-      } else {
-        const { url } = await mintaTautan();
-        setOfficeUrl(
-          "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url)
-        );
-      }
+      const { url } = await mintaTautan();
+      setOfficeUrl(
+        "https://view.officeapps.live.com/op/embed.aspx?src=" + encodeURIComponent(url)
+      );
     } catch (e) {
       setErr(`Gagal memuat pratinjau: ${e.message}`);
       setMemuat(false);
     }
-  }, [fileInfo?.ada, fileInfo?.ukuran, mintaTautan, ambilBerkas]);
+  }, [fileInfo?.ada, fileInfo?.ukuran, mintaTautan]);
 
   useEffect(() => {
     let batal = false;
@@ -221,40 +179,46 @@ function usePratinjauPptx(fileInfo, mintaTautan, ambilBerkas) {
     return () => { batal = true; };
   }, [siapkan, fileInfo?.updated_at]);
 
-  return {
-    officeUrl, memuat, setMemuat, buffer, alasanLokal, progres,
-    err, setErr, muatUlang: siapkan,
-  };
+  return { officeUrl, memuat, setMemuat, alasan, err, setErr, muatUlang: siapkan };
 }
 
 /** Bagian pratinjau yang dipakai bersama oleh mode tim & pendamping. */
-function IsiPratinjau({ pptx, wrapRef, wrapUkuran }) {
+function IsiPratinjau({ pptx, wrapRef, wrapUkuran, ukuran, unduh, unduhBusy }) {
   const selesai = useCallback(() => pptx.setMemuat(false), [pptx]);
-  const gagal = useCallback(
-    (e) => {
-      pptx.setMemuat(false);
-      pptx.setErr(
-        `Pratinjau bawaan gagal menampilkan berkas (${e?.message || "format tidak didukung"}) — unduh untuk membukanya di PowerPoint.`
-      );
-    },
-    [pptx]
-  );
+
+  // Pratinjau tidak mungkin dilakukan → informasikan & arahkan ke unduhan,
+  // supaya berkas dibuka di PowerPoint dengan tampilan yang benar-benar asli.
+  if (pptx.alasan) {
+    return (
+      <div className="empty" style={{ marginTop: 10 }}>
+        <div className="big"><Presentation className="lucide" /></div>
+        <p>
+          Pratinjau tidak ditampilkan — berkas <b>{fmtUkuran(ukuran || 0)}</b> {pptx.alasan}.
+          <br />
+          Unduh berkasnya untuk melihat presentasi lengkap di PowerPoint.
+        </p>
+        <button
+          className="btn primary"
+          onClick={unduh}
+          disabled={unduhBusy}
+          style={{ marginTop: 12 }}
+        >
+          <Download className="lucide" />{" "}
+          {unduhBusy ? "Mengunduh…" : "Unduh presentasi"}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="docx-frame-wrap" ref={wrapRef}>
       {pptx.memuat && (
         <div className="docx-loading">
-          <Loader className="lucide docx-spin" />{" "}
-          {pptx.progres > 0 && pptx.progres < 100
-            ? `Mengunduh presentasi… ${pptx.progres}%`
-            : "Memuat presentasi…"}
+          <Loader className="lucide docx-spin" /> Memuat presentasi…
         </div>
       )}
       {pptx.officeUrl && (
         <OfficeFrame url={pptx.officeUrl} wrapUkuran={wrapUkuran} onLoad={selesai} />
-      )}
-      {pptx.buffer && (
-        <PptxLokal buffer={pptx.buffer} onSiap={selesai} onGagal={gagal} />
       )}
     </div>
   );
@@ -337,7 +301,7 @@ function PresentasiFasilitator() {
   const ambilBerkas = useCallback(
     (onProgress) => api.fasilitator.presentasiBerkas(timId, onProgress), [timId]
   );
-  const pptx = usePratinjauPptx(info?.file, mintaTautan, ambilBerkas);
+  const pptx = usePratinjauPptx(info?.file, mintaTautan);
   const [unduhBusy, unduh] = useUnduhPresentasi(ambilBerkas, info?.file?.nama);
 
   if (gagal === "belum-assign")
@@ -361,7 +325,7 @@ function PresentasiFasilitator() {
               <b className="docx-nama">{info.file.nama}</b>
               <span className="muted docx-meta">
                 {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)} · 👁 mode pendamping
-                {pptx.alasanLokal ? ` · ${pptx.alasanLokal}` : ""}
+                {pptx.officeUrl ? " · ditampilkan oleh PowerPoint Online" : ""}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -374,7 +338,8 @@ function PresentasiFasilitator() {
               </button>
             </div>
           </div>
-          <IsiPratinjau pptx={pptx} wrapRef={wrapRef} wrapUkuran={wrapUkuran} />
+          <IsiPratinjau pptx={pptx} wrapRef={wrapRef} wrapUkuran={wrapUkuran}
+                        ukuran={info.file.ukuran} unduh={unduh} unduhBusy={unduhBusy} />
         </div>
       )}
 
@@ -436,7 +401,7 @@ function PresentasiTim() {
 
   const mintaTautan = useCallback(() => api.presentasiTautan(), []);
   const ambilBerkas = useCallback((onProgress) => api.presentasiBerkas(onProgress), []);
-  const pptx = usePratinjauPptx(info?.file, mintaTautan, ambilBerkas);
+  const pptx = usePratinjauPptx(info?.file, mintaTautan);
   const [unduhBusy, unduh] = useUnduhPresentasi(ambilBerkas, info?.file?.nama);
 
   /* ---------- unggah / hapus berkas .pptx ---------- */
@@ -606,7 +571,6 @@ function PresentasiTim() {
               <span className="muted docx-meta">
                 {fmtUkuran(info.file.ukuran)} · {fmtWaktu(info.file.updated_at)}
                 {pptx.officeUrl ? " · ditampilkan oleh PowerPoint Online" : ""}
-                {pptx.alasanLokal ? ` · ${pptx.alasanLokal}` : ""}
               </span>
             </div>
             <div className="row docx-tools" style={{ marginTop: 0 }}>
@@ -622,7 +586,8 @@ function PresentasiTim() {
               </button>
             </div>
           </div>
-          <IsiPratinjau pptx={pptx} wrapRef={wrapRef} wrapUkuran={wrapUkuran} />
+          <IsiPratinjau pptx={pptx} wrapRef={wrapRef} wrapUkuran={wrapUkuran}
+                        ukuran={info.file.ukuran} unduh={unduh} unduhBusy={unduhBusy} />
         </div>
       )}
 

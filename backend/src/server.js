@@ -149,24 +149,29 @@ app.use(async (_req, _res, next) => {
   }
 });
 
-// Swagger UI + spec mentah
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "Logbook API" }));
-app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
+// Swagger UI + spec mentah — HANYA saat dijalankan lokal.
+// Di produksi spec ditutup (404) agar daftar lengkap endpoint tidak bisa
+// dienumerasi pengunjung; dokumentasi tetap tersedia bagi pengembang yang
+// menjalankan aplikasi di komputernya sendiri.
+if (!config.diVercel) {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "Logbook API" }));
+  app.get("/openapi.json", (_req, res) => res.json(swaggerSpec));
+}
 
 // Health check + penanda build.
-// `deploy` berubah setiap kali ada deploy baru (URL unik Vercel) sehingga
-// mudah memastikan versi mana yang sedang online, dan `boot` menunjukkan
-// kapan instance serverless ini pertama kali dijalankan.
+// Sengaja MINIM informasi internal: cukup `commit` (7 karakter hash git) untuk
+// memastikan versi mana yang sedang online, dan `boot` untuk mengetahui kapan
+// instance serverless ini pertama kali dijalankan. URL deploy unik Vercel
+// (mengandung nama project & tim) tidak lagi dibagikan ke publik.
 const BOOT_TS = new Date().toISOString();
 app.get("/health", (_req, res) => {
   // Jangan pernah di-cache CDN: kalau tidak, hasil pengecekan bisa
-  // menampilkan deploy LAMA dan mengesankan deploy gagal.
+  // menampilkan commit LAMA dan mengesankan deploy gagal.
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.json({
     ok: true,
     ts: new Date().toISOString(),
     boot: BOOT_TS,
-    deploy: process.env.VERCEL_URL || "lokal",
     commit: (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 7),
     region: process.env.VERCEL_REGION || "",
   });
