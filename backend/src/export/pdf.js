@@ -2,7 +2,7 @@
 import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
-import { getFileBuffer, compressForEmbed } from "../files.js";
+import { getFileBufferRetry, compressForEmbed } from "../files.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -44,8 +44,8 @@ export async function buildPdf(userId, namaTim = "") {
     [...new Set(semuaKey)].map(async (k) => {
       const ext = path.extname(k).toLowerCase();
       if (![".jpg", ".jpeg", ".png"].includes(ext)) return; // pdfkit hanya JPEG/PNG
-      const buf = await getFileBuffer(k);
-      // dikecilkan utk sematan dokumen — jaga total berkas < batas respons Vercel
+      const buf = await getFileBufferRetry(k, 3, 800);
+      // disiapkan utk sematan dokumen — foto kecil di-upscale, rasio asli terjaga
       if (buf) bufferMap.set(k, await compressForEmbed(buf));
     })
   );
@@ -181,12 +181,14 @@ export async function buildPdf(userId, namaTim = "") {
               fy += fh + gap;
               if (fy + fh > BATAS_BAWAH()) { doc.addPage(); fy = doc.y; }
             }
-            // cover + clip → semua thumbnail berukuran PENUH 88×66 yang
-            // seragam (bukan letterbox yang menyisakan ruang kosong dalam
-            // bingkai saat fotonya potret)
+            // fit + rata tengah → foto tampil UTUH di dalam bingkai.
+            // Dulu memakai `cover` (crop tengah) supaya bingkai terisi penuh,
+            // tetapi tangkapan layar lebar jadi terpotong dan isinya hilang.
+            // Sisa ruang bingkai diberi latar abu muda agar tetap rapi.
             doc.save();
             doc.roundedRect(fx, fy, fw, fh, 4).clip();
-            doc.image(buf, fx, fy, { cover: [fw, fh], align: "center", valign: "center" });
+            doc.rect(fx, fy, fw, fh).fill(ZEBRA);
+            doc.image(buf, fx, fy, { fit: [fw, fh], align: "center", valign: "center" });
             doc.restore();
             doc.roundedRect(fx, fy, fw, fh, 4).lineWidth(0.8).stroke(LINE);
             fx += fw + gap;
@@ -256,15 +258,17 @@ export async function buildPdf(userId, namaTim = "") {
         if (vi === 4) doc.font("Helvetica");
         cx += cols[vi].w * W;
       });
-      // bukti thumbnail — cover + clip agar seragam memenuhi kotaknya;
-      // lebih dari satu bukti ditumpuk vertikal dalam kolom
+      // bukti thumbnail — fit + rata tengah agar bukti/nota terlihat UTUH
+      // (bukan terpotong seperti saat memakai cover); beberapa bukti
+      // ditumpuk vertikal dalam kolom
       try {
         const bw = cols[5].w * W - 12, bh = 30;
         let by = ry + 3;
         for (const buf of buktiBufs) {
           doc.save();
           doc.roundedRect(cx + 4, by, bw, bh, 3).clip();
-          doc.image(buf, cx + 4, by, { cover: [bw, bh] });
+          doc.rect(cx + 4, by, bw, bh).fill(ZEBRA);
+          doc.image(buf, cx + 4, by, { fit: [bw, bh], align: "center", valign: "center" });
           doc.restore();
           doc.roundedRect(cx + 4, by, bw, bh, 3).lineWidth(0.6).stroke(LINE);
           by += bh + 4;

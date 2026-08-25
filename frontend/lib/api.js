@@ -406,6 +406,17 @@ export const api = {
     }),
   statistik: () => aFetch("/api/statistik", { cache: "no-store" }),
 
+  // ---- Ekspor ----
+  /**
+   * Siapkan berkas ekspor & minta tautannya: { mode: "cdn"|"server", url, nama }.
+   * Mode "cdn" → berkas dititipkan server ke ImageKit dan diunduh browser
+   * LANGSUNG dari CDN, jadi tidak terbentur batas respons Vercel (±4,5 MB)
+   * dan tidak memakan kuota bandwidth serverless. Lihat lib/unduh.js.
+   */
+  eksporTautan: (jenis) =>
+    aFetch(`/api/export/tautan/${encodeURIComponent(jenis)}`, { method: "POST" }),
+
+
   // ---- Impor ----
   /**
    * Impor .docx. File kecil dikirim sekali jalan; file besar otomatis

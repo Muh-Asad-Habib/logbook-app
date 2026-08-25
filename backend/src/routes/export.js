@@ -3,6 +3,8 @@ import { buildDocx, entriesToExport } from "../export/docx.js";
 import { buildPdf } from "../export/pdf.js";
 import { buildXlsx } from "../export/xlsx.js";
 import { authRequired, hanyaTim } from "../auth.js";
+import { pakaiCloud, putFileEkspor, signedUrl, removeFiles } from "../files.js";
+import * as store from "../storage.js";
 
 const router = Router();
 router.use(authRequired); // ekspor berisi data milik user yang login
@@ -21,6 +23,28 @@ function tanggalUnduh() {
 const bersihkanNama = (s) =>
   String(s || "").replace(/[\\/:*?"<>|\r\n]+/g, " ").replace(/\s+/g, " ").trim() || "Tim";
 
+const JENIS = {
+  docx: {
+    akhiran: "Kegiatan & Keuangan",
+    tipe: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buat: async (req) => (await buildDocx(req.userId)).buffer,
+  },
+  pdf: {
+    akhiran: "Kegiatan & Keuangan",
+    tipe: "application/pdf",
+    buat: (req) => buildPdf(req.userId, bersihkanNama(req.user?.username)),
+  },
+  xlsx: {
+    akhiran: "Rekap Kegiatan & Keuangan",
+    tipe: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buat: (req) => buildXlsx(req.userId, bersihkanNama(req.user?.username)),
+  },
+};
+
+/** Nama berkas unduhan khas tiap tim, mis. "Logbook Tim Alpha - … (04-08-2026).docx". */
+const namaBerkas = (req, jenis) =>
+  `Logbook ${bersihkanNama(req.user?.username)} - ${JENIS[jenis].akhiran} (${tanggalUnduh()}).${jenis}`;
+
 /**
  * Pasang header unduhan dengan nama berkas khas tiap tim, mis.
  * "Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx".
@@ -37,6 +61,53 @@ function kirimBerkas(req, res, buffer, { ekstensi, tipe, akhiran = "Kegiatan & K
   );
   res.send(buffer);
 }
+
+/**
+ * @openapi
+ * /api/export/tautan/{jenis}:
+ *   post:
+ *     tags: [Export]
+ *     summary: Siapkan berkas ekspor lalu kembalikan tautan CDN (byte tidak lewat server)
+ *     description: >
+ *       Berkas dibangun di server, dititipkan ke ImageKit, lalu browser
+ *       mengunduhnya LANGSUNG dari CDN. Ini menghindari batas respons
+ *       serverless Vercel (±4,5 MB) sehingga foto di dokumen bisa disematkan
+ *       beresolusi tinggi, sekaligus menghemat kuota bandwidth.
+ *       Mode lokal (tanpa ImageKit) membalas `{ mode: "server" }` — pemanggil
+ *       memakai jalur lama /api/export/{jenis}.
+ *     parameters:
+ *       - in: path
+ *         name: jenis
+ *         required: true
+ *         schema: { type: string, enum: [docx, pdf, xlsx] }
+ *     responses:
+ *       200: { description: "{ mode, url, nama, ukuran }" }
+ *       400: { description: Jenis ekspor tidak dikenali }
+ */
+router.post("/tautan/:jenis", async (req, res, next) => {
+  try {
+    const jenis = String(req.params.jenis || "").toLowerCase();
+    if (!Object.hasOwn(JENIS, jenis)) {
+      return res.status(400).json({ error: "Jenis ekspor tidak dikenali" });
+    }
+    const nama = namaBerkas(req, jenis);
+    // Mode lokal (tanpa ImageKit): tidak ada CDN → pakai jalur lama.
+    if (!pakaiCloud()) {
+      return res.json({ mode: "server", url: `/api/export/${jenis}`, nama });
+    }
+
+    const buffer = await JENIS[jenis].buat(req);
+    const key = await putFileEkspor(`ekspor.${jenis}`, buffer, "eksp");
+
+    // Satu berkas ekspor tersimpan per jenis: hasil sebelumnya dibuang supaya
+    // penyimpanan cloud tidak menumpuk berkas usang.
+    const kunciLama = await store.getSetting(req.userId, `ekspor_key_${jenis}`, "");
+    if (kunciLama && kunciLama !== key) removeFiles([kunciLama]).catch(() => {});
+    await store.setSetting(req.userId, `ekspor_key_${jenis}`, key);
+
+    res.json({ mode: "cdn", url: signedUrl(key, 3600), nama, ukuran: buffer.length });
+  } catch (err) { next(err); }
+});
 
 /**
  * @openapi

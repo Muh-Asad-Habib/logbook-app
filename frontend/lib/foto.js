@@ -3,15 +3,27 @@
  *
  * Kenapa perlu: di Vercel, serverless function menolak request ber-body
  * > ±4,5 MB (HTTP 413) SEBELUM sampai ke kode kita — kompresi sharp di
- * server sudah terlambat. Maka foto dikecilkan dulu di sini, meniru
- * pipeline server (maks 1600px, JPEG progresif ±kualitas 80).
+ * server sudah terlambat.
+ *
+ * Prinsipnya "sehemat mungkin TANPA terlihat": langkah di sini sengaja
+ * ringan (2048px, mutu 0,92) dan foto di bawah LEWATI_DI_BAWAH dikirim apa
+ * adanya. Penghematan sesungguhnya dilakukan server dengan mozjpeg
+ * (2000px, mutu 85) yang jauh lebih efisien daripada canvas browser pada
+ * mutu yang sama. Kompresi diperketat HANYA bila total unggahan mendekati
+ * batas Vercel — jadi kualitas tidak dikorbankan tanpa alasan.
  */
 
-const MAX_DIM = 1600;                 // sisi terpanjang (sama dengan sharp server)
-const KUALITAS = 0.8;                 // kualitas JPEG utama
-const KUALITAS_ULANG = 0.65;          // bila hasil pertama masih besar
-const TARGET_PER_FOTO = 900 * 1024;   // target ukuran per foto
-const LEWATI_DI_BAWAH = 300 * 1024;   // foto kecil dikirim apa adanya
+const MAX_DIM = 2048;                 // sisi terpanjang (server memangkas lagi ke 2000)
+const KUALITAS = 0.92;                // mutu JPEG utama — praktis tak terlihat bedanya
+const TARGET_PER_FOTO = 1.6 * 1024 * 1024; // di atas ini, mutu diturunkan sedikit
+const KUALITAS_ULANG = 0.85;
+const LEWATI_DI_BAWAH = 1024 * 1024;  // foto < 1 MB dikirim apa adanya (server yang mengompres)
+
+/** Tahap penghematan tambahan bila TOTAL unggahan mendekati batas Vercel. */
+const TAHAP_KETAT = [
+  { dim: 1600, mutu: 0.82 },
+  { dim: 1280, mutu: 0.72 },
+];
 
 /** Batas aman total upload per request (limit keras Vercel ±4,5 MB). */
 export const BATAS_UPLOAD = 4 * 1024 * 1024;
@@ -62,28 +74,39 @@ const keBlob = (kanvas, q) =>
   new Promise((resolve) => kanvas.toBlob(resolve, "image/jpeg", q));
 
 /**
- * Kompres satu foto → File JPEG yang jauh lebih kecil.
- * GIF (bisa animasi) dan berkas kecil dilewatkan; bila kompresi gagal
- * atau tidak menghasilkan berkas lebih kecil, kembalikan berkas asli.
+ * Kompres satu foto → File JPEG yang lebih ringan, dengan penurunan mutu
+ * yang praktis tidak terlihat. GIF (bisa animasi) dan berkas kecil
+ * dilewatkan; bila kompresi gagal atau tidak menghasilkan berkas lebih
+ * kecil, kembalikan berkas asli.
+ * @param {File} file
+ * @param {{dim?: number, mutu?: number, lewatiDiBawah?: number}} [opsi]
  */
-export async function kompresFoto(file) {
+export async function kompresFoto(file, opsi = {}) {
+  const dim = opsi.dim ?? MAX_DIM;
+  const mutu = opsi.mutu ?? KUALITAS;
+  const lewati = opsi.lewatiDiBawah ?? LEWATI_DI_BAWAH;
   if (!file || !/^image\//.test(file.type) || file.type === "image/gif") return file;
-  if (file.size <= LEWATI_DI_BAWAH) return file;
+  if (file.size <= lewati) return file;
   try {
     const bmp = await bacaBitmap(file);
     const w = bmp.width || bmp.naturalWidth;
     const h = bmp.height || bmp.naturalHeight;
     if (!w || !h) return file;
-    const skala = Math.min(1, MAX_DIM / Math.max(w, h));
+    // Foto TIDAK pernah diperbesar di sini & rasionya dipertahankan penuh —
+    // gambar utuh, tidak ada bagian yang terpotong.
+    const skala = Math.min(1, dim / Math.max(w, h));
     const kanvas = document.createElement("canvas");
     kanvas.width = Math.max(1, Math.round(w * skala));
     kanvas.height = Math.max(1, Math.round(h * skala));
-    kanvas.getContext("2d").drawImage(bmp, 0, 0, kanvas.width, kanvas.height);
+    const ctx = kanvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bmp, 0, 0, kanvas.width, kanvas.height);
     bmp.close?.();
 
-    let blob = await keBlob(kanvas, KUALITAS);
+    let blob = await keBlob(kanvas, mutu);
     if (blob && blob.size > TARGET_PER_FOTO) {
-      const ulang = await keBlob(kanvas, KUALITAS_ULANG);
+      const ulang = await keBlob(kanvas, Math.min(mutu, KUALITAS_ULANG));
       if (ulang && ulang.size < blob.size) blob = ulang;
     }
     if (!blob || blob.size >= file.size) return file; // tidak membantu → kirim asli
@@ -97,13 +120,30 @@ export async function kompresFoto(file) {
 /**
  * Kompres semua berkas sebuah field di FormData (in-place).
  * Entri file kosong (input tidak diisi) ikut dibersihkan.
+ *
+ * Mutu tinggi dipakai lebih dulu; kompresi baru diperketat BILA total
+ * unggahan mendekati batas keras Vercel — sehingga foto tetap jernih pada
+ * kondisi normal, tanpa mengorbankan keberhasilan unggahan saat fotonya
+ * banyak/besar.
  * @returns {Promise<number>} total byte seluruh berkas setelah kompresi.
  */
 export async function kompresFormFoto(fd, field = "foto") {
   const files = fd.getAll(field).filter((f) => f && typeof f === "object" && f.size > 0);
   fd.delete(field);
   if (!files.length) return 0;
-  const hasil = await Promise.all(files.map(kompresFoto));
+
+  const jumlah = (list) => list.reduce((s, f) => s + f.size, 0);
+  let hasil = await Promise.all(files.map((f) => kompresFoto(f)));
+
+  // Ambang 92% memberi ruang untuk batas multipart & field lain di form.
+  const ambang = BATAS_UPLOAD * 0.92;
+  for (const { dim, mutu } of TAHAP_KETAT) {
+    if (jumlah(hasil) <= ambang) break;
+    hasil = await Promise.all(
+      hasil.map((f) => kompresFoto(f, { dim, mutu, lewatiDiBawah: 0 }))
+    );
+  }
+
   let total = 0;
   for (const f of hasil) {
     fd.append(field, f);

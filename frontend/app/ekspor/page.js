@@ -5,8 +5,8 @@ import {
   FileText, Printer, Sheet, Download, Upload, FileOutput, Lightbulb, TriangleAlert,
   Images,
 } from "lucide-react";
-import { api, exportUrl, useApi, refreshData } from "@/lib/api";
-import { unduhZipFoto, susunDaftarZip } from "@/lib/unduh";
+import { api, useApi, refreshData } from "@/lib/api";
+import { unduhZipFoto, susunDaftarZip, unduhEkspor } from "@/lib/unduh";
 import { toast } from "@/components/Toast";
 
 const KARTU = [
@@ -14,20 +14,24 @@ const KARTU = [
     Ic: FileText, judul: "Dokumen Word (.docx)", warna: "v1",
     ket: "Dokumen logbook rapi berisi seluruh kegiatan & keuangan akunmu " +
       "beserta fotonya — siap dikumpulkan atau dicetak.",
-    href: "/api/export/docx", tombol: "Unduh DOCX",
+    jenis: "docx", tombol: "Unduh DOCX",
   },
   {
     Ic: Printer, judul: "Dokumen PDF (.pdf)", warna: "v4",
     ket: "Rekap siap cetak: ringkasan dana, seluruh kegiatan lengkap dengan foto, " +
       "dan tabel keuangan bertotal.",
-    href: "/api/export/pdf", tombol: "Unduh PDF",
+    jenis: "pdf", tombol: "Unduh PDF",
   },
   {
     Ic: Sheet, judul: "Rekap Excel (.xlsx)", warna: "v5",
     ket: "Tiga sheet: Kegiatan, Keuangan, dan Ringkasan — siap diolah lebih lanjut.",
-    href: "/api/export/xlsx", tombol: "Unduh Excel",
+    jenis: "xlsx", tombol: "Unduh Excel",
   },
 ];
+
+/** Ukuran berkas dalam satuan yang mudah dibaca. */
+const fmtUkuran = (b) =>
+  b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(b / 1024)} KB`;
 
 export default function EksporPage() {
   const { data: info, error: e1 } = useApi("/api/export/info");
@@ -39,6 +43,24 @@ export default function EksporPage() {
   const [hasilImpor, setHasilImpor] = useState(null);
   const [busyZip, setBusyZip] = useState(false);
   const [progresZip, setProgresZip] = useState("");
+  const [busyEkspor, setBusyEkspor] = useState("");
+
+  /**
+   * Unduh berkas ekspor. Server hanya menyiapkan berkas & mengirim tautan;
+   * byte-nya ditarik langsung dari CDN (lihat lib/unduh.js) sehingga tidak
+   * dibatasi ukuran respons Vercel — dokumen bisa memuat foto resolusi tinggi.
+   */
+  const unduhBerkas = async (jenis, label) => {
+    setBusyEkspor(jenis);
+    try {
+      const ukuran = await unduhEkspor(jenis);
+      toast.ok(ukuran ? `${label} tersimpan (${fmtUkuran(ukuran)})` : `${label} sedang diunduh`);
+    } catch (e) {
+      toast.err(`Gagal menyiapkan ${label}: ${e.message}`);
+    } finally {
+      setBusyEkspor("");
+    }
+  };
 
   // Unduh SEMUA foto (kegiatan + bukti keuangan) sebagai satu ZIP dengan
   // folder per tanggal — dirakit di browser agar bebas batas respons Vercel.
@@ -125,9 +147,14 @@ export default function EksporPage() {
               <div className="metric-value" style={{ fontSize: "1.02rem" }}>{k.judul}</div>
             </div>
             <p className="muted" style={{ flex: 1 }}>{k.ket}</p>
-            <a className="btn primary mt" href={exportUrl(k.href)} style={{ textDecoration: "none" }}>
-              <Download className="lucide" /> {k.tombol}
-            </a>
+            <button
+              className="btn primary mt"
+              onClick={() => unduhBerkas(k.jenis, k.judul)}
+              disabled={busyEkspor === k.jenis}
+            >
+              <Download className="lucide" />{" "}
+              {busyEkspor === k.jenis ? "Menyiapkan…" : k.tombol}
+            </button>
           </div>
         ))}
         <div className="card" style={{ display: "flex", flexDirection: "column" }}>
@@ -188,7 +215,8 @@ export default function EksporPage() {
         <p className="muted mts">
           • Ekspor tidak mengubah data — berkas yang diunduh adalah salinan berisi data terkini.<br />
           • Entri dicocokkan dengan isi dokumen; yang sudah ada dilewati, jadi aman diunduh berulang.<br />
-          • Tautan unduh juga bisa dipanggil langsung, mis. <code>/api/export/pdf</code>.
+          • Foto disematkan <b>utuh</b> (tidak dipangkas) dengan resolusi tinggi; berkasnya
+          ditarik langsung dari penyimpanan awan, jadi tidak ada batas ukuran unduhan.
         </p>
       </div>
     </>

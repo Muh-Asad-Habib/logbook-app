@@ -220,11 +220,9 @@ function KeuanganFasilitator() {
                       {buktiKeys(r.e).length ? (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {buktiKeys(r.e).map((k, i) => (
-                            <img key={k} src={thumbUrl(k, 120)}
+                            <img key={k} className="foto-mini" src={thumbUrl(k, 160)}
                                  alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
-                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)}
-                                 style={{ width: 44, height: 44, objectFit: "cover",
-                                          borderRadius: 8, cursor: "zoom-in" }} />
+                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)} />
                           ))}
                         </div>
                       ) : "—"}
@@ -421,11 +419,9 @@ function KeuanganTim() {
                       {buktiKeys(r.e).length ? (
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {buktiKeys(r.e).map((k, i) => (
-                            <img key={k} src={thumbUrl(k, 120)}
+                            <img key={k} className="foto-mini" src={thumbUrl(k, 160)}
                                  alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
-                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)}
-                                 style={{ width: 44, height: 44, objectFit: "cover",
-                                          borderRadius: 8, cursor: "zoom-in" }} />
+                                 onError={retryFoto} onClick={() => bukaBukti(r.e, i)} />
                           ))}
                         </div>
                       ) : "—"}

@@ -11,8 +11,9 @@
  *  2. LOKAL (folder uploads/) — fallback otomatis bila env tidak terisi;
  *     berguna untuk pengembangan di laptop tanpa akun ImageKit.
  *
- *  Semua unggahan dikompresi dengan sharp (maks 1600px, JPEG progresif) —
- *  foto HP 3–5 MB menyusut jadi ±200–400 KB, kuota cloud jadi awet.
+ *  Semua unggahan dikompresi dengan sharp (maks 2000px, JPEG progresif mutu 85)
+ *  — foto HP 3–5 MB menyusut jadi ±250–500 KB tanpa penurunan yang kentara,
+ *  kuota cloud tetap awet.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -60,9 +61,16 @@ const authHeader = () =>
 
 /* ---------------- util kompresi ---------------- */
 
-/** Batas kompresi: sisi terpanjang & kualitas JPEG. */
-const MAX_DIM = 1600;
-const JPEG_QUALITY = 80;
+/**
+ * Batas kompresi unggahan: sisi terpanjang & kualitas JPEG.
+ *
+ * Sengaja LEBIH TINGGI dari sebelumnya (1600px/q80 → 2000px/q85): mozjpeg
+ * sangat efisien, jadi kenaikan mutu ini hanya menambah ±20–30% ukuran berkas
+ * (tetap ±250–500 KB per foto) tetapi menghilangkan artefak yang dulu terlihat
+ * saat foto dibuka besar di Lightbox maupun disematkan ke dokumen Word.
+ */
+const MAX_DIM = 2000;
+const JPEG_QUALITY = 85;
 
 /**
  * Kompres buffer gambar (resize + JPEG progresif).
@@ -89,38 +97,83 @@ function buatKey(prefix, ext) {
   return `${prefix}_${Date.now()}-${crypto.randomBytes(3).toString("hex")}${ext}`;
 }
 
+/* Batas resolusi foto yang DISEMATKAN ke dokumen (DOCX/PDF).
+ * 1000px sangat berlebih untuk kebutuhan cetak: foto tampil paling besar
+ * ±5 cm di dokumen, jadi 1000px setara ±500 dpi (standar cetak 300 dpi). */
+const EMBED_DIM = 1000;        // sisi terpanjang sematan
+const EMBED_MUTU = 85;         // kualitas JPEG sematan
+const EMBED_MIN = 700;         // di bawah ini foto di-upscale dulu
+const EMBED_FAKTOR_MAX = 4;    // pembesaran maksimal 4× agar tidak jadi "bubur"
+
 /**
- * Kompres gambar untuk DISEMATKAN ke dokumen ekspor (DOCX/PDF).
- * Foto di dokumen hanya tampil ±2,6 cm, jadi 640px sudah melebihi kebutuhan
- * cetak 300dpi — ini menjaga ukuran berkas ekspor jauh di bawah batas
- * response Vercel (±4,5 MB). Format asli dipertahankan (jpeg→jpeg, png→png)
- * agar relationship/content-type dokumen tidak berubah.
- * Bila gagal atau hasil tidak lebih kecil → kembalikan buffer asli.
+ * Siapkan gambar untuk DISEMATKAN ke dokumen ekspor (DOCX/PDF) dan kembalikan
+ * dimensi ASLI-nya (setelah rotasi EXIF) supaya pemanggil bisa menghitung
+ * ukuran tampil sesuai RASIO ASLI — foto tidak perlu dipangkas/terpotong.
+ *
+ * - Foto besar diturunkan ke EMBED_DIM (1200px) — jauh di atas kebutuhan
+ *   cetak 300dpi untuk kolom selebar ±3 cm, jadi hasilnya tajam.
+ * - Foto KECIL (mis. hasil impor DOCX ±220–420px) di-UPSCALE (lanczos3 +
+ *   sharpen ringan, maks 4×) supaya tidak pecah-pecah saat dicetak.
+ * - Format asli dipertahankan (jpeg→jpeg, png→png) agar relationship &
+ *   content-type dokumen tidak berubah. GIF/format lain dilewatkan.
+ *
+ * @returns {Promise<{buffer: Buffer, w: number, h: number, ok: boolean}>}
+ *   ok=false bila format tak didukung/gagal (buffer asli dikembalikan).
  */
-export async function compressForEmbed(buffer, maxDim = 640, quality = 72) {
+export async function siapkanEmbed(buffer, maxDim = EMBED_DIM, quality = EMBED_MUTU) {
+  const gagal = { buffer, w: 0, h: 0, ok: false };
   try {
-    if (!buffer || buffer.length < 24 * 1024) return buffer; // sudah kecil
+    if (!buffer) return gagal;
     const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
     const isPng = buffer[0] === 0x89 && buffer[1] === 0x50;
-    if (!isJpeg && !isPng) return buffer; // gif/format lain: biarkan
-    let s = sharp(buffer, { failOn: "none" })
-      .rotate()
-      .resize(maxDim, maxDim, { fit: "inside", withoutEnlargement: true });
+    if (!isJpeg && !isPng) return gagal; // gif/format lain: biarkan
+    const md = await sharp(buffer, { failOn: "none" }).metadata();
+    let w = md.width, h = md.height;
+    if (!w || !h) return gagal;
+    if (md.orientation >= 5) [w, h] = [h, w]; // EXIF rotasi 90°
+    const sisi = Math.max(w, h);
+    const kecil = sisi < EMBED_MIN;
+
+    // Jalur cepat: JPEG yang sudah pas ukuran & tanpa rotasi EXIF dipakai
+    // apa adanya — menghemat waktu CPU (penting saat satu dokumen memuat
+    // ratusan foto) sekaligus menghindari rekompresi yang menurunkan mutu.
+    if (!kecil && sisi <= maxDim && isJpeg && !(md.orientation > 1)) {
+      return { buffer, w, h, ok: true };
+    }
+
+    const target = kecil
+      ? Math.min(maxDim, Math.round(sisi * EMBED_FAKTOR_MAX))
+      : Math.min(maxDim, sisi);
+
+    let s = sharp(buffer, { failOn: "none" }).rotate().resize(target, target, {
+      fit: "inside",              // TANPA crop — rasio asli dipertahankan
+      withoutEnlargement: false,  // izinkan upscale untuk foto kecil
+      kernel: "lanczos3",
+    });
+    if (kecil) s = s.sharpen(); // hasil upscale dipertegas
     s = isPng
       ? s.png({ compressionLevel: 9 })
       : s.jpeg({ quality, progressive: true, mozjpeg: true });
     const out = await s.toBuffer();
-    return out.length < buffer.length ? out : buffer;
+    // Hasil upscale WAJIB dipakai walau berkasnya jadi lebih besar — itulah
+    // tujuannya. Selain itu, pakai hasil hanya bila benar-benar lebih kecil.
+    const pakai = kecil || out.length < buffer.length ? out : buffer;
+    return { buffer: pakai, w, h, ok: true };
   } catch {
-    return buffer;
+    return gagal;
   }
+}
+
+/** Versi ringkas siapkanEmbed — hanya buffer-nya (dipakai logo/kop dokumen). */
+export async function compressForEmbed(buffer, maxDim = EMBED_DIM, quality = EMBED_MUTU) {
+  return (await siapkanEmbed(buffer, maxDim, quality)).buffer;
 }
 
 /* Batas resolusi unduhan JPG (?dl=1). Foto tersimpan bisa sangat kecil
  * (mis. hasil impor DOCX ±220–420 px) sehingga blur saat dibuka — saat
  * diunduh, foto kecil di-upscale dan foto raksasa diturunkan. */
 const UNDUH_MIN = 1280;     // sisi terpanjang minimal — di bawah ini di-upscale
-const UNDUH_MAX = 1600;     // sisi terpanjang maksimal (selaras batas upload)
+const UNDUH_MAX = 2000;     // sisi terpanjang maksimal (selaras batas upload)
 const UNDUH_FAKTOR_MAX = 4; // pembesaran maksimal 4× agar tidak jadi "bubur"
 
 /**
@@ -225,6 +278,46 @@ export async function putFile(originalName, buffer, prefix = "img") {
 }
 
 /**
+ * TIMPA isi berkas yang sudah ada TANPA mengubah kuncinya — dipakai skrip
+ * perawatan `tools/perbaiki-foto.mjs` untuk meng-upscale foto lama yang
+ * tersimpan beresolusi rendah. Karena kuncinya tetap, seluruh entri
+ * kegiatan/keuangan yang menunjuk berkas ini otomatis ikut membaik tanpa
+ * perubahan database.
+ *
+ * ImageKit: unggah ulang dengan `fileName` sama + useUniqueFileName=false →
+ * berkas di path yang sama digantikan dan cache CDN-nya dibersihkan otomatis.
+ */
+export async function timpaFile(key, buffer) {
+  if (pakaiCloud()) {
+    const form = new FormData();
+    form.append("file", buffer.toString("base64"));
+    form.append("fileName", key);
+    form.append("folder", IK.folder);
+    form.append("useUniqueFileName", "false");
+    form.append("overwriteFile", "true");
+    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      headers: { Authorization: authHeader() },
+      body: form,
+    });
+    if (!res.ok) {
+      const pesan = await res.text().catch(() => "");
+      throw new Error(`Timpa berkas di ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
+    }
+    const info = await res.json();
+    await q(
+      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
+       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
+      [key, info.fileId || "", info.url || ""]
+    );
+    return key;
+  }
+  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  fs.writeFileSync(safePath(key), buffer);
+  return key;
+}
+
+/**
  * Simpan berkas NON-gambar apa adanya (tanpa kompresi sharp) — dipakai untuk
  * laporan kemajuan .docx dan presentasi .pptx. Whitelist ketat: hanya kedua
  * ekstensi itu yang diterima.
@@ -232,6 +325,27 @@ export async function putFile(originalName, buffer, prefix = "img") {
  * dengan foto). Lokal: tulis ke folder uploads/.
  */
 const EXT_DOKUMEN = new Set([".docx", ".pptx"]);
+
+/** Ekstensi berkas HASIL EKSPOR yang boleh dititipkan ke CDN. */
+const EXT_EKSPOR = new Set([".docx", ".pdf", ".xlsx"]);
+
+/**
+ * Simpan berkas HASIL EKSPOR (.docx/.pdf/.xlsx) ke penyimpanan cloud lalu
+ * kembalikan kuncinya — dipakai agar unduhan ekspor ditarik browser LANGSUNG
+ * dari CDN ImageKit, bukan mengalir lewat serverless function Vercel
+ * (menghindari batas respons ±4,5 MB sekaligus menghemat kuota bandwidth).
+ */
+export async function putFileEkspor(originalName, buffer, prefix = "eksp") {
+  const ext = path.extname(originalName || "").toLowerCase();
+  if (!EXT_EKSPOR.has(ext)) {
+    throw new Error("Ekstensi hasil ekspor tidak dikenali");
+  }
+  const key = buatKey(prefix, ext);
+  if (pakaiCloud()) return putBlob(key, buffer);
+  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  fs.writeFileSync(safePath(key), buffer);
+  return key;
+}
 
 export async function putFileRaw(originalName, buffer, prefix = "lap") {
   const ext = path.extname(originalName || "").toLowerCase();
@@ -540,11 +654,19 @@ export async function thumbLokal(key, lebar) {
  * Ambil isi berkas sebagai Buffer — dipakai ekspor DOCX/PDF untuk menyematkan
  * foto ke dokumen. Cloud: unduh dari signed URL; lokal: baca file.
  * Mengembalikan null bila tidak ada/gagal (ekspor tetap jalan tanpa foto itu).
+ *
+ * BATAS WAKTU wajib: tanpa ini satu permintaan CDN yang menggantung akan
+ * membekukan seluruh proses ekspor (dan menghabiskan jatah durasi fungsi
+ * serverless) — lebih baik satu foto dilewati daripada unduhan gagal total.
  */
+const AMBIL_TIMEOUT_MS = 15_000;
+
 export async function getFileBuffer(key) {
   try {
     if (pakaiCloud()) {
-      const res = await fetch(signedUrl(key, 300));
+      const res = await fetch(signedUrl(key, 300), {
+        signal: AbortSignal.timeout(AMBIL_TIMEOUT_MS),
+      });
       if (!res.ok) return null;
       return Buffer.from(await res.arrayBuffer());
     }
