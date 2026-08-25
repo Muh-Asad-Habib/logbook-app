@@ -223,6 +223,124 @@ async function uploadChunked(basePath, file, onProgress, extra = {}, selesai = "
 
 const LANGSUNG_MAKS = 3 * 1024 * 1024; // ≤3 MB → satu request multipart
 
+/* ---------- UNGGAH LANGSUNG BROWSER → IMAGEKIT (hemat trafik server) ----------
+ * Server hanya menerbitkan "izin" (beberapa ratus byte) lalu memverifikasi
+ * hasilnya; byte berkas berjalan langsung dari browser ke ImageKit. Untuk
+ * berkas 170 MB ini menghemat ratusan MB trafik Vercel per unggahan. */
+
+/** Unggah SATU bagian ke ImageKit; kembalikan { key, fileId }. */
+async function unggahBagianIK(dasar, izin, key, potong) {
+  const fd = new FormData();
+  fd.append("file", potong, key);
+  fd.append("fileName", key);
+  fd.append("folder", dasar.folder);
+  fd.append("useUniqueFileName", "false");
+  fd.append("publicKey", dasar.publicKey);
+  fd.append("token", izin.token);
+  fd.append("expire", String(izin.expire));
+  fd.append("signature", izin.signature);
+  const res = await fetch(dasar.uploadUrl, { method: "POST", body: fd });
+  if (!res.ok) {
+    let pesan = `HTTP ${res.status}`;
+    try { pesan = (await res.json())?.message || pesan; } catch {}
+    throw new Error(`Unggah ke penyimpanan gagal: ${pesan}`);
+  }
+  const info = await res.json();
+  if (!info?.fileId) throw new Error("Penyimpanan tidak mengembalikan fileId");
+  return { key, fileId: info.fileId };
+}
+
+/**
+ * Unggah berkas dokumen (.pptx/.docx) langsung ke ImageKit.
+ * @returns hasil pendaftaran, atau null bila server meminta jalur lama
+ *   (mode lokal tanpa ImageKit).
+ */
+async function unggahDokumenLangsung(dasarPath, file, onProgress) {
+  const izinRes = await aFetch(`${dasarPath}/izin-unggah`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nama: file.name, ukuran: file.size }),
+  });
+  if (izinRes?.mode !== "langsung") return null; // → fallback jalur server
+
+  const { partMax, jumlah, bagian, izin, stem, tanda } = izinRes;
+  const terunggah = [];
+  for (let i = 0; i < jumlah; i++) {
+    const potong = file.slice(i * partMax, (i + 1) * partMax);
+    terunggah.push(await unggahBagianIK(izinRes, izin[i], bagian[i], potong));
+    // sisakan 1 langkah untuk verifikasi server
+    onProgress?.(Math.round(((i + 1) / (jumlah + 1)) * 100));
+  }
+  return aFetch(`${dasarPath}/daftarkan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nama: file.name, stem, jumlah, tanda, bagian: terunggah }),
+  });
+}
+
+/** Unggah presentasi (.pptx) langsung ke ImageKit. */
+const unggahPresentasiLangsung = (file, onProgress) =>
+  unggahDokumenLangsung("/api/presentasi", file, onProgress);
+
+/** Unggah laporan kemajuan (.docx) langsung ke ImageKit. */
+const unggahLaporanLangsung = (file, onProgress) =>
+  unggahDokumenLangsung("/api/laporan", file, onProgress);
+
+/**
+ * Rakit berkas dari daftar signed URL CDN menjadi satu Blob — byte ditarik
+ * langsung dari ImageKit, tidak melewati server kita sama sekali.
+ */
+async function rakitDariUrl(urls, onProgress, mime) {
+  const bagian = [];
+  for (let i = 0; i < urls.length; i++) {
+    const res = await fetch(urls[i], { cache: "no-store" });
+    if (!res.ok) throw new Error(`Bagian #${i + 1} gagal diambil (HTTP ${res.status})`);
+    bagian.push(await res.arrayBuffer());
+    onProgress?.(Math.round(((i + 1) / urls.length) * 100));
+  }
+  return new Blob(bagian, { type: mime });
+}
+
+const MIME_PPTX =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const MIME_DOCX =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/**
+ * Ambil berkas dokumen sebagai Blob.
+ * Utama : daftar signed URL CDN (`…/bagian`) lalu dirakit di browser.
+ * Cadangan: lewat server (mode lokal, atau bila CDN menolak CORS).
+ */
+async function ambilDokumenBlob(pathBagian, pathFile, onProgress, mime) {
+  try {
+    const info = await aFetch(pathBagian, { cache: "no-store" });
+    if (info?.urls?.length) {
+      return { nama: info.nama || "", blob: await rakitDariUrl(info.urls, onProgress, mime) };
+    }
+  } catch {
+    // lanjut ke cadangan lewat server
+  }
+  const res = await fetch(`${API_URL}${pathFile}`, {
+    headers: authHeaders(), cache: "no-store", credentials: "same-origin",
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { msg = (await res.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  onProgress?.(100);
+  return { nama: "", blob: await res.blob() };
+}
+
+/** Berkas presentasi (.pptx) sebagai Blob. */
+const ambilPresentasiBlob = (pathBagian, pathFile, onProgress) =>
+  ambilDokumenBlob(pathBagian, pathFile, onProgress, MIME_PPTX);
+
+/** Berkas laporan (.docx) sebagai Blob. */
+const ambilLaporanBlob = (pathBagian, pathFile, onProgress) =>
+  ambilDokumenBlob(pathBagian, pathFile, onProgress, MIME_DOCX);
+
+
 export const api = {
   // ---- Auth ----
   register: (username, password, opts = {}) =>
@@ -306,7 +424,19 @@ export const api = {
 
   // ---- Laporan kemajuan (.docx — satu file, unggahan baru mengganti lama) ----
   laporanInfo: () => aFetch("/api/laporan/info", { cache: "no-store" }),
+  /**
+   * Unggah laporan. Jalur utama: LANGSUNG ke ImageKit (byte tidak lewat
+   * server → trafik Vercel nyaris nol). Jalur cadangan: lewat server
+   * (mode lokal tanpa ImageKit, atau bila unggahan langsung gagal).
+   */
   uploadLaporan: async (file, onProgress) => {
+    try {
+      const hasil = await unggahLaporanLangsung(file, onProgress);
+      if (hasil) return hasil;
+    } catch (e) {
+      // Berkas besar TIDAK boleh jatuh ke jalur server (batas body Vercel).
+      if (file.size > LANGSUNG_MAKS * 32) throw e;
+    }
     if (file.size <= LANGSUNG_MAKS) {
       const fd = new FormData();
       fd.append("file", file);
@@ -317,22 +447,32 @@ export const api = {
   deleteLaporan: () => aFetch("/api/laporan", { method: "DELETE" }),
   /** Tautan publik sementara (30 mnt) — dipakai penampil Microsoft Office. */
   laporanTautan: () => aFetch("/api/laporan/tautan", { method: "POST" }),
+  /** Berkas laporan sebagai Blob — ditarik dari CDN bila memungkinkan. */
+  laporanBerkas: (onProgress) =>
+    ambilLaporanBlob("/api/laporan/file/bagian", "/api/laporan/file", onProgress),
   /** Ambil berkas laporan sebagai ArrayBuffer (untuk dirender docx-preview). */
-  laporanFile: async () => {
-    const res = await fetch(`${API_URL}/api/laporan/file`, {
-      headers: authHeaders(), cache: "no-store", credentials: "same-origin",
-    });
-    if (!res.ok) {
-      let msg = `HTTP ${res.status}`;
-      try { msg = (await res.json()).error || msg; } catch {}
-      throw new Error(msg);
-    }
-    return res.arrayBuffer();
+  laporanFile: async (onProgress) => {
+    const { blob } = await ambilLaporanBlob(
+      "/api/laporan/file/bagian", "/api/laporan/file", onProgress
+    );
+    return blob.arrayBuffer();
   },
 
   // ---- Presentasi (.pptx + tautan Canva — boleh keduanya, hapus terpisah) ----
   presentasiInfo: () => aFetch("/api/presentasi/info", { cache: "no-store" }),
+  /**
+   * Unggah presentasi. Jalur utama: LANGSUNG ke ImageKit (byte tidak lewat
+   * server → trafik Vercel nyaris nol). Jalur cadangan: lewat server
+   * (mode lokal tanpa ImageKit, atau bila unggahan langsung gagal).
+   */
   uploadPresentasi: async (file, onProgress) => {
+    try {
+      const hasil = await unggahPresentasiLangsung(file, onProgress);
+      if (hasil) return hasil;
+    } catch (e) {
+      // Berkas besar TIDAK boleh jatuh ke jalur server (batas body Vercel).
+      if (file.size > LANGSUNG_MAKS * 32) throw e;
+    }
     if (file.size <= LANGSUNG_MAKS) {
       const fd = new FormData();
       fd.append("file", file);
@@ -343,6 +483,9 @@ export const api = {
   deletePresentasiFile: () => aFetch("/api/presentasi/file", { method: "DELETE" }),
   /** Tautan publik sementara (30 mnt) — dipakai penampil Microsoft Office. */
   presentasiTautan: () => aFetch("/api/presentasi/tautan", { method: "POST" }),
+  /** Berkas presentasi sebagai Blob — ditarik dari CDN bila memungkinkan. */
+  presentasiBerkas: (onProgress) =>
+    ambilPresentasiBlob("/api/presentasi/file/bagian", "/api/presentasi/file", onProgress),
   /** Simpan tautan Canva (dinormalisasi server ke bentuk embed). */
   setCanva: (url) =>
     aFetch("/api/presentasi/canva", {
@@ -383,21 +526,33 @@ export const api = {
     laporanInfo: (timId) => aFetch(`/api/fasilitator/tim/${timId}/laporan-info`, { cache: "no-store" }),
     laporanTautan: (timId) =>
       aFetch(`/api/fasilitator/tim/${timId}/laporan-tautan`, { method: "POST" }),
-    laporanFile: async (timId) => {
-      const res = await fetch(`${API_URL}/api/fasilitator/tim/${timId}/laporan-file`, {
-        headers: authHeaders(), cache: "no-store", credentials: "same-origin",
-      });
-      if (!res.ok) {
-        let msg = `HTTP ${res.status}`;
-        try { msg = (await res.json()).error || msg; } catch {}
-        throw new Error(msg);
-      }
-      return res.arrayBuffer();
+    /** Berkas laporan tim sebagai Blob — ditarik dari CDN bila memungkinkan. */
+    laporanBerkas: (timId, onProgress) =>
+      ambilLaporanBlob(
+        `/api/fasilitator/tim/${timId}/laporan-bagian`,
+        `/api/fasilitator/tim/${timId}/laporan-file`,
+        onProgress
+      ),
+    /** Berkas laporan tim sebagai ArrayBuffer (untuk dirender docx-preview). */
+    laporanFile: async (timId, onProgress) => {
+      const { blob } = await ambilLaporanBlob(
+        `/api/fasilitator/tim/${timId}/laporan-bagian`,
+        `/api/fasilitator/tim/${timId}/laporan-file`,
+        onProgress
+      );
+      return blob.arrayBuffer();
     },
     presentasiInfo: (timId) =>
       aFetch(`/api/fasilitator/tim/${timId}/presentasi-info`, { cache: "no-store" }),
     presentasiTautan: (timId) =>
       aFetch(`/api/fasilitator/tim/${timId}/presentasi-tautan`, { method: "POST" }),
+    /** Berkas presentasi tim sebagai Blob — ditarik dari CDN bila memungkinkan. */
+    presentasiBerkas: (timId, onProgress) =>
+      ambilPresentasiBlob(
+        `/api/fasilitator/tim/${timId}/presentasi-bagian`,
+        `/api/fasilitator/tim/${timId}/presentasi-file`,
+        onProgress
+      ),
   },
 
   // ---- Komentar (fasilitator ↔ tim, 2 arah) ----

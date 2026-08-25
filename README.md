@@ -396,18 +396,24 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | GET | `/api/laporan/info` | Info berkas laporan (nama, ukuran, waktu unggah) |
-| GET | `/api/laporan/file` | Tampilkan / unduh `.docx` |
-| POST / DELETE | `/api/laporan` | Unggah / hapus laporan (potongan: `/chunk` + `/selesai`) |
+| POST | `/api/laporan/izin-unggah` | Izin unggah **langsung ke ImageKit** (byte tidak lewat server, maks. 300 MB) |
+| POST | `/api/laporan/daftarkan` | Catat berkas hasil unggah langsung (diverifikasi ke metadata ImageKit) |
+| GET | `/api/laporan/file` | Tampilkan / unduh `.docx` (302 ke CDN bila satu bagian) |
+| GET | `/api/laporan/file/bagian` | Daftar signed URL tiap bagian — dirakit di browser |
+| POST / DELETE | `/api/laporan` | Unggah lewat server — cadangan mode lokal (potongan: `/chunk` + `/selesai`) / hapus |
 | POST | `/api/laporan/tautan` | Tautan sementara untuk penampil Office |
-| GET | `/api/laporan/publik/{kunci}` | Akses berkas melalui tautan sementara |
+| GET | `/api/laporan/publik/{kunci}` | Akses berkas melalui tautan sementara — **selalu dilayani server** agar render Word Online tidak berubah |
 
 **Presentasi**
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | GET | `/api/presentasi/info` | Info berkas `.pptx` dan tautan Canva |
-| GET / DELETE | `/api/presentasi/file` | Unduh / hapus `.pptx` (tautan Canva tetap ada) |
-| POST | `/api/presentasi` | Unggah `.pptx` (potongan: `/chunk` + `/selesai`) |
+| POST | `/api/presentasi/izin-unggah` | Izin unggah **langsung ke ImageKit** (byte tidak lewat server, maks. 300 MB) |
+| POST | `/api/presentasi/daftarkan` | Catat berkas hasil unggah langsung (diverifikasi ke metadata ImageKit) |
+| GET / DELETE | `/api/presentasi/file` | Unduh (302 ke CDN) / hapus `.pptx` (tautan Canva tetap ada) |
+| GET | `/api/presentasi/file/bagian` | Daftar signed URL tiap bagian — dirakit di browser |
+| POST | `/api/presentasi` | Unggah `.pptx` lewat server — cadangan mode lokal (potongan: `/chunk` + `/selesai`) |
 | POST / DELETE | `/api/presentasi/canva` | Simpan / hapus tautan Canva |
 | POST | `/api/presentasi/tautan` | Tautan sementara untuk penampil PowerPoint |
 | GET | `/api/presentasi/publik/{kunci}` | Akses berkas melalui tautan sementara |
@@ -421,7 +427,9 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | DELETE | `/api/fasilitator/tim/{id}` | Keluar dari sebuah tim |
 | GET | `/api/fasilitator/tim/{id}/kegiatan` \| `/keuangan` \| `/statistik` \| `/ringkasan` | Data tim tersebut |
 | GET | `/api/fasilitator/tim/{id}/laporan-info` \| `/laporan-file` | Laporan kemajuan tim |
+| GET | `/api/fasilitator/tim/{id}/laporan-bagian` | Signed URL bagian laporan tim — dirakit di browser |
 | GET | `/api/fasilitator/tim/{id}/presentasi-info` \| `/presentasi-file` | Presentasi tim |
+| GET | `/api/fasilitator/tim/{id}/presentasi-bagian` | Signed URL bagian presentasi tim — dirakit di browser |
 | POST | `/api/fasilitator/tim/{id}/laporan-tautan` \| `/presentasi-tautan` | Tautan penampil dokumen |
 
 **Kode tim, komentar & pengesahan**
@@ -486,6 +494,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:panel-api --workspace backend` | Endpoint panel admin: validasi input, pengelolaan akun, audit |
 | `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
+| `npm run diag:presentasi-langsung --workspace backend` | Jalur unggah **langsung ke ImageKit**: penerbitan izin, verifikasi metadata, berkas satu bagian & multi-bagian, redirect 302 ke CDN, dan penolakan izin palsu (butuh internet + env `IMAGEKIT_*`) |
+| `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
 
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
 tidak terganggu.

@@ -16,6 +16,7 @@ import { authRequired, hanyaPendamping } from "../auth.js";
 import { bacaAktivitas, catatAktivitas } from "../aktivitas.js";
 import { rateLimit } from "../ratelimit.js";
 import { q } from "../db.js";
+import { pakaiCloud, signedUrl, signedUrlBagian } from "../files.js";
 
 const router = Router();
 router.use(authRequired);
@@ -223,6 +224,11 @@ router.get("/tim/:timId/laporan-info", pastikanAkses, async (req, res, next) => 
  */
 router.get("/tim/:timId/laporan-file", pastikanAkses, async (req, res, next) => {
   try {
+    // HEMAT TRAFIK: berkas satu-kunci → CDN yang mengirim byte-nya.
+    const meta = await store.metaLaporan(req.tim.id);
+    if (meta && pakaiCloud() && !String(meta.file_key).startsWith("multi:")) {
+      return res.redirect(302, signedUrl(meta.file_key, 3600));
+    }
     const l = await store.getLaporan(req.tim.id);
     if (!l) return res.status(404).json({ error: "Tim belum mengunggah laporan" });
     res.setHeader("Content-Type",
@@ -232,6 +238,34 @@ router.get("/tim/:timId/laporan-file", pastikanAkses, async (req, res, next) => 
       `${unduh}; filename="${encodeURIComponent(l.nama)}"`);
     res.setHeader("Cache-Control", "private, no-store");
     res.send(l.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/fasilitator/tim/{timId}/laporan-bagian:
+ *   get:
+ *     tags: [Fasilitator]
+ *     summary: Daftar signed URL bagian laporan tim (dirakit di browser)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ nama, ukuran, urls: [] }" }
+ *       404: { description: Belum ada berkas / mode lokal }
+ */
+router.get("/tim/:timId/laporan-bagian", pastikanAkses, async (req, res, next) => {
+  try {
+    const meta = await store.metaLaporan(req.tim.id);
+    if (!meta) return res.status(404).json({ error: "Tim belum mengunggah laporan" });
+    if (!pakaiCloud()) return res.status(404).json({ error: "Mode lokal — pakai laporan-file" });
+    res.json({
+      nama: meta.nama,
+      ukuran: meta.ukuran,
+      urls: signedUrlBagian(meta.file_key, 3600),
+    });
   } catch (err) {
     next(err);
   }
@@ -292,6 +326,34 @@ router.get("/tim/:timId/presentasi-info", pastikanAkses, async (req, res, next) 
 
 /**
  * @openapi
+ * /api/fasilitator/tim/{timId}/presentasi-bagian:
+ *   get:
+ *     tags: [Fasilitator]
+ *     summary: Daftar signed URL bagian presentasi tim (dirakit di browser)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: timId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: "{ nama, ukuran, urls: [] }" }
+ *       404: { description: Belum ada berkas / mode lokal }
+ */
+router.get("/tim/:timId/presentasi-bagian", pastikanAkses, async (req, res, next) => {
+  try {
+    const meta = await store.metaPresentasi(req.tim.id);
+    if (!meta) return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
+    if (!pakaiCloud()) return res.status(404).json({ error: "Mode lokal — pakai presentasi-file" });
+    res.json({
+      nama: meta.nama,
+      ukuran: meta.ukuran,
+      urls: signedUrlBagian(meta.file_key, 3600),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
  * /api/fasilitator/tim/{timId}/presentasi-file:
  *   get:
  *     tags: [Fasilitator]
@@ -301,10 +363,17 @@ router.get("/tim/:timId/presentasi-info", pastikanAkses, async (req, res, next) 
  *       - { in: path, name: timId, required: true, schema: { type: string } }
  *     responses:
  *       200: { description: Berkas .pptx }
+ *       302: { description: Redirect ke CDN (mode cloud, berkas satu bagian) }
  *       404: { description: Tim belum mengunggah presentasi }
  */
 router.get("/tim/:timId/presentasi-file", pastikanAkses, async (req, res, next) => {
   try {
+    // HEMAT TRAFIK: berkas satu-kunci → CDN yang mengirim byte-nya.
+    const meta = await store.metaPresentasi(req.tim.id);
+    if (!meta) return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
+    if (pakaiCloud() && !String(meta.file_key).startsWith("multi:")) {
+      return res.redirect(302, signedUrl(meta.file_key, 3600));
+    }
     const p = await store.getPresentasi(req.tim.id);
     if (!p) return res.status(404).json({ error: "Tim belum mengunggah presentasi" });
     res.setHeader("Content-Type",

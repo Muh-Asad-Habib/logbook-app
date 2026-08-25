@@ -1,8 +1,20 @@
 /**
  * Laporan Kemajuan (.docx) — SATU file per akun.
  * Unggahan baru selalu MENGGANTI file lama (UPSERT di storage), jadi tidak
- * pernah ada dua laporan tersimpan. File besar diunggah terpotong (chunked)
- * agar lolos batas body ±4,5 MB Vercel — pola yang sama dengan impor DOCX.
+ * pernah ada dua laporan tersimpan.
+ *
+ * HEMAT TRAFIK SERVER (Vercel):
+ * - Unggah  : browser mengunggah bagian-bagian berkas LANGSUNG ke ImageKit
+ *             memakai "izin" (token+expire+signature) dari /izin-unggah —
+ *             beberapa ratus byte. Server memverifikasi hasilnya lewat API
+ *             metadata ImageKit di /daftarkan. Byte berkas TIDAK lewat server.
+ * - Unduh   : /file me-REDIRECT (302) ke signed URL ImageKit; berkas
+ *             multi-bagian dilayani /file/bagian lalu dirakit di browser.
+ * - Fallback: mode lokal (tanpa env IMAGEKIT_*) tetap memakai jalur lama
+ *             (multer + unggah terpotong) supaya pengembangan di laptop jalan.
+ *
+ * PENAMPIL TIDAK BERUBAH: /publik/:kunci (yang diambil server Microsoft)
+ * tetap mengirim berkas dari server apa adanya — lihat catatan di sana.
  */
 import { Router } from "express";
 import multer from "multer";
@@ -15,12 +27,22 @@ import {
   cekPotongan, simpanPotongan, rakitPotongan, bersihkanPotongan,
   ID_RE, validTotal,
 } from "../potongan.js";
+import {
+  pakaiCloud, signedUrl, signedUrlBagian, PART_MAX,
+  izinUnggahIK, infoUnggahIK, metaFileIK, catatFileIK,
+  kunciUnggahan, namaBagian, buatStem, tandaInternal, removeFiles,
+} from "../files.js";
 
-const MAKS_UKURAN = 40 * 1024 * 1024; // 40 MB — laporan berfoto banyak pun cukup
+const MAKS_UKURAN = 300 * 1024 * 1024; // 300 MB lewat jalur unggah langsung
+/** Jalur lama (byte lewat server) tetap dibatasi agar Vercel tidak kewalahan. */
+const MAKS_UKURAN_SERVER = 40 * 1024 * 1024;
+
+const MIME_DOCX =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAKS_UKURAN, files: 1 },
+  limits: { fileSize: MAKS_UKURAN_SERVER, files: 1 },
 });
 
 const router = Router();
@@ -48,10 +70,15 @@ router.get("/publik/:kunci", async (req, res, next) => {
       if (l) q("DELETE FROM laporan_links WHERE kunci = $1", [kunci]).catch(() => {});
       return res.status(404).json({ error: "Tautan kedaluwarsa — muat ulang halaman" });
     }
+    // CATATAN PENTING — JANGAN diubah jadi redirect ke CDN.
+    // Tautan ini khusus dipakai penampil Microsoft Word Online. Supaya hasil
+    // rendernya DIJAMIN sama persis seperti sekarang, berkasnya tetap dikirim
+    // server apa adanya. Beban trafiknya kecil: penampil Office hanya dipakai
+    // untuk berkas ≤10 MB — berkas besar dirender sisi-klien (docx-preview)
+    // dan byte-nya ditarik langsung dari CDN, tidak lewat server.
     const lap = await store.getLaporan(l.user_id);
     if (!lap) return res.status(404).json({ error: "Laporan tidak ada" });
-    res.setHeader("Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Type", MIME_DOCX);
     res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(lap.nama)}"`);
     res.setHeader("Cache-Control", "private, no-store");
     res.send(lap.buffer);
@@ -107,8 +134,8 @@ async function simpan(req, res, nama, buffer) {
   if (!validDocx(buffer)) {
     return res.status(400).json({ error: "Berkas bukan dokumen Word (.docx) yang valid" });
   }
-  if (buffer.length > MAKS_UKURAN) {
-    return res.status(400).json({ error: "Berkas terlalu besar (maks. 40 MB)" });
+  if (buffer.length > MAKS_UKURAN_SERVER) {
+    return res.status(400).json({ error: "Berkas terlalu besar untuk jalur ini (maks. 40 MB)" });
   }
   const hasil = await store.saveLaporan(req.userId, bersihkanNama(nama), buffer);
   catatAktivitas(req.userId, "laporan.unggah", { nama: hasil.nama, ukuran: hasil.ukuran });
@@ -130,6 +157,141 @@ router.get("/info", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ============ UNGGAH LANGSUNG BROWSER → IMAGEKIT (hemat trafik) ============ */
+
+const STEM_RE = /^[A-Za-z0-9._-]{6,120}$/;
+
+/**
+ * @openapi
+ * /api/laporan/izin-unggah:
+ *   post:
+ *     tags: [Laporan]
+ *     summary: Terbitkan izin unggah langsung ke ImageKit (byte tidak lewat server)
+ *     responses:
+ *       200: { description: "{ mode: 'langsung'|'server', … }" }
+ *       400: { description: Nama/ukuran tidak valid }
+ */
+router.post("/izin-unggah", async (req, res, next) => {
+  try {
+    const nama = bersihkanNama(req.body?.nama);
+    const ukuran = Number(req.body?.ukuran);
+    if (!Number.isFinite(ukuran) || ukuran <= 0) {
+      return res.status(400).json({ error: "Ukuran berkas tidak valid" });
+    }
+    if (ukuran > MAKS_UKURAN) {
+      return res.status(400).json({ error: "Berkas terlalu besar (maks. 300 MB)" });
+    }
+    // Mode lokal (tanpa ImageKit): pakai jalur lama lewat server.
+    if (!pakaiCloud()) return res.json({ mode: "server", maksServer: MAKS_UKURAN_SERVER });
+
+    const jumlah = Math.max(1, Math.ceil(ukuran / PART_MAX));
+    const stem = buatStem("lap");
+    const dasar = infoUnggahIK();
+    // Satu izin per bagian: token ImageKit hanya boleh dipakai sekali.
+    const izin = Array.from({ length: jumlah }, () => izinUnggahIK());
+    const bagian = Array.from({ length: jumlah }, (_, i) => namaBagian(stem, i, jumlah, ".docx"));
+    res.json({
+      mode: "langsung",
+      ...dasar,
+      stem,
+      jumlah,
+      bagian,
+      izin,
+      nama,
+      // Titipan bertanda tangan — diverifikasi ulang saat /daftarkan.
+      tanda: tandaInternal(`${req.userId}|${stem}|${jumlah}`),
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /api/laporan/daftarkan:
+ *   post:
+ *     tags: [Laporan]
+ *     summary: Catat berkas yang sudah diunggah browser ke ImageKit (diverifikasi)
+ *     responses:
+ *       200: { description: Tersimpan (laporan lama digantikan) }
+ *       400: { description: Verifikasi gagal }
+ */
+router.post("/daftarkan", async (req, res, next) => {
+  const terdaftar = [];
+  try {
+    if (!pakaiCloud()) return res.status(400).json({ error: "Mode cloud tidak aktif" });
+    const nama = bersihkanNama(req.body?.nama);
+    const stem = String(req.body?.stem || "");
+    const jumlah = Number(req.body?.jumlah);
+    const daftar = Array.isArray(req.body?.bagian) ? req.body.bagian : [];
+    const tanda = String(req.body?.tanda || "");
+
+    if (!STEM_RE.test(stem) || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 40) {
+      return res.status(400).json({ error: "Parameter unggahan tidak valid" });
+    }
+    if (tanda !== tandaInternal(`${req.userId}|${stem}|${jumlah}`)) {
+      return res.status(400).json({ error: "Izin unggah tidak sah — ulangi unggahan" });
+    }
+    if (daftar.length !== jumlah) {
+      return res.status(400).json({ error: `Bagian tidak lengkap (${daftar.length}/${jumlah})` });
+    }
+
+    // VERIFIKASI ke ImageKit: nama & ukuran tiap bagian harus cocok, dan
+    // fileId-nya memang milik akun kita (respons metadata hanya ±300 byte).
+    let total = 0;
+    for (let i = 0; i < jumlah; i++) {
+      const kunciSeharusnya = namaBagian(stem, i, jumlah, ".docx");
+      const b = daftar.find((x) => String(x?.key) === kunciSeharusnya);
+      if (!b?.fileId) {
+        return res.status(400).json({ error: `Bagian #${i} tidak ditemukan` });
+      }
+      const meta = await metaFileIK(String(b.fileId));
+      if (!meta || meta.name !== kunciSeharusnya) {
+        return res.status(400).json({ error: `Bagian #${i} gagal diverifikasi` });
+      }
+      const size = Number(meta.size) || 0;
+      if (size <= 0 || size > PART_MAX + 1024) {
+        return res.status(400).json({ error: `Ukuran bagian #${i} tidak wajar` });
+      }
+      total += size;
+      await catatFileIK(kunciSeharusnya, meta.fileId, meta.url || "");
+      terdaftar.push(kunciSeharusnya);
+    }
+    if (total <= 0 || total > MAKS_UKURAN) {
+      return res.status(400).json({ error: "Ukuran total berkas tidak wajar" });
+    }
+
+    const fileKey = kunciUnggahan(stem, jumlah, ".docx");
+    const hasil = await store.daftarkanLaporan(req.userId, nama, total, fileKey);
+    catatAktivitas(req.userId, "laporan.unggah", { nama: hasil.nama, ukuran: hasil.ukuran });
+    res.json({ ok: true, ...hasil, catatan: "Laporan lama (bila ada) sudah digantikan" });
+  } catch (err) {
+    removeFiles(terdaftar).catch(() => {}); // jangan tinggalkan bagian yatim
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/laporan/file/bagian:
+ *   get:
+ *     tags: [Laporan]
+ *     summary: Daftar signed URL bagian berkas (dirakit di browser, hemat trafik)
+ *     responses:
+ *       200: { description: "{ nama, ukuran, urls: [] }" }
+ *       404: { description: Belum ada berkas / mode lokal }
+ */
+router.get("/file/bagian", async (req, res, next) => {
+  try {
+    const meta = await store.metaLaporan(req.userId);
+    if (!meta) return res.status(404).json({ error: "Belum ada laporan tersimpan" });
+    if (!pakaiCloud()) return res.status(404).json({ error: "Mode lokal — pakai /file" });
+    res.json({
+      nama: meta.nama,
+      ukuran: meta.ukuran,
+      urls: signedUrlBagian(meta.file_key, 3600),
+    });
+  } catch (err) { next(err); }
+});
+
 /**
  * @openapi
  * /api/laporan/file:
@@ -138,14 +300,19 @@ router.get("/info", async (req, res, next) => {
  *     summary: Unduh/ambil berkas laporan kemajuan (.docx)
  *     responses:
  *       200: { description: Berkas .docx }
+ *       302: { description: Redirect ke CDN (mode cloud, berkas satu bagian) }
  *       404: { description: Belum ada laporan }
  */
 router.get("/file", async (req, res, next) => {
   try {
+    // HEMAT TRAFIK: berkas satu-kunci → biarkan CDN yang mengirim byte-nya.
+    const meta = await store.metaLaporan(req.userId);
+    if (meta && pakaiCloud() && !String(meta.file_key).startsWith("multi:")) {
+      return res.redirect(302, signedUrl(meta.file_key, 3600));
+    }
     const l = await store.getLaporan(req.userId);
     if (!l) return res.status(404).json({ error: "Belum ada laporan tersimpan" });
-    res.setHeader("Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Type", MIME_DOCX);
     const unduh = req.query.unduh ? "attachment" : "inline";
     res.setHeader("Content-Disposition",
       `${unduh}; filename="${encodeURIComponent(l.nama)}"`);

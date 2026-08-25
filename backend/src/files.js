@@ -310,7 +310,105 @@ export async function putBlob(key, buffer) {
  * Berkas final yang melebihi PART_MAX otomatis dipecah menjadi beberapa bagian
  * `<stem>.partN.bin` di ImageKit, dan kolom file_key menyimpan kunci komposit
  * `multi:<jumlah>:<stem>`. Perakitan kembali transparan lewat getFileBesar(). */
-const PART_MAX = 20 * 1024 * 1024; // aman di bawah batas 25 MB ImageKit gratis
+export const PART_MAX = 20 * 1024 * 1024; // aman di bawah batas 25 MB ImageKit gratis
+
+/* ---------------- UNGGAH LANGSUNG BROWSER → IMAGEKIT ----------------
+ * Jalur hemat trafik: byte berkas TIDAK pernah melewati server kita.
+ * Server hanya menerbitkan "izin" (token+expire+signature) beberapa ratus byte,
+ * browser mengunggah sendiri ke upload.imagekit.io, lalu server memverifikasi
+ * hasilnya lewat API metadata (respons kecil) sebelum dicatat ke database.
+ *
+ * Tanpa ini, satu unggahan 170 MB memakai ±4× trafik server (naik terpotong →
+ * turun untuk dirakit → naik lagi per bagian). Dengan ini: ±0 byte.
+ */
+
+/** Nama berkas ImageKit yang aman (dipakai sebagai kunci di tabel `files`). */
+export const KEY_RE = /^[A-Za-z0-9._-]{6,120}$/;
+
+/**
+ * Terbitkan parameter autentikasi unggah client-side ImageKit.
+ * signature = HMAC-SHA1(privateKey, token + expire) — sesuai SDK resmi.
+ * `expire` wajib < 1 jam ke depan.
+ */
+export function izinUnggahIK(detikBerlaku = 40 * 60) {
+  const token = crypto.randomUUID();
+  const expire = Math.floor(Date.now() / 1000) + Math.min(detikBerlaku, 55 * 60);
+  const signature = crypto
+    .createHmac("sha1", IK.privateKey)
+    .update(token + expire)
+    .digest("hex");
+  return { token, expire, signature };
+}
+
+/** Info statis yang dibutuhkan browser untuk unggah langsung. */
+export function infoUnggahIK() {
+  return {
+    uploadUrl: "https://upload.imagekit.io/api/v1/files/upload",
+    publicKey: IK.publicKey,
+    folder: IK.folder,
+    partMax: PART_MAX,
+  };
+}
+
+/**
+ * Ambil metadata satu berkas di ImageKit ({ name, size, filePath, url, … }).
+ * Dipakai untuk MEMVERIFIKASI unggahan langsung: klien tidak boleh mendaftarkan
+ * fileId sembarangan. Respons hanya beberapa ratus byte.
+ */
+export async function metaFileIK(fileId) {
+  try {
+    const res = await fetch(
+      `https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}/details`,
+      { headers: { Authorization: authHeader() } }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Catat pemetaan key → fileId (agar penghapusan nanti bisa dilakukan). */
+export async function catatFileIK(key, fileId, url = "") {
+  await q(
+    `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
+     ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
+    [key, fileId || "", url || ""]
+  );
+}
+
+/**
+ * Nama berkas tiap bagian pada unggahan langsung.
+ * Berkas satu bagian tetap memakai ekstensi aslinya (.pptx / .docx) agar CDN
+ * mengirim content-type yang benar (penampil Microsoft Office menolak berkas
+ * ber-ekstensi .bin). Berkas multi-bagian bukan dokumen utuh, jadi .bin.
+ */
+export const namaBagian = (stem, i, jumlah, ext = ".pptx") =>
+  jumlah > 1 ? `${stem}.part${i}.bin` : `${stem}${ext}`;
+
+/** Kunci yang disimpan di kolom file_key untuk unggahan langsung. */
+export const kunciUnggahan = (stem, jumlah, ext = ".pptx") =>
+  jumlah > 1 ? `multi:${jumlah}:${stem}` : namaBagian(stem, 0, 1, ext);
+
+/** Pangkal nama unik untuk sekumpulan bagian (dipakai unggah langsung). */
+export const buatStem = (prefix = "ppt") => buatKey(prefix, "");
+
+/**
+ * Tanda tangan internal (HMAC) — dipakai untuk menitipkan data ke klien
+ * (mis. pangkal nama berkas) lalu memverifikasinya saat kembali, sehingga
+ * klien tidak bisa mengarang kunci berkas milik orang lain.
+ */
+export const tandaInternal = (data) =>
+  crypto
+    .createHmac("sha256", IK.privateKey || "logbook-lokal")
+    .update(String(data))
+    .digest("hex")
+    .slice(0, 32);
+
+/** Daftar signed URL tiap bagian — dipakai browser untuk pratinjau/unduh. */
+export function signedUrlBagian(key, detik = 3600) {
+  return kunciBagian(key).map((k) => signedUrl(k, detik));
+}
 
 export async function putFileBesar(originalName, buffer, prefix = "lap") {
   if (buffer.length <= PART_MAX) return putFileRaw(originalName, buffer, prefix);
