@@ -41,3 +41,7 @@ hasil-deploy.txt
 *.log
 .DS_Store
 Thumbs.db
+
+# rahasia (.env, .env.local, .env.production…) — contoh isian tetap dilacak
+.env*
+!.env.example
