@@ -213,7 +213,7 @@ besar, di dalamnya admin dapat:
   username, setel ulang password, keluarkan dari perangkat yang sedang login,
   serta menghapus akun.
 - Memantau **perangkat & sesi** — berapa dan siapa saja yang sedang login,
-  ditinjau secara keseluruhan, per akun, maupun per tim beserta pendampingnya.
+  ditinjau secara keseluruhan maupun per akun.
 - Mengatur **kode pendaftaran** fasilitator dan dosen, serta **penugasan tim**
   untuk menghubungkan pembimbing dengan tim yang didampingi.
 - Membaca **catatan aktivitas** panel yang tersimpan otomatis.

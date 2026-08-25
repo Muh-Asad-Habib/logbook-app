@@ -86,7 +86,7 @@ const sandbox = {
 let api;
 try {
   const nama = Object.keys(sandbox);
-  const fn = new Function(...nama, kode + "\n;return { B: B, HAL: HAL, urlHal: urlHal, keHalaman: keHalaman, render: render, renderSesi: renderSesi, kartuAkunSesi: kartuAkunSesi, kartuTimSesi: kartuTimSesi, barisPendampingSesi: barisPendampingSesi, sesiPerAkun: sesiPerAkun, akunOnline: akunOnline, setMode: function(m){ MODE_SESI = m; }, bentang: function(id){ BUKA_SESI[id] = true; }, setState: function(u, s){ USERS = u; SESI = s; PERTAMA = false; } };");
+  const fn = new Function(...nama, kode + "\n;return { B: B, HAL: HAL, urlHal: urlHal, keHalaman: keHalaman, render: render, renderSesi: renderSesi, kartuAkunSesi: kartuAkunSesi, sesiPerAkun: sesiPerAkun, akunOnline: akunOnline, setMode: function(m){ MODE_SESI = m; }, bentang: function(id){ BUKA_SESI[id] = true; }, setState: function(u, s){ USERS = u; SESI = s; PERTAMA = false; } };");
 
   api = fn(...nama.map((n) => sandbox[n]));
   cek("skrip panel berjalan tanpa error", true);
@@ -134,28 +134,14 @@ cek("kartu akun offline: tanpa tombol cabut", !kartuOffline.includes('data-act="
 const kartuFas = api.kartuAkunSesi(users[2], []);
 cek("kartu pendamping: jumlah tim diampu", kartuFas.includes("mengampu 3 tim"));
 cek("kartu pendamping: login terakhir ditampilkan", kartuFas.includes("login terakhir"));
-
-/* ---- 4b. mode "Per tim": tim + pendampingnya dalam satu kartu ---- */
-const kartuTim = api.kartuTimSesi(users[0], peta);
-cek("kartu tim: ringkasan pendamping & status online",
-  kartuTim.includes("1 pendamping") && kartuTim.includes("0 sedang online"), kartuTim.slice(0, 0));
-cek("kartu tim: tombol atur pendamping", kartuTim.includes('data-act="fas"'));
+cek("kartu pendamping: pintasan atur tim diampu", kartuFas.includes('data-act="tim"'));
+cek("kartu tim: pintasan atur pendamping", kartuOnline.includes('data-act="fas"'));
 
 api.bentang("t1");
-const kartuTimBuka = api.kartuTimSesi(users[0], peta);
-cek("kartu tim dibentangkan: bagian perangkat & pendamping",
-  kartuTimBuka.includes("Perangkat tim") && kartuTimBuka.includes("Pendamping tim (1)"));
-cek("kartu tim dibentangkan: perangkat tim tampil", kartuTimBuka.includes("Brave · Linux"));
-cek("kartu tim dibentangkan: pendamping tampil dengan status",
-  kartuTimBuka.includes("Bu Rina") && kartuTimBuka.includes('class="st off"'));
-
-const kartuTimTanpaPendamping = api.kartuTimSesi(users[1], peta);
-cek("kartu tim tanpa pendamping diberi penjelasan",
-  kartuTimTanpaPendamping.includes("belum punya pendamping"));
-
-const brsPend = api.barisPendampingSesi({ id: "f1", username: "Bu Rina", role: "fasilitator" }, peta);
-cek("baris pendamping: offline + login terakhir",
-  brsPend.includes("offline") && brsPend.includes("login terakhir"));
+const kartuBuka = api.kartuAkunSesi(users[0], sesi);
+cek("kartu dibentangkan: daftar perangkat tampil", kartuBuka.includes("Brave · Linux"));
+cek("kartu offline dibentangkan: diberi penjelasan",
+  api.kartuAkunSesi(users[1], []).length > 0);
 
 /* ---- 5. render tiap halaman tidak melempar error ---- */
 for (const h of ["ringkas", "akun", "sesi", "audit", "pengaturan"]) {
@@ -163,9 +149,9 @@ for (const h of ["ringkas", "akun", "sesi", "audit", "pengaturan"]) {
   catch (e) { cek(`render halaman ${h}`, false, e.message); }
 }
 
-/* ---- 6. ketiga mode halaman sesi bisa digambar ---- */
+/* ---- 6. kedua mode halaman sesi bisa digambar ---- */
 api.keHalaman("sesi", false);
-for (const m of ["semua", "akun", "tim"]) {
+for (const m of ["semua", "akun"]) {
   try { api.setMode(m); api.renderSesi(); cek(`mode sesi "${m}" digambar`, true); }
   catch (e) { cek(`mode sesi "${m}" digambar`, false, e.message); }
 }

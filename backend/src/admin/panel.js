@@ -235,10 +235,6 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .asx.buka .asx-tgl .i{transform:rotate(90deg)}
   .asx-tgl:hover{color:#fff;border-color:var(--p);background:rgba(109,124,255,.2)}
   .asx-b{border-top:1px solid var(--line);padding:4px 16px 14px;background:#0b1024}
-  /* judul kelompok di dalam kartu (mis. "Perangkat tim" / "Pendamping") */
-  .grp{font:800 .64rem var(--mono);color:#5d668f;letter-spacing:.1em;text-transform:uppercase;
-    padding:13px 2px 5px;display:flex;align-items:center;gap:8px}
-  .grp::after{content:"";flex:1 1 auto;height:1px;background:linear-gradient(90deg,#1b2242,transparent)}
   .dev{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px dashed #1b2242;flex-wrap:wrap}
   .dev:last-child{border-bottom:none}
   .dev-ic{font-size:1.15rem;flex:0 0 auto}
@@ -928,7 +924,6 @@ export const PANEL_HTML = /* html */ `<!doctype html>
             <div class="seg" id="seg-sesi">
               <button class="on" data-mode-sesi="semua"><svg class="i"><use href="#i-device"/></svg> Keseluruhan</button>
               <button data-mode-sesi="akun"><svg class="i"><use href="#i-users"/></svg> Per akun</button>
-              <button data-mode-sesi="tim"><svg class="i"><use href="#i-folder"/></svg> Per tim</button>
             </div>
             <div class="fchips" id="fil-peran"></div>
           </div>
@@ -950,11 +945,6 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <!-- mode: per akun (termasuk akun yang sedang TIDAK login) -->
           <div id="sesi-akun" class="hide">
             <div id="daftar-akun-sesi"></div>
-          </div>
-
-          <!-- mode: per tim (tim + pendamping yang mengampunya) -->
-          <div id="sesi-tim" class="hide">
-            <div id="daftar-tim-sesi"></div>
           </div>
         </div>
 
@@ -1763,20 +1753,13 @@ function akunOnline(){
 function renderSesi(){
   renderStatSesi();
   renderFilterPeran();
-  var a = $("#sesi-semua"), b = $("#sesi-akun"), c = $("#sesi-tim");
+  var a = $("#sesi-semua"), b = $("#sesi-akun");
   if (a) a.classList.toggle("hide", MODE_SESI !== "semua");
   if (b) b.classList.toggle("hide", MODE_SESI !== "akun");
-  if (c) c.classList.toggle("hide", MODE_SESI !== "tim");
-  // Saringan peran tidak relevan pada tampilan per tim (satu kartu sudah
-  // memuat tim beserta seluruh pendampingnya).
-  var fp = $("#fil-peran");
-  if (fp) fp.classList.toggle("hide", MODE_SESI === "tim");
   document.querySelectorAll("[data-mode-sesi]").forEach(function(x){
     x.classList.toggle("on", x.dataset.modeSesi === MODE_SESI);
   });
-  if (MODE_SESI === "semua") renderTabelSesi();
-  else if (MODE_SESI === "akun") renderAkunSesi();
-  else renderTimSesi();
+  if (MODE_SESI === "semua") renderTabelSesi(); else renderAkunSesi();
 }
 
 /** Kartu ringkas di kepala halaman: berapa perangkat & siapa yang online. */
@@ -1905,6 +1888,9 @@ function kartuAkunSesi(u, list){
         '<span class="st ' + (online ? "on" : "off") + '"><i></i>' +
           (online ? list.length + " perangkat" : "offline") + "</span>" +
         '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + " Data</button>" +
+        (isPendamping(role)
+          ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '">🔗</button>'
+          : '<button class="btn sm ic" title="Pendamping tim ini" data-act="fas" data-id="' + u.id + '">🎓</button>') +
         (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
           u.id + '">' + sv("power") + "</button>" : "") +
         '<button class="asx-tgl" data-act="lipat" data-id="' + u.id +
@@ -1926,112 +1912,6 @@ function barisPerangkat(s){
     '<div class="dev-act">' +
       '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
       'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + "</button>" +
-    "</div></div>";
-}
-
-/* ---------- mode "Per tim" ----------
- * Sudut pandang paling menjawab pertanyaan sehari-hari: "tim ini sedang
- * dikerjakan siapa, dan pendampingnya sudah masuk belum?" Satu kartu = satu
- * tim, berisi perangkat tim itu SEKALIGUS daftar fasilitator/dosen yang
- * mengampunya beserta status login masing-masing. */
-function renderTimSesi(){
-  var peta = sesiPerAkun();
-  var cari = cariSesi();
-  var tim = USERS.filter(function(u){ return !isPendamping(u.role || "tim"); });
-  var rows = tim.filter(function(t){
-    if (!cari) return true;
-    var teks = t.username + " " +
-      (t.pengampu || []).map(function(p){ return p.username; }).join(" ") + " " +
-      (peta[t.id] || []).map(function(s){ return (s.perangkat || "") + " " + (s.ip || ""); }).join(" ");
-    return teks.toLowerCase().indexOf(cari) >= 0;
-  });
-  rows.sort(function(a, b){
-    var na = (peta[a.id] || []).length, nb = (peta[b.id] || []).length;
-    if (!!na !== !!nb) return nb ? 1 : -1;
-    return String(b.loginTerakhir || "").localeCompare(String(a.loginTerakhir || ""));
-  });
-  setHTML($("#daftar-tim-sesi"), rows.map(function(t){
-    return kartuTimSesi(t, peta);
-  }).join("") ||
-    '<div class="kosong"><div class="big">👥</div>' +
-    (cari ? "Tidak ada tim yang cocok dengan pencarian ini."
-          : "Belum ada akun tim terdaftar.") + "</div>",
-    "tim-sesi");
-}
-
-function kartuTimSesi(t, peta){
-  var list = peta[t.id] || [];
-  var online = list.length > 0;
-  var buka = !!BUKA_SESI[t.id];
-  var ini = (t.username || "?").charAt(0).toUpperCase();
-  var pend = t.pengampu || [];
-  var pendOnline = pend.filter(function(p){ return (peta[p.id] || []).length > 0; }).length;
-
-  var meta = [];
-  meta.push(online
-    ? list.length + " perangkat aktif " + sejak((list[0] || {}).terakhir)
-    : (t.loginTerakhir ? "login terakhir " + sejak(t.loginTerakhir) : "belum pernah login"));
-  meta.push(pend.length
-    ? pend.length + " pendamping · " + pendOnline + " sedang online"
-    : "belum punya pendamping");
-
-  var isi = "";
-  if (buka) {
-    isi = '<div class="asx-b">' +
-      '<div class="grp">Perangkat tim</div>' +
-      (list.length ? list.map(barisPerangkat).join("")
-        : '<div class="mut" style="padding:9px 2px">Tim ini sedang tidak login di perangkat mana pun.' +
-          (t.loginTerakhir ? " Terakhir login " + esc(tglJam(t.loginTerakhir)) + "." : "") + "</div>") +
-      '<div class="grp">Pendamping tim (' + pend.length + ")</div>" +
-      (pend.length ? pend.map(function(p){ return barisPendampingSesi(p, peta); }).join("")
-        : '<div class="mut" style="padding:9px 2px">Belum ada fasilitator/dosen yang mengampu tim ini. ' +
-          'Atur lewat halaman Akun pengguna → tombol 🎓 pada baris tim.</div>') +
-      "</div>";
-  }
-
-  return '<div class="asx' + (online ? " aktif" : "") + (buka ? " buka" : "") + '">' +
-    '<div class="asx-h" data-act="lipat" data-id="' + t.id + '">' +
-      '<span class="ava" style="' + avaStyle(t.username) + '">' + esc(ini) + "</span>" +
-      '<div class="asx-nm"><b>' + esc(t.username) + ' <span class="badge b">👥 tim</span>' +
-        (t.n_acc ? ' <span class="badge g">✔ ' + t.n_acc + " ACC</span>" : "") +
-      "</b>" +
-      '<div class="asx-meta">' + meta.map(function(m, i){
-        return (i ? '<i class="dot"></i>' : "") + "<span>" + esc(m) + "</span>";
-      }).join("") + "</div></div>" +
-      '<div class="asx-act">' +
-        '<span class="st ' + (online ? "on" : "off") + '"><i></i>' +
-          (online ? list.length + " perangkat" : "offline") + "</span>" +
-        '<button class="btn sm p" data-act="detail" data-id="' + t.id + '">' + sv("folder") + " Data</button>" +
-        '<button class="btn sm ic" title="Atur pendamping tim ini" data-act="fas" data-id="' + t.id + '">🎓</button>' +
-        (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
-          t.id + '">' + sv("power") + "</button>" : "") +
-        '<button class="asx-tgl" data-act="lipat" data-id="' + t.id +
-          '" title="' + (buka ? "Sembunyikan" : "Lihat") + ' rincian" aria-expanded="' + buka + '">' +
-          sv("chev") + "</button>" +
-      "</div></div>" + isi + "</div>";
-}
-
-/** Baris pendamping di dalam kartu tim: status login + pintasan aksinya. */
-function barisPendampingSesi(p, peta){
-  var akun = USERS.find(function(x){ return x.id === p.id; }) || p;
-  var list = peta[p.id] || [];
-  var online = list.length > 0;
-  var role = p.role || "fasilitator";
-  var ini = (p.username || "?").charAt(0).toUpperCase();
-  var ket = online
-    ? list.length + " perangkat · " + (list[0].perangkat || "perangkat tidak dikenal") +
-      " · aktif " + sejak(list[0].terakhir)
-    : (akun.loginTerakhir ? "login terakhir " + sejak(akun.loginTerakhir) : "belum pernah login");
-  return '<div class="dev">' +
-    '<span class="ava" style="width:30px;height:30px;flex:0 0 30px;font-size:.76rem;' +
-      avaStyle(p.username) + '">' + esc(ini) + "</span>" +
-    '<div class="dev-nm"><b>' + esc(p.username) + "</b> " +
-      '<span class="badge ' + (role === "dosen" ? "c" : "y") + '">' + labelPeran(role) + "</span>" +
-      '<div class="mut">' + esc(ket) + "</div></div>" +
-    '<span class="st ' + (online ? "on" : "off") + '"><i></i>' + (online ? "online" : "offline") + "</span>" +
-    '<div class="dev-act">' +
-      '<button class="btn sm ic" title="Buka data pendamping" data-act="detail" data-id="' +
-        p.id + '">' + sv("folder") + "</button>" +
     "</div></div>";
 }
 function barisSesi(s){
