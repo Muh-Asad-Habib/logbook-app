@@ -1177,26 +1177,6 @@ td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
   position: absolute; inset: 0; overflow: hidden; background: #525659;
 }
 .docx-office-scale iframe { display: block; }
-/* Renderer .pptx sisi-klien (pptx-preview) — dipakai saat penampil Office
- * tidak bisa dipakai (berkas besar / jaringan lokal). Slide dirender sebagai
- * daftar vertikal, jadi wadahnya perlu bisa di-scroll & berlatar gelap
- * seperti penampil Office agar tampilannya konsisten. */
-.pptx-lokal {
-  position: absolute; inset: 0;
-  overflow: auto;
-  background: #525659;
-  padding: 16px 0;
-  display: flex; flex-direction: column; align-items: center; gap: 16px;
-}
-.pptx-lokal::-webkit-scrollbar { width: 10px; height: 10px; }
-.pptx-lokal::-webkit-scrollbar-thumb { background: #7a7d84; border-radius: 8px; }
-.pptx-lokal::-webkit-scrollbar-track { background: transparent; }
-/* Tiap slide diberi bayangan supaya terpisah jelas dari latar gelap. */
-.pptx-lokal > * {
-  box-shadow: 0 5px 22px rgba(0, 0, 0, 0.45);
-  flex: 0 0 auto;
-  max-width: 100%;
-}
 .docx-loading {
   position: absolute; inset: 0; z-index: 2;
   display: flex; align-items: center; justify-content: center; gap: 8px;

@@ -43,7 +43,7 @@ bisa dicetak menjadi dokumen laporan.
 | 💰 **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan. |
 | 📊 **Dashboard** | Ringkasan capaian, total waktu, dana terpakai & sisa dana, grafik mini, dan kegiatan terbaru. |
 | 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
-| 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. |
+| 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. Pratinjau `.pptx` memakai penampil PowerPoint Online (maks. 10 MB); berkas lebih besar cukup diunduh. |
 | 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
 | 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. |
 | 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
@@ -121,7 +121,7 @@ dilampirkan sebagai bukti.
 | Menu | Isi | Catatan |
 |---|---|---|
 | **Laporan Kemajuan** | satu berkas `.docx` | Unggahan baru menggantikan berkas lama. Tampil langsung di aplikasi dan bisa diunduh. |
-| **Presentasi** | satu berkas `.pptx` **dan/atau** satu tautan Canva | Boleh dipakai bersamaan dan dihapus terpisah. `.pptx` bisa diunduh; Canva hanya pratinjau. |
+| **Presentasi** | satu berkas `.pptx` **dan/atau** satu tautan Canva | Boleh dipakai bersamaan dan dihapus terpisah. `.pptx` bisa diunduh; Canva hanya pratinjau. Pratinjau `.pptx` memakai penampil PowerPoint Online (maks. 10 MB); berkas lebih besar cukup diunduh. |
 
 Untuk Canva, salin tautan dari tombol **Bagikan** dan pastikan setelannya
 *"Siapa saja dengan tautan dapat melihat"* agar pratinjaunya dapat dibuka
@@ -341,8 +341,16 @@ database tetap lega, sekaligus membuat pemuatan foto lebih cepat melalui CDN.
 ## 📚 REST API & dokumentasi Swagger
 
 Dokumentasi interaktif tersedia pada `/docs` (misalnya
-`http://localhost:4000/docs`). Seluruh endpoint data memerlukan token login,
-melalui header `Authorization: Bearer <token>` atau query `?token=...`.
+`http://localhost:4000/docs`) **saat aplikasi dijalankan secara lokal**. Di
+pemasangan produksi, `/docs` dan `/openapi.json` sengaja ditutup agar daftar
+lengkap endpoint tidak dapat ditelusuri pengunjung.
+
+Seluruh endpoint data memerlukan sesi login. Pemanggilan API mengirim token
+melalui header `Authorization: Bearer <token>`, sementara gambar dan tautan
+unduhan yang dibuka langsung oleh peramban dikenali lewat cookie HttpOnly
+`logbook_sesi` yang dipasang saat login. Token **tidak pernah** diterima
+melalui query string, sehingga tidak bocor ke riwayat peramban, log
+server/CDN, maupun header `Referer`.
 
 ```bash
 # 1) masuk → memperoleh token
@@ -387,9 +395,9 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 
 | Method | Endpoint | Fungsi |
 |---|---|---|
-| GET | `/health` | Pemeriksaan status + penanda versi deploy |
-| GET | `/docs` | Dokumentasi Swagger interaktif |
-| GET | `/openapi.json` | Spesifikasi OpenAPI mentah |
+| GET | `/health` | Pemeriksaan status + hash commit yang sedang online |
+| GET | `/docs` | Dokumentasi Swagger interaktif *(hanya saat dijalankan lokal)* |
+| GET | `/openapi.json` | Spesifikasi OpenAPI mentah *(hanya saat dijalankan lokal)* |
 
 **Laporan kemajuan**
 
@@ -524,6 +532,14 @@ ruangnya benar-benar kembali ke kuota.
   alamat aplikasi hanya akan melihat halaman masuk.
 - Pembatasan hak akses per peran diterapkan di server, sehingga akun pembimbing
   tidak dapat mengubah data tim walaupun permintaannya dibuat secara manual.
+  Setiap permintaan pembimbing terhadap data sebuah tim juga diperiksa
+  penugasannya lebih dulu — termasuk saat memberi ACC — sehingga id tim milik
+  orang lain tidak dapat "ditebak" lewat parameter.
+- Pendaftaran dibatasi jumlah percobaannya per alamat IP, sehingga kode
+  pendaftaran fasilitator/dosen tidak dapat ditebak dengan cara mencoba
+  berulang kali.
+- Unggahan berkas besar yang dipotong-potong dibatasi ukuran, jumlah potongan,
+  dan format datanya, lalu sisa potongan yang terbengkalai dibersihkan otomatis.
 - Sesi kedaluwarsa otomatis setelah 30 hari tidak dipakai, dan mengganti password
   langsung mengakhiri sesi di perangkat lain.
 - Halaman **Profil → Perangkat & sesi aktif** memperlihatkan setiap perangkat yang
