@@ -672,6 +672,41 @@ export async function saveLaporan(userId, nama, buffer) {
   return { nama, ukuran: buffer.length };
 }
 
+/**
+ * Catat laporan yang SUDAH berada di ImageKit (diunggah langsung oleh
+ * browser). Tidak ada byte berkas yang melewati server — hanya metadata.
+ * Berkas lama otomatis dihapus, ACC direset seperti unggahan biasa.
+ */
+export async function daftarkanLaporan(userId, nama, ukuran, fileKey) {
+  const lama = await q(
+    "SELECT file_key FROM laporan_docx WHERE user_id = $1 AND file_key <> ''", [userId]
+  );
+  await q(
+    `INSERT INTO laporan_docx (user_id, nama, data, ukuran, updated_at, file_key)
+     VALUES ($1, $2, '', $3, $4, $5)
+     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
+       data = '', ukuran = EXCLUDED.ukuran, updated_at = EXCLUDED.updated_at,
+       file_key = EXCLUDED.file_key`,
+    [userId, nama, ukuran, nowIso(), fileKey]
+  );
+  if (lama[0]?.file_key) await removeFiles(kunciBagian(lama[0].file_key));
+  await hapusPersetujuan("laporan", userId);
+  return { nama, ukuran };
+}
+
+/** Metadata laporan + kunci berkasnya (untuk membangun signed URL). */
+export async function metaLaporan(userId) {
+  const rows = await q(
+    "SELECT nama, ukuran, file_key FROM laporan_docx WHERE user_id = $1", [userId]
+  );
+  if (!rows[0]?.file_key) return null;
+  return {
+    nama: rows[0].nama,
+    ukuran: Number(rows[0].ukuran) || 0,
+    file_key: rows[0].file_key,
+  };
+}
+
 export async function infoLaporan(userId) {
   const rows = await q(
     "SELECT nama, ukuran, updated_at FROM laporan_docx WHERE user_id = $1", [userId]
@@ -828,6 +863,36 @@ export async function savePresentasi(userId, nama, buffer) {
   if (lama[0]?.file_key) await removeFiles(kunciBagian(lama[0].file_key));
   await hapusPersetujuan("presentasi", userId);
   return { nama, ukuran: buffer.length };
+}
+
+/**
+ * Catat presentasi yang SUDAH berada di ImageKit (diunggah langsung oleh
+ * browser). Tidak ada byte berkas yang melewati server — hanya metadata.
+ * Berkas lama otomatis dihapus, ACC direset seperti unggahan biasa.
+ */
+export async function daftarkanPresentasi(userId, nama, ukuran, fileKey) {
+  const lama = await q(
+    "SELECT file_key FROM presentasi WHERE user_id = $1 AND file_key <> ''", [userId]
+  );
+  const ts = nowIso();
+  await q(
+    `INSERT INTO presentasi (user_id, nama, ukuran, file_key, file_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $5)
+     ON CONFLICT (user_id) DO UPDATE SET nama = EXCLUDED.nama,
+       ukuran = EXCLUDED.ukuran, file_key = EXCLUDED.file_key,
+       file_at = EXCLUDED.file_at, updated_at = EXCLUDED.updated_at`,
+    [userId, nama, ukuran, fileKey, ts]
+  );
+  if (lama[0]?.file_key) await removeFiles(kunciBagian(lama[0].file_key));
+  await hapusPersetujuan("presentasi", userId);
+  return { nama, ukuran };
+}
+
+/** Metadata presentasi + kunci berkasnya (untuk membangun signed URL). */
+export async function metaPresentasi(userId) {
+  const r = await barisPresentasi(userId);
+  if (!r?.file_key) return null;
+  return { nama: r.nama, ukuran: Number(r.ukuran) || 0, file_key: r.file_key };
 }
 
 /** Info gabungan: { file: {ada,…}, canva: {ada, url}, ada } */

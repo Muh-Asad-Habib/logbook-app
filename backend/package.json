@@ -12,6 +12,8 @@
     "diag:panel-api": "node diag-panel-api.mjs",
     "diag:peran": "node diag-fasilitator.mjs",
     "diag:presentasi": "node diag-presentasi.mjs",
+    "diag:presentasi-langsung": "node diag-presentasi-langsung.mjs",
+    "diag:laporan-langsung": "node diag-laporan-langsung.mjs",
     "bersih:db": "node --env-file=../.env bersih-db.mjs",
     "diag": "npm run diag:rute && npm run diag:panel"
   },

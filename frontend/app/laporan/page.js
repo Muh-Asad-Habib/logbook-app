@@ -25,13 +25,14 @@ import {
   ZoomIn, ZoomOut, Maximize, Loader, RefreshCw,
 } from "lucide-react";
 import {
-  api, exportUrl, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
+  api, useApi, revalidate, fmtTgl, isPendamping, getTimAktif,
 } from "@/lib/api";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const BATAS_OFFICE = 10 * 1024 * 1024; // penampil Office menolak file > ±10 MB
+const MAKS_UNGGAH = 300 * 1024 * 1024; // batas unggah 300 MB — dicek DI AWAL
 
 const fmtUkuran = (b) =>
   b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil((b || 0) / 1024)} KB`;
@@ -166,6 +167,35 @@ export default function LaporanPage() {
   return fas ? <LaporanFasilitator /> : <LaporanTim />;
 }
 
+/**
+ * Unduhan laporan TANPA membebani server: byte ditarik dari CDN ImageKit
+ * (dirakit di browser bila berkasnya berbagi beberapa bagian), lalu disimpan
+ * lewat object URL sehingga NAMA BERKAS ASLI tetap terjaga — `/file` kini
+ * me-redirect ke CDN, jadi tautan <a> biasa akan memakai nama acak CDN.
+ */
+function useUnduhLaporan(ambilBerkas, namaInfo) {
+  const [busy, setBusy] = useState(false);
+  const unduh = useCallback(async () => {
+    setBusy(true);
+    try {
+      const { nama, blob } = await ambilBerkas();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = namaInfo || nama || "laporan-kemajuan.docx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (e) {
+      toast.err(`Gagal mengunduh: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [ambilBerkas, namaInfo]);
+  return [busy, unduh];
+}
+
 /* ===================== MODE PENDAMPING (lihat + komentar + ACC) ===================== */
 function LaporanFasilitator() {
   const [timId, setTimId] = useState("");
@@ -177,6 +207,10 @@ function LaporanFasilitator() {
   const frameRef = useRef(null);
   const [wrapRef, wrapUkuran] = useUkuranWadah();
   const [acc, muatAcc] = useAcc("laporan", timId, !!timId);
+  const ambilBerkas = useCallback(
+    (onProgress) => api.fasilitator.laporanBerkas(timId, onProgress), [timId]
+  );
+  const [unduhBusy, unduh] = useUnduhLaporan(ambilBerkas, info?.nama);
 
   useEffect(() => {
     const muatTim = async () => {
@@ -298,10 +332,11 @@ function LaporanFasilitator() {
                       title={modeCadangan ? "Coba tampilkan via Word Online" : "Halaman kosong/rusak? Coba tampilan cadangan"}>
                 <RefreshCw className="lucide" />
               </button>
-              <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
-                 href={`${exportUrl(`/api/fasilitator/tim/${timId}/laporan-file`)}?unduh=1`}>
+              <button className="btn sm" onClick={unduh} disabled={unduhBusy}
+                      title="Unduh berkas asli">
                 <Download className="lucide" />
-              </a>
+              </button>
+
             </div>
           </div>
           {!modeCadangan && officeUrl && (
@@ -372,6 +407,8 @@ function LaporanTim() {
   const inputRef = useRef(null);
   const zoomRef = useRef(null);
   const lebarHalamanRef = useRef(0);
+  const ambilBerkas = useCallback((onProgress) => api.laporanBerkas(onProgress), []);
+  const [unduhBusy, unduh] = useUnduhLaporan(ambilBerkas, info?.nama);
 
   /* ---------- cadangan: docx-preview di shadow DOM terisolasi ---------- */
   const terapkanZoom = useCallback(() => {
@@ -485,6 +522,12 @@ function LaporanTim() {
       toast.err("Berkas harus berformat .docx");
       return;
     }
+    if (file.size > MAKS_UNGGAH) {
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      setErr(`Berkas ${mb} MB melebihi batas 300 MB — perkecil dahulu (mis. kompres gambar di dalamnya).`);
+      toast.err("Berkas melebihi batas 300 MB");
+      return;
+    }
     setBusy(true);
     setProgres(0);
     setErr("");
@@ -531,6 +574,7 @@ function LaporanTim() {
             </div>
             <div className="muted">
               Hanya satu laporan yang disimpan — unggahan baru <b>otomatis menggantikan</b> file lama.
+              Maksimal <b>300 MB</b>.
             </div>
           </div>
         </div>
@@ -590,10 +634,10 @@ function LaporanTim() {
                       title={modeCadangan ? "Coba tampilkan via Word Online" : "Halaman kosong/rusak? Coba tampilan cadangan"}>
                 <RefreshCw className="lucide" />
               </button>
-              <a className="btn sm" style={{ textDecoration: "none" }} title="Unduh berkas asli"
-                 href={`${exportUrl("/api/laporan/file")}?unduh=1`}>
+              <button className="btn sm" onClick={unduh} disabled={unduhBusy}
+                      title="Unduh berkas asli">
                 <Download className="lucide" />
-              </a>
+              </button>
               <button className="btn sm danger" onClick={hapus} title="Hapus laporan">
                 <Trash2 className="lucide" />
               </button>
