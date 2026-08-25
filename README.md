@@ -204,24 +204,22 @@ untuk berpindah. Pembimbing juga dapat keluar dari sebuah tim kapan saja.
 
 ## 🛡️ Panduan untuk admin
 
-Panel admin merupakan halaman terpisah dengan login tersendiri. Di dalamnya
-tersedia:
+Panel admin merupakan halaman terpisah dengan login tersendiri. Secara garis
+besar, di dalamnya admin dapat:
 
-- **Ringkasan** jumlah akun, kegiatan, belanja, sesi aktif, entri ter-ACC, dan
-  laporan.
-- **Daftar akun** bertab **👥 Tim / 🎓 Fasilitator / 👨‍🏫 Dosen Pendamping**
-  lengkap dengan pencarian.
-- **Detail akun** — kegiatan, keuangan, laporan, perangkat yang sedang login, dan
-  jejak aktivitas satu akun.
-- **Perangkat & sesi aktif** — seluruh perangkat yang sedang masuk ke aplikasi
-  dari semua peran (tim, fasilitator, dosen pendamping): nama akun, jenis
-  perangkat, alamat IP penuh, sejak kapan, dan terakhir aktif kapan. Setiap
-  perangkat bisa dikeluarkan sendiri-sendiri tanpa mengganggu sesi lain.
-- **Pengelolaan akun** — ganti username, setel ulang password, keluarkan dari
-  semua perangkat, hapus akun.
-- **Kode pendaftaran** untuk fasilitator dan dosen (dapat diganti kapan saja).
-- **Penugasan tim** — hubungkan pembimbing ke tim melalui tombol **🔗 Tim**.
-- **Catatan audit** yang diperbarui langsung.
+- Melihat **ringkasan** jumlah akun, kegiatan, belanja, laporan, dan berapa akun
+  yang sedang login.
+- Mengelola **akun pengguna** — tim, fasilitator, dan dosen pendamping: ganti
+  username, setel ulang password, keluarkan dari perangkat yang sedang login,
+  serta menghapus akun.
+- Memantau **perangkat & sesi** — berapa dan siapa saja yang sedang login,
+  ditinjau secara keseluruhan, per akun, maupun per tim beserta pendampingnya.
+- Mengatur **kode pendaftaran** fasilitator dan dosen, serta **penugasan tim**
+  untuk menghubungkan pembimbing dengan tim yang didampingi.
+- Membaca **catatan aktivitas** panel yang tersimpan otomatis.
+
+Seluruh tampilan panel menyegarkan diri sendiri, jadi perubahan langsung terlihat
+tanpa perlu memuat ulang halaman.
 
 > Alamat panel admin beserta kredensialnya dibuat otomatis saat aplikasi pertama
 > kali dijalankan dan ditampilkan **satu kali** pada log server — catat baik-baik.
@@ -503,8 +501,9 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 
 | Perintah | Yang diuji |
 |---|---|
-| `npm run diag --workspace backend` | Seluruh rute terdaftar (`diag:rute`) dan keutuhan panel admin (`diag:panel`) |
+| `npm run diag --workspace backend` | Seluruh rute terdaftar (`diag:rute`), keutuhan panel admin (`diag:panel`), dan perilaku antarmukanya (`diag:panel-ui`) |
 | `npm run diag:panel-api --workspace backend` | Endpoint panel admin: validasi input, pengelolaan akun, audit |
+| `npm run diag:pusat-kendali --workspace backend` | Halaman-halaman panel admin, saringan catatan aktivitas, pencatatan login terakhir, dan data pendamping tim |
 | `npm run diag:peran --workspace backend` | Alur peran menyeluruh: pendaftaran dengan kode, penolakan 403, penugasan tim, komentar dua arah, lencana belum dibaca, dan ACC dosen |
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
 | `npm run diag:presentasi-langsung --workspace backend` | Jalur unggah **langsung ke ImageKit**: penerbitan izin, verifikasi metadata, berkas satu bagian & multi-bagian, redirect 302 ke CDN, dan penolakan izin palsu (butuh internet + env `IMAGEKIT_*`) |
@@ -548,20 +547,18 @@ ruangnya benar-benar kembali ke kuota.
 - Sesi kedaluwarsa otomatis setelah 30 hari tidak dipakai, dan mengganti password
   langsung mengakhiri sesi di perangkat lain.
 - Halaman **Profil → Perangkat & sesi aktif** memperlihatkan setiap perangkat yang
-  sedang masuk ke akun (mis. “Brave · Linux”, jaringan `114.120.•.•`, terakhir
-  aktif kapan) dan dapat mengeluarkannya satu per satu atau sekaligus — berguna
-  saat lupa keluar di komputer pinjaman. User-Agent **tidak** disimpan utuh, dan
-  alamat IP yang diperlihatkan kepada pemilik akun hanya bagian jaringannya.
+  sedang masuk ke akun (mis. “Brave · Linux”, terakhir aktif kapan) dan dapat
+  mengeluarkannya satu per satu atau sekaligus — berguna saat lupa keluar di
+  komputer pinjaman. Data yang disimpan sengaja seminim mungkin: User-Agent
+  **tidak** disimpan utuh, dan keterangan jaringan yang ditampilkan kepada pemilik
+  akun sudah disamarkan.
 - Nama peramban dibaca dari *Client Hints* (`Sec-CH-UA`), sehingga peramban yang
   sengaja menyamar sebagai Chrome di User-Agent — **Brave** — tetap dikenali
   dengan nama aslinya.
-- Pusat kendali punya bagian **Perangkat & sesi aktif** untuk seluruh akun (tim,
-  fasilitator, dan dosen pendamping): siapa, perangkat apa, alamat IP **penuh**,
-  sejak kapan, dan terakhir aktif kapan — lengkap dengan tombol mengeluarkan satu
-  perangkat tertentu. IP penuh hanya terlihat di panel ini, hanya tersimpan
-  selama sesinya hidup, dan ikut terhapus begitu sesi dicabut atau kedaluwarsa.
-  (Alamat MAC tidak pernah bisa dilihat aplikasi web mana pun — alamat itu tidak
-  ikut melewati internet.)
+- Keterangan sesi hanya hidup selama sesinya: begitu sesi dicabut atau
+  kedaluwarsa, catatannya ikut terhapus sehingga tidak ada jejak yang berumur
+  panjang. (Alamat MAC tidak pernah bisa dilihat aplikasi web mana pun — alamat
+  itu tidak ikut melewati internet.)
 - Tersedia pembatasan percobaan masuk (anti tebak-tebakan password) serta header
   keamanan standar.
 - Gambar disajikan melalui tautan bertanda tangan berumur pendek dan hanya dapat

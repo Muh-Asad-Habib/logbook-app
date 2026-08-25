@@ -51,13 +51,67 @@ const wajib = [
   '.matches(":modal")',
   "dlg-bg",
   'e.key !== "Escape"',
+  // ---- pusat kendali multi-halaman (URL rapi + History API) ----
+  "function keHalaman",
+  "function urlHal",
+  "function halDariPath",
+  "popstate",
+  'id="hal-ringkas"',
+  'id="hal-akun"',
+  'id="hal-sesi"',
+  'id="hal-audit"',
+  'id="hal-pengaturan"',
+  'data-page="sesi"',
+  // ---- halaman Perangkat & sesi ----
+  "function renderAkunSesi",
+  "function kartuAkunSesi",
+  "function barisPerangkat",
+  "function renderStatSesi",
+  "function renderFilterPeran",
+  'data-mode-sesi="akun"',
+  "data-peran-sesi",
+  "BUKA_SESI",
+  "loginTerakhir",
+  "pengampu",
+  // ---- jejak audit dengan saringan ----
+  "data-fil-audit",
+  "AUDIT_N",
+  "AUDIT_F",
+  "/data/audit?n=",
 ];
 const hilang = wajib.filter((k) => !PANEL_HTML.includes(k));
 if (hilang.length) {
   gagal += 1;
   console.log(`❌ penanda fitur hilang: ${hilang.join(", ")}`);
 } else {
-  console.log("✅ semua penanda fitur fasilitator ada di panel");
+  console.log("✅ semua penanda fitur ada di panel");
+}
+
+// Setiap $("#id") yang dipanggil skrip harus benar-benar ada di markup —
+// menangkap salah ketik id yang baru terasa saat panel dibuka di peramban.
+const idDipakai = [...blok.join("\n").matchAll(/\$\("#([a-zA-Z0-9_-]+)"\)/g)].map((m) => m[1]);
+const idHilang = [...new Set(idDipakai)].filter((id) => !PANEL_HTML.includes(`id="${id}"`));
+if (idHilang.length) {
+  gagal += 1;
+  console.log(`❌ id dipakai skrip tapi tidak ada di markup: ${idHilang.join(", ")}`);
+} else {
+  console.log(`✅ ${new Set(idDipakai).size} id elemen yang dipakai skrip semuanya ada`);
+}
+
+// Tag pembungkus harus seimbang — satu </div> yang terlewat bisa merusak
+// seluruh tata letak halaman tanpa memunculkan error apa pun di konsol.
+const markup = PANEL_HTML.slice(PANEL_HTML.indexOf("<body>"), PANEL_HTML.indexOf("<script>"));
+const timpang = [];
+for (const t of ["div", "section", "aside", "header", "nav", "table", "tbody", "form", "dialog"]) {
+  const buka = (markup.match(new RegExp(`<${t}\\b`, "g")) || []).length;
+  const tutup = (markup.match(new RegExp(`</${t}>`, "g")) || []).length;
+  if (buka !== tutup) timpang.push(`${t} (${buka} buka / ${tutup} tutup)`);
+}
+if (timpang.length) {
+  gagal += 1;
+  console.log(`❌ tag tidak seimbang: ${timpang.join(", ")}`);
+} else {
+  console.log("✅ struktur tag markup seimbang");
 }
 
 console.log(gagal ? `\n${gagal} MASALAH DITEMUKAN` : "\nPANEL VALID");

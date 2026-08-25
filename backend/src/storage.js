@@ -166,6 +166,7 @@ export async function revokeUserSessions(userId, exceptToken = "") {
 export async function listUsersWithStats() {
   const rows = await q(
     `SELECT u.id, u.username, u.created_at, u.updated_at, u.role,
+            COALESCE(u.last_login_at, '')                                       AS last_login_at,
             (SELECT COUNT(*) FROM kegiatan k WHERE k.user_id = u.id)                    AS n_keg,
             (SELECT COUNT(*) FROM keuangan b WHERE b.user_id = u.id)                    AS n_keu,
             (SELECT COALESCE(SUM(jsonb_array_length(k.foto_keys)), 0)
@@ -186,6 +187,14 @@ export async function listUsersWithStats() {
                WHERE p.tim_user_id = u.id AND p.status = 'disetujui')                    AS n_acc,
             (SELECT COUNT(*) FROM persetujuan p
                WHERE p.tim_user_id = u.id AND p.status = 'revisi')                       AS n_revisi,
+            -- Nama pendamping yang mengampu tim ini (dipakai halaman
+            -- "Perangkat & sesi" agar tiap tim langsung terlihat siapa
+            -- fasilitator/dosennya tanpa permintaan tambahan per baris).
+            COALESCE((SELECT json_agg(json_build_object(
+                        'id', pu.id, 'username', pu.username,
+                        'role', COALESCE(pu.role, 'tim')) ORDER BY pu.username)
+                        FROM fasilitator_tim ft JOIN users pu ON pu.id = ft.fasilitator_id
+                       WHERE ft.tim_user_id = u.id), '[]')                                AS pengampu,
             GREATEST(
               COALESCE((SELECT MAX(k.created_at) FROM kegiatan k WHERE k.user_id = u.id), ''),
               COALESCE((SELECT MAX(b.created_at) FROM keuangan b WHERE b.user_id = u.id), '')
@@ -213,6 +222,8 @@ export async function listUsersWithStats() {
     n_tim_diampu: angka(r.n_tim_diampu),
     n_acc: angka(r.n_acc),
     n_revisi: angka(r.n_revisi),
+    pengampu: larik(r.pengampu),
+    loginTerakhir: r.last_login_at || "",
     aktivitasTerakhir: r.last_at || "",
     pemilikTemplate: ownerId === r.id,
     dana_awal: r.dana_awal || "",
@@ -372,6 +383,11 @@ export async function createSession(userId, jejak = {}) {
       String(jejak.ipPenuh || "").slice(0, 45),
     ]
   );
+  // Stempel "login terakhir" pada akunnya. Sengaja TIDAK ikut terhapus saat
+  // sesinya dicabut — pusat kendali memakainya untuk menampilkan kapan akun
+  // yang sedang offline terakhir dipakai. Gagal di sini tidak boleh
+  // menggagalkan login itu sendiri.
+  await q("UPDATE users SET last_login_at = $1 WHERE id = $2", [ts, userId]).catch(() => {});
   return token; // hanya di sini token asli pernah keluar
 }
 

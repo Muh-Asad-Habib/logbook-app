@@ -250,12 +250,26 @@ export function audit(req, aksi, detail = {}) {
   siarkan("audit"); // beri tahu panel yang sedang terbuka
 }
 
-/** Baca N baris audit terakhir (terbaru dulu). */
-export async function readAudit(n = 40) {
+/**
+ * Baca N baris audit terakhir (terbaru dulu).
+ * @param {number} n jumlah baris (dibatasi 1..1000)
+ * @param {string} [filter] awalan nama aksi, mis. "user." atau "login."
+ *        — kosong berarti semua aksi.
+ */
+export async function readAudit(n = 40, filter = "") {
+  const batas = Math.min(Math.max(Number(n) || 40, 1), 1000);
+  // Hanya awalan yang aman (huruf, angka, titik, strip) — tidak ada wildcard
+  // LIKE yang bisa diselundupkan lewat query string.
+  const awalan = String(filter || "").trim().replace(/[^a-z0-9._-]/gi, "").slice(0, 40);
   try {
-    const rows = await q(
-      "SELECT ts, aksi, ip, detail FROM audit ORDER BY id DESC LIMIT $1", [n]
-    );
+    const rows = awalan
+      ? await q(
+          "SELECT ts, aksi, ip, detail FROM audit WHERE aksi LIKE $2 ORDER BY id DESC LIMIT $1",
+          [batas, awalan + "%"]
+        )
+      : await q(
+          "SELECT ts, aksi, ip, detail FROM audit ORDER BY id DESC LIMIT $1", [batas]
+        );
     return rows.map((r) => ({ ts: r.ts, aksi: r.aksi, ip: r.ip, ...objek(r.detail) }));
   } catch {
     return [];
