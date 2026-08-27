@@ -66,7 +66,7 @@
 }
 /* Aksen warna sesuai sumber dana saat aktif */
 .seg-btn.on.belmawa { color: var(--p1); }
-.seg-btn.on.pt { color: #db2777; }
+.seg-btn.on.pt { color: #0d9488; }
 .seg-btn.on.netral { color: var(--muted); }
 .seg-sumber .seg-btn:first-child.on { color: var(--p1); }
 .seg-btn .dot { opacity: 0.5; }
@@ -111,7 +111,7 @@
   font-variant-numeric: tabular-nums;
 }
 .mini-chip.belmawa { color: var(--p1); }
-.mini-chip.pt { color: #db2777; }
+.mini-chip.pt { color: #0d9488; }
 .mini-chip.warn { background: #fef3c7; color: #b45309; padding: 5px 8px; }
 [data-theme="dark"] .mini-chip.warn { background: #4e3c11; color: #fcd34d; }
 .mini-chip .lucide { width: 14px; height: 14px; }
@@ -144,7 +144,7 @@
   font-size: 1.16rem; font-weight: 800; letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums; line-height: 1.25;
 }
-.ikh-val.pakai { color: var(--p3); }
+.ikh-val.pakai { color: #0284c7; }
 .ikh-item small { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
 .ikh-item.utama .ikh-val { color: var(--ok); font-size: 1.32rem; }
 .ikh-item.utama.minus .ikh-val { color: var(--bad, #ef4444); }

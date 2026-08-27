@@ -292,7 +292,7 @@ function KeuanganFasilitator() {
 
       <p className="muted mt">
         {view.length} dari {items.length} entri belanja tim · total{" "}
-        <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
+        <b style={{ color: "var(--p1)" }}>{fmtRupiah(total)}</b>
       </p>
 
       <RekapDana items={items} dana={dana} milikTim={false} memuat={dana === null} />
@@ -501,7 +501,7 @@ function KeuanganTim() {
       {err && <div className="error-box mt">{err}</div>}
       <p className="muted mt">
         {view.length} dari {list.length} entri · total{" "}
-        <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
+        <b style={{ color: "var(--p1)" }}>{fmtRupiah(total)}</b>
       </p>
 
       {list.length > 0 && (

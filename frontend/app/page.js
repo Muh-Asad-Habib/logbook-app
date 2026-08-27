@@ -160,7 +160,7 @@ function DashboardTim() {
             <div className="metric-label">PENGELUARAN</div>
             <div className="metric-value">{fmtRupiah(stat.total_pengeluaran)}</div>
             <div className="metric-delta neg">{stat.jumlah_belanja} transaksi</div>
-            <Sparkline points={sparkCum} color="#db2777" />
+            <Sparkline points={sparkCum} color="#0284c7" />
           </div>
         </div>
         <div className="card metric">
@@ -215,7 +215,7 @@ function DashboardTim() {
           <AreaChart
             points={cumPoints}
             yMax={Math.max(stat.dana_awal, cum) * 1.08 || undefined}
-            color="#db2777" fmtVal={fmtJt} id="cum"
+            color="#0284c7" fmtVal={fmtJt} id="cum"
           />
         </div>
       </div>

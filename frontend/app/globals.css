@@ -449,7 +449,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .metric-label { font-size: 0.72rem; font-weight: 800; color: var(--muted); letter-spacing: 0.07em; }
 .metric-value { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .metric-delta { font-size: 0.72rem; font-weight: 700; color: var(--ok); }
-.metric-delta.neg { color: var(--p3); }
+.metric-delta.neg { color: #0284c7; }
 .metric-spark { margin-top: 6px; display: block; max-width: 100%; height: auto; }
 
 @media (max-width: 640px) {
@@ -484,12 +484,14 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .badge.info { background: #e0e7ff; color: #3730a3; }
 .badge.warn { background: #fef9c3; color: #854d0e; }
 .badge.pink { background: #fce7f3; color: #9d174d; }
+.badge.teal { background: #ccfbf1; color: #0f766e; }
 .badge.danger { background: #fee2e2; color: #991b1b; }
 .badge.netral { background: var(--soft); color: var(--muted); }
 [data-theme="dark"] .badge.ok { background: #14532d; color: #86efac; }
 [data-theme="dark"] .badge.info { background: #312e81; color: #c7d2fe; }
 [data-theme="dark"] .badge.warn { background: #713f12; color: #fde68a; }
 [data-theme="dark"] .badge.pink { background: #831843; color: #fbcfe8; }
+[data-theme="dark"] .badge.teal { background: #134e4a; color: #5eead4; }
 [data-theme="dark"] .badge.danger { background: #7f1d1d; color: #fecaca; }
 
 /* Rekap dana PKM (halaman Keuangan) */
@@ -571,7 +573,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; display: inline-block;
 }
 .dot.belmawa { background: var(--p1, #4f46e5); }
-.dot.pt { background: #db2777; }
+.dot.pt { background: #0d9488; }
 .dot.netral { background: var(--muted); }
 
 /* Lencana sumber dana + menu ubah cepat (tabel & kartu keuangan) */

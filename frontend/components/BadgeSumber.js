@@ -20,7 +20,7 @@ function IsiBadge({ e }) {
   if (!e.sumber) return <span className="badge netral">belum dipilih</span>;
   return (
     <>
-      <span className={e.sumber === "belmawa" ? "badge info" : "badge pink"}>
+      <span className={e.sumber === "belmawa" ? "badge info" : "badge teal"}>
         {labelSumber(e.sumber)}
       </span>
       {e.sumber === "belmawa" && (
