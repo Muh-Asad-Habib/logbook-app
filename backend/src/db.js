@@ -99,6 +99,11 @@ const SKEMA = [
   `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS bukti_keys JSONB NOT NULL DEFAULT '[]'`,
   `UPDATE keuangan SET bukti_keys = jsonb_build_array(bukti_key)
     WHERE bukti_key <> '' AND bukti_keys = '[]'::jsonb`,
+  // Sumber dana (belmawa / pt) + kategori PKM 2026 (bahan habis pakai, sewa &
+  // jasa, transportasi, lain-lain). OPSIONAL — string kosong berarti tim belum
+  // memilih, entri lama tetap valid dan hanya diberi tanda di UI.
+  `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS sumber   TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS kategori TEXT NOT NULL DEFAULT ''`,
   `CREATE TABLE IF NOT EXISTS pengaturan (
      user_id TEXT NOT NULL,
      kunci   TEXT NOT NULL,

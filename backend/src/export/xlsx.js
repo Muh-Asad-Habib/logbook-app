@@ -1,6 +1,7 @@
 /** Ekspor Excel — rekap kegiatan & keuangan (exceljs). */
 import ExcelJS from "exceljs";
 import * as store from "../storage.js";
+import { LABEL_SUMBER, LABEL_KATEGORI } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -75,12 +76,12 @@ export async function buildXlsx(userId, namaTim = "") {
   wb.creator = "Logbook Amerta Sign";
   wb.created = new Date();
 
-  const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
+  const [kegiatan, keuangan, dana] = await Promise.all([
     store.listKegiatan(userId),
     store.listKeuangan(userId),
-    store.getSetting(userId, "dana_awal", "0"),
+    store.hitungDana(userId),
   ]);
-  const danaAwal = Number(danaAwalStr) || 0;
+  const danaAwal = dana.total;
   const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
   const capaian = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0;
   const totalMenit = kegiatan.reduce((s, e) => s + e.waktu_menit, 0);
@@ -104,7 +105,7 @@ export async function buildXlsx(userId, namaTim = "") {
       ? `${Math.floor(totalMenit / 60)} jam ${totalMenit % 60} menit` : `${totalMenit} menit`,
       C.amberBg, C.ink],
     ["Jumlah transaksi belanja", `${keuangan.length} transaksi`, C.amberBg, C.ink],
-    ["Dana awal", danaAwal, C.zebra, C.ink],
+    ["Dana kegiatan (Belmawa + PT)", danaAwal, C.zebra, C.ink],
     ["Total pengeluaran", pengeluaran, C.roseBg, C.rose],
     ["Sisa dana", sisaDana, sisaDana >= 0 ? C.greenBg : C.roseBg,
       sisaDana >= 0 ? C.green : C.rose],
@@ -165,26 +166,31 @@ export async function buildXlsx(userId, namaTim = "") {
     { key: "sf", width: 12 },
     { key: "jml", width: 9 },
     { key: "tot", width: 17 },
+    { key: "sum", width: 14 },
+    { key: "kat", width: 20 },
     { key: "bk", width: 10 },
   ];
-  judulSheet(s2, "LOGBOOK KEUANGAN", sub, 8);
+  judulSheet(s2, "LOGBOOK KEUANGAN", sub, 10);
   const h2 = s2.addRow(["No", "Tanggal", "Item", "Harga satuan", "Satuan",
-    "Jumlah", "Total", "Ada bukti"]);
+    "Jumlah", "Total", "Sumber dana", "Kategori PKM", "Ada bukti"]);
   styleHeader(h2);
   keuangan.forEach((e, i) => {
     const nBukti = (e.bukti_keys || []).length;
     const r = s2.addRow({ no: i + 1, tgl: fmtTgl(e.tanggal), item: e.item,
       hs: e.harga_satuan, sf: e.satuan_suffix || "", jml: e.jumlah,
-      tot: e.total, bk: nBukti > 1 ? `Ya (${nBukti})` : nBukti ? "Ya" : "-" });
+      tot: e.total, sum: LABEL_SUMBER[e.sumber] || "-",
+      kat: e.sumber === "belmawa" ? (LABEL_KATEGORI[e.kategori] || "-") : "-",
+      bk: nBukti > 1 ? `Ya (${nBukti})` : nBukti ? "Ya" : "-" });
     styleData(r, i % 2 === 1);
     r.getCell("no").alignment = { vertical: "middle", horizontal: "center" };
     r.getCell("item").alignment = { wrapText: true, vertical: "middle" };
-    ["jml", "bk", "sf"].forEach((k) =>
+    ["jml", "bk", "sf", "sum"].forEach((k) =>
       { r.getCell(k).alignment = { vertical: "middle", horizontal: "center" }; });
+    r.getCell("kat").alignment = { wrapText: true, vertical: "middle" };
     ["hs", "tot"].forEach((k) => { r.getCell(k).numFmt = '"Rp"#,##0'; });
     if (nBukti) r.getCell("bk").font = { color: { argb: C.green }, bold: true };
   });
-  s2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + keuangan.length, column: 8 } };
+  s2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + keuangan.length, column: 10 } };
 
   // baris total menonjol
   const totRow = s2.addRow({ item: "TOTAL PENGELUARAN", tot: pengeluaran });
@@ -196,7 +202,7 @@ export async function buildXlsx(userId, namaTim = "") {
   totRow.getCell("tot").font = { bold: true, size: 11, color: { argb: C.indigoDark } };
   totRow.getCell("tot").numFmt = '"Rp"#,##0';
   totRow.height = 24;
-  const sisaRow = s2.addRow({ item: "SISA DANA (dana awal − pengeluaran)", tot: sisaDana });
+  const sisaRow = s2.addRow({ item: "SISA DANA (dana kegiatan − pengeluaran)", tot: sisaDana });
   sisaRow.eachCell({ includeEmpty: true }, (c) => {
     c.fill = fill(sisaDana >= 0 ? C.greenBg : C.roseBg);
     c.border = BORDER;

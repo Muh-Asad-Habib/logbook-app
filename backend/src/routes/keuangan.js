@@ -20,6 +20,17 @@ router.use(authRequired); // semua endpoint keuangan milik user yang login
 router.use(hanyaTim); // fasilitator: baca lewat /api/fasilitator, bukan di sini
 
 /**
+ * Sumber dana & kategori PKM — OPSIONAL.
+ * Nilai di luar daftar (atau kosong) disimpan sebagai "" = belum dipilih,
+ * jadi tim tidak pernah gagal menyimpan hanya karena field tambahan ini.
+ */
+const SUMBER = new Set(["belmawa", "pt"]);
+const KATEGORI = new Set(["bahan", "sewa", "transport", "lain"]);
+const bersihkanSumber = (v) => (SUMBER.has(String(v || "").trim()) ? String(v).trim() : "");
+const bersihkanKategori = (v, sumber) =>
+  sumber === "belmawa" && KATEGORI.has(String(v || "").trim()) ? String(v).trim() : "";
+
+/**
  * @openapi
  * /api/keuangan:
  *   get:
@@ -49,6 +60,14 @@ router.use(hanyaTim); // fasilitator: baca lewat /api/fasilitator, bukan di sini
  *               harga_satuan: { type: number, example: 99900 }
  *               satuan_suffix: { type: string, example: "/bulan" }
  *               jumlah: { type: number, example: 1 }
+ *               sumber:
+ *                 type: string
+ *                 description: "Opsional — belmawa | pt (kosong = belum dipilih)"
+ *                 example: belmawa
+ *               kategori:
+ *                 type: string
+ *                 description: "Opsional, hanya untuk sumber belmawa — bahan | sewa | transport | lain"
+ *                 example: bahan
  *               bukti:
  *                 type: array
  *                 items: { type: string, format: binary }
@@ -77,6 +96,7 @@ router.post("/", upload.array("bukti"), async (req, res, next) => {
     for (const f of req.files || []) {
       buktiKeys.push(await putFile(f.originalname, f.buffer, `keu_${tanggal}`));
     }
+    const sumberBersih = bersihkanSumber(req.body.sumber);
     const e = await store.addKeuangan(req.userId, {
       tanggal,
       item: item.trim(),
@@ -84,6 +104,8 @@ router.post("/", upload.array("bukti"), async (req, res, next) => {
       satuan_suffix: satuan_suffix.trim(),
       jumlah: Number(req.body.jumlah) || 1,
       bukti_keys: buktiKeys,
+      sumber: sumberBersih,
+      kategori: bersihkanKategori(req.body.kategori, sumberBersih),
     });
     catatAktivitas(req.userId, "keuangan.tambah", {
       tanggal, ringkas: item.trim().slice(0, 60), total: e.total,
@@ -116,6 +138,8 @@ router.post("/", upload.array("bukti"), async (req, res, next) => {
  *               harga_satuan: { type: number }
  *               satuan_suffix: { type: string }
  *               jumlah: { type: number }
+ *               sumber: { type: string, description: "belmawa | pt | '' (opsional)" }
+ *               kategori: { type: string, description: "bahan | sewa | transport | lain (opsional)" }
  *               keep_keys: { type: string, description: "JSON array key bukti lama yang dipertahankan" }
  *               bukti:
  *                 type: array
@@ -168,6 +192,17 @@ router.put("/:id", upload.array("bukti"), async (req, res, next) => {
       patch.satuan_suffix = req.body.satuan_suffix.trim();
     }
     if (req.body.jumlah !== undefined) patch.jumlah = Number(req.body.jumlah) || 1;
+    // Sumber/kategori opsional — hanya diubah bila memang dikirim klien
+    if (req.body.sumber !== undefined || req.body.kategori !== undefined) {
+      const sumberBersih = req.body.sumber !== undefined
+        ? bersihkanSumber(req.body.sumber)
+        : doc.sumber || "";
+      patch.sumber = sumberBersih;
+      patch.kategori = bersihkanKategori(
+        req.body.kategori !== undefined ? req.body.kategori : doc.kategori,
+        sumberBersih
+      );
+    }
     const hasil = await store.updateKeuangan(req.userId, doc.id, patch);
     catatAktivitas(req.userId, "keuangan.ubah", {
       tanggal, ringkas: String(patch.item ?? doc.item).slice(0, 60), total: hasil.total,

@@ -8,9 +8,11 @@ import {
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
+import { SUMBER_DANA, KATEGORI_PKM, labelSumber, labelKategori } from "@/lib/pkm";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
+import RekapDana from "@/components/RekapDana";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -56,8 +58,26 @@ function TombolUnduhBukti({ e, ringkas = false }) {
   );
 }
 
-/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
-function useJumlahKomentar(jenis, timId, aktif = true) {
+/**
+ * Label sumber dana & kategori PKM sebuah entri.
+ * Fitur opsional — entri lama/belum dipilih hanya diberi tanda abu-abu.
+ */
+function BadgeSumber({ e }) {
+  if (!e.sumber) return <span className="badge netral">sumber belum dipilih</span>;
+  const kelas = e.sumber === "belmawa" ? "badge info" : "badge pink";
+  return (
+    <>
+      <span className={kelas}>{labelSumber(e.sumber)}</span>
+      {e.sumber === "belmawa" && (
+        e.kategori
+          ? <span className="badge ok">{labelKategori(e.kategori)}</span>
+          : <span className="badge netral">kategori belum dipilih</span>
+      )}
+    </>
+  );
+}
+
+/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */function useJumlahKomentar(jenis, timId, aktif = true) {
   const [peta, setPeta] = useState({});
   useEffect(() => {
     if (!aktif) return;
@@ -81,6 +101,7 @@ export default function KeuanganPage() {
 function KeuanganFasilitator() {
   const [timId, setTimId] = useState("");
   const [items, setItems] = useState(null);
+  const [dana, setDana] = useState(null);
   const [gagal, setGagal] = useState("");
   const [cari, setCari] = useState("");
   const [mode, setMode] = useState("Tabel");
@@ -110,9 +131,14 @@ function KeuanganFasilitator() {
     if (!timId) return;
     let hidup = true;
     setItems(null);
+    setDana(null);
     api.fasilitator.keuangan(timId)
       .then((rows) => { if (hidup) setItems(rows); })
       .catch((e) => { if (hidup) setGagal(e.message); });
+    // Nominal dana tim — untuk menghitung persentase di rekap (opsional)
+    api.fasilitator.statistik(timId)
+      .then((s) => { if (hidup) setDana({ belmawa: s.dana_belmawa, pt: s.dana_pt }); })
+      .catch(() => {});
     return () => { hidup = false; };
   }, [timId]);
 
@@ -184,6 +210,8 @@ function KeuanganFasilitator() {
         <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
       </p>
 
+      <RekapDana items={items} dana={dana || {}} milikTim={false} />
+
       {view.length === 0 && (
         <div className="empty">
           <div className="big"><Wallet className="lucide" /></div>
@@ -212,7 +240,10 @@ function KeuanganFasilitator() {
                 ) : (
                   <tr key={r.e.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
-                    <td className="item-col">{r.e.item}</td>
+                    <td className="item-col">
+                      {r.e.item}
+                      <div className="mts"><BadgeSumber e={r.e} /></div>
+                    </td>
                     <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
                     <td className="num">{r.e.jumlah}</td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
@@ -253,6 +284,7 @@ function KeuanganFasilitator() {
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
+                  <div className="mts"><BadgeSumber e={e} /></div>
                   {buktiKeys(e).length > 0 && (
                     <div className="foto-row">
                       {buktiKeys(e).map((k, i) => (
@@ -283,6 +315,7 @@ function KeuanganFasilitator() {
 /* ===================== MODE TIM (halaman lama + komentar + status ACC) ===================== */
 function KeuanganTim() {
   const { data: items, error: loadErr } = useApi("/api/keuangan");
+  const { data: stat } = useApi("/api/statistik");
   const [cari, setCari] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [edit, setEdit] = useState(null);
@@ -383,6 +416,13 @@ function KeuanganTim() {
         <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
       </p>
 
+      {list.length > 0 && (
+        <RekapDana
+          items={list}
+          dana={{ belmawa: stat?.dana_belmawa || 0, pt: stat?.dana_pt || 0 }}
+        />
+      )}
+
       {view.length === 0 && !err && (
         <div className="empty">
           <div className="big"><Wallet className="lucide" /></div>
@@ -411,7 +451,10 @@ function KeuanganTim() {
                 ) : (
                   <tr key={r.e.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
-                    <td className="item-col">{r.e.item}</td>
+                    <td className="item-col">
+                      {r.e.item}
+                      <div className="mts"><BadgeSumber e={r.e} /></div>
+                    </td>
                     <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
                     <td className="num">{r.e.jumlah}</td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
@@ -459,6 +502,7 @@ function KeuanganTim() {
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
+                  <div className="mts"><BadgeSumber e={e} /></div>
                   {buktiKeys(e).length > 0 && (
                     <div className="foto-row">
                       {buktiKeys(e).map((k, i) => (
@@ -512,6 +556,9 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   const [err, setErr] = useState("");
   const [harga, setHarga] = useState(entri?.harga_satuan ?? 0);
   const [jumlah, setJumlah] = useState(entri?.jumlah ?? 1);
+  // Sumber dana & kategori PKM — opsional, boleh dibiarkan kosong
+  const [sumber, setSumber] = useState(entri?.sumber || "");
+  const [kategori, setKategori] = useState(entri?.kategori || "");
   const lama = entri ? buktiKeys(entri) : [];
 
   const submit = async (ev) => {
@@ -570,6 +617,31 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             <input type="number" name="jumlah" min="0" step="any" value={jumlah}
                    onChange={(e) => setJumlah(e.target.value)} />
           </label>
+          <label className="field">
+            Sumber dana <span className="muted">(opsional)</span>
+            <select name="sumber" value={sumber}
+                    onChange={(e) => {
+                      setSumber(e.target.value);
+                      if (e.target.value !== "belmawa") setKategori("");
+                    }}>
+              <option value="">— belum dipilih —</option>
+              {SUMBER_DANA.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+          {sumber === "belmawa" && (
+            <label className="field">
+              Kategori PKM <span className="muted">(opsional)</span>
+              <select name="kategori" value={kategori}
+                      onChange={(e) => setKategori(e.target.value)}>
+                <option value="">— belum dipilih —</option>
+                {KATEGORI_PKM.map((k) => (
+                  <option key={k.id} value={k.id}>{k.label} (maks {k.maks}%)</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <p className="mt">
           Total:{" "}

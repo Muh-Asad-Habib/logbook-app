@@ -484,10 +484,25 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .badge.info { background: #e0e7ff; color: #3730a3; }
 .badge.warn { background: #fef9c3; color: #854d0e; }
 .badge.pink { background: #fce7f3; color: #9d174d; }
+.badge.danger { background: #fee2e2; color: #991b1b; }
+.badge.netral { background: var(--soft); color: var(--muted); }
 [data-theme="dark"] .badge.ok { background: #14532d; color: #86efac; }
 [data-theme="dark"] .badge.info { background: #312e81; color: #c7d2fe; }
 [data-theme="dark"] .badge.warn { background: #713f12; color: #fde68a; }
 [data-theme="dark"] .badge.pink { background: #831843; color: #fbcfe8; }
+[data-theme="dark"] .badge.danger { background: #7f1d1d; color: #fecaca; }
+
+/* Rekap dana PKM (halaman Keuangan) */
+.rekap-sumber {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px; margin-top: 12px;
+}
+.rekap-box {
+  background: var(--soft); border-radius: 14px; padding: 12px 14px;
+}
+.rekap-cap { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; color: var(--muted); }
+.rekap-val { font-size: 1.15rem; font-weight: 800; margin: 2px 0 3px; }
+.rekap-sub { margin-top: 16px; font-size: 0.82rem; font-weight: 800; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;

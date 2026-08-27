@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isPendamping } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
+import { BATAS_DANA_PT } from "@/lib/pkm";
 import {
   Gauge, Heatmap, AreaChart, BarChart, Breakdown, Sparkline,
 } from "@/components/Charts";
@@ -33,20 +34,30 @@ function DashboardTim() {
   const { data: keuData } = useApi("/api/keuangan");
   const kegiatan = kegData || [];
   const keuangan = keuData || [];
-  const [danaInput, setDanaInput] = useState("");
+  const [danaBelmawa, setDanaBelmawa] = useState("");
+  const [danaPt, setDanaPt] = useState("");
   const [danaSaved, setDanaSaved] = useState(false);
   const [lb, setLb] = useState(null);
 
   useEffect(() => {
-    if (stat) setDanaInput(String(stat.dana_awal));
-  }, [stat?.dana_awal]);
+    if (!stat) return;
+    // Akun lama hanya punya dana_awal → tampilkan sebagai dana Belmawa
+    const belmawa = stat.dana_belmawa || (stat.dana_pt ? 0 : stat.dana_awal) || 0;
+    setDanaBelmawa(String(belmawa));
+    setDanaPt(String(stat.dana_pt || 0));
+  }, [stat?.dana_belmawa, stat?.dana_pt, stat?.dana_awal]);
 
   const simpanDana = async () => {
     try {
-      await api.setSetting("dana_awal", String(Number(danaInput) || 0));
+      const belmawa = Number(danaBelmawa) || 0;
+      const pt = Number(danaPt) || 0;
+      await api.setSetting("dana_belmawa", String(belmawa));
+      await api.setSetting("dana_pt", String(pt));
+      // dana_awal lama tetap disinkronkan = total, agar data/ekspor lama konsisten
+      await api.setSetting("dana_awal", String(belmawa + pt));
       setDanaSaved(true);
       setTimeout(() => setDanaSaved(false), 1800);
-      toast.ok("Dana awal tersimpan");
+      toast.ok("Dana kegiatan tersimpan");
       revalidate("/api/statistik").catch(() => {});
     } catch (e) {
       toast.err(`Gagal menyimpan: ${e.message}`);
@@ -194,7 +205,7 @@ function DashboardTim() {
         <div className="card">
           <h3><TrendingDown className="lucide" /> Pengeluaran kumulatif</h3>
           <p className="sub">
-            dibanding dana awal {stat.dana_awal > 0 ? fmtRupiah(stat.dana_awal) : "(belum diset)"}
+            dibanding total dana {stat.dana_awal > 0 ? fmtRupiah(stat.dana_awal) : "(belum diset)"}
           </p>
           <AreaChart
             points={cumPoints}
@@ -207,21 +218,34 @@ function DashboardTim() {
       {/* ===== Dana + timeline ===== */}
       <div className="grid side mt stagger">
         <div className="card">
-          <h3><Banknote className="lucide" /> Dana penelitian</h3>
-          <p className="sub">atur dana awal &amp; pantau pemakaian</p>
+          <h3><Banknote className="lucide" /> Dana kegiatan</h3>
+          <p className="sub">dana Belmawa &amp; Perguruan Tinggi (isi sesuai yang diterima tim)</p>
           <label className="field">
-            Dana awal (Rp)
-            <input type="number" min="0" step="any" value={danaInput}
-                   onChange={(e) => setDanaInput(e.target.value)} />
+            Dana Belmawa (Rp)
+            <input type="number" min="0" step="any" value={danaBelmawa}
+                   onChange={(e) => setDanaBelmawa(e.target.value)} />
           </label>
+          <label className="field mt">
+            Dana Perguruan Tinggi (Rp)
+            <input type="number" min="0" step="any" value={danaPt}
+                   onChange={(e) => setDanaPt(e.target.value)} />
+          </label>
+          <p className="muted mts" style={{ fontSize: ".74rem" }}>
+            Umumnya dana PT maksimal {fmtRupiah(BATAS_DANA_PT)}.
+          </p>
+          {Number(danaPt) > BATAS_DANA_PT && (
+            <p className="mts" style={{ fontSize: ".76rem", color: "#b45309", fontWeight: 700 }}>
+              ⚠ Dana PT melebihi {fmtRupiah(BATAS_DANA_PT)} — tetap bisa disimpan, mohon dicek lagi.
+            </p>
+          )}
           <button className="btn primary mt" style={{ width: "100%" }} onClick={simpanDana}>
-            {danaSaved ? <><Check className="lucide" /> Tersimpan!</> : <><Save className="lucide" /> Simpan dana awal</>}
+            {danaSaved ? <><Check className="lucide" /> Tersimpan!</> : <><Save className="lucide" /> Simpan dana kegiatan</>}
           </button>
           {stat.dana_awal > 0 && (
             <>
               <div className="progress mt"><div style={{ width: `${pakaiPct}%` }} /></div>
               <div className="row spread mts">
-                <span className="muted">Terpakai {pakaiPct}%</span>
+                <span className="muted">Terpakai {pakaiPct}% dari {fmtRupiah(stat.dana_awal)}</span>
                 <span className="muted"><b>{fmtRupiah(stat.sisa_dana)}</b> tersisa</span>
               </div>
             </>

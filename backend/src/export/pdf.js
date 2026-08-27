@@ -3,6 +3,7 @@ import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
 import { getFileBufferRetry, compressForEmbed } from "../files.js";
+import { teksSumber } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -28,12 +29,12 @@ const SKY = "#0369a1";
 
 export async function buildPdf(userId, namaTim = "") {
   // Ambil data + seluruh foto (dari cloud/lokal) lebih dulu, baru menggambar
-  const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
+  const [kegiatan, keuangan, dana] = await Promise.all([
     store.listKegiatan(userId),
     store.listKeuangan(userId),
-    store.getSetting(userId, "dana_awal", "0"),
+    store.hitungDana(userId),
   ]);
-  const danaAwal = Number(danaAwalStr) || 0;
+  const danaAwal = dana.total;
 
   const semuaKey = [
     ...kegiatan.flatMap((e) => (e.foto_keys || []).slice(0, 8)),
@@ -209,9 +210,10 @@ export async function buildPdf(userId, namaTim = "") {
     judulBagian("2", "LOGBOOK KEUANGAN");
 
     const cols = [
-      { t: "Tanggal", w: 0.16 }, { t: "Item", w: 0.34 },
-      { t: "Harga satuan", w: 0.18, kanan: true }, { t: "Jml", w: 0.07, kanan: true },
-      { t: "Total", w: 0.15, kanan: true }, { t: "Bukti", w: 0.10 },
+      { t: "Tanggal", w: 0.14 }, { t: "Item", w: 0.26 },
+      { t: "Sumber dana", w: 0.15 },
+      { t: "Harga satuan", w: 0.16, kanan: true }, { t: "Jml", w: 0.06, kanan: true },
+      { t: "Total", w: 0.14, kanan: true }, { t: "Bukti", w: 0.09 },
     ];
     const drawHeader = () => {
       const hy = doc.y;
@@ -232,7 +234,7 @@ export async function buildPdf(userId, namaTim = "") {
       pastikanRuang(46);
       if (doc.y < 70) drawHeader(); // halaman baru → ulangi header
       const ry = doc.y;
-      const vals = [fmtTgl(e.tanggal), e.item,
+      const vals = [fmtTgl(e.tanggal), e.item, teksSumber(e),
         `${fmtRp(e.harga_satuan)}${e.satuan_suffix || ""}`, String(e.jumlah), fmtRp(e.total)];
       // ukur tinggi baris dulu untuk zebra stripe
       doc.font("Helvetica").fontSize(8.5);
@@ -252,17 +254,17 @@ export async function buildPdf(userId, namaTim = "") {
       let cx = X;
       doc.fillColor(INK).font("Helvetica").fontSize(8.5);
       vals.forEach((v, vi) => {
-        if (vi === 4) doc.font("Helvetica-Bold"); // kolom Total ditebalkan
+        if (vi === 5) doc.font("Helvetica-Bold"); // kolom Total ditebalkan
         doc.text(v, cx + 6, ry + 4,
           { width: cols[vi].w * W - 12, align: cols[vi].kanan ? "right" : "left" });
-        if (vi === 4) doc.font("Helvetica");
+        if (vi === 5) doc.font("Helvetica");
         cx += cols[vi].w * W;
       });
       // bukti thumbnail — fit + rata tengah agar bukti/nota terlihat UTUH
       // (bukan terpotong seperti saat memakai cover); beberapa bukti
       // ditumpuk vertikal dalam kolom
       try {
-        const bw = cols[5].w * W - 12, bh = 30;
+        const bw = cols[6].w * W - 12, bh = 30;
         let by = ry + 3;
         for (const buf of buktiBufs) {
           doc.save();
@@ -293,7 +295,7 @@ export async function buildPdf(userId, namaTim = "") {
     doc.fillColor(INDIGO_DARK).font("Helvetica-Bold").fontSize(14)
       .text(fmtRp(pengeluaran), X + W - tw + 14, ty + 20);
     doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
-      .text(`Dana awal ${fmtRp(danaAwal)}  ·  Sisa dana ${fmtRp(sisaDana)}`,
+      .text(`Dana kegiatan ${fmtRp(danaAwal)}  ·  Sisa dana ${fmtRp(sisaDana)}`,
         X + W - tw + 14, ty + 38);
     doc.y = ty + 60;
 

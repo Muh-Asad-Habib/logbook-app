@@ -83,23 +83,25 @@ statistikRouter.use(authRequired);
 statistikRouter.use(hanyaTim); // fasilitator pakai /api/fasilitator/tim/:id/statistik
 statistikRouter.get("/", async (req, res, next) => {
   try {
-    const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
+    const [kegiatan, keuangan, dana] = await Promise.all([
       store.listKegiatan(req.userId),
       store.listKeuangan(req.userId),
-      store.getSetting(req.userId, "dana_awal", "0"),
+      store.hitungDana(req.userId),
     ]);
     const capaian = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0;
     const totalMenit = kegiatan.reduce((s, e) => s + e.waktu_menit, 0);
     const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
-    const danaAwal = Number(danaAwalStr) || 0;
     res.json({
       capaian_total: capaian,
       jumlah_kegiatan: kegiatan.length,
       total_waktu_menit: totalMenit,
       jumlah_belanja: keuangan.length,
       total_pengeluaran: pengeluaran,
-      dana_awal: danaAwal,
-      sisa_dana: danaAwal - pengeluaran,
+      // dana_awal = total dana (Belmawa + PT); tetap dipakai klien lama
+      dana_awal: dana.total,
+      dana_belmawa: dana.belmawa,
+      dana_pt: dana.pt,
+      sisa_dana: dana.total - pengeluaran,
     });
   } catch (err) {
     next(err);
