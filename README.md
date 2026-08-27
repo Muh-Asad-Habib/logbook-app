@@ -40,8 +40,9 @@ bisa dicetak menjadi dokumen laporan.
 | Fitur | Penjelasan |
 |---|---|
 | 🗓️ **Catatan kegiatan** | Tanggal, uraian kegiatan, durasi, tambahan capaian (%), dan beberapa foto sekaligus. Otomatis dikelompokkan per bulan. |
-| 💰 **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan. |
-| 📊 **Dashboard** | Ringkasan capaian, total waktu, dana terpakai & sisa dana, grafik mini, dan kegiatan terbaru. |
+| 💰 **Catatan keuangan** | Item belanja, harga satuan, jumlah, total otomatis, plus foto nota/bukti. Ada subtotal per bulan, filter bulan &amp; sumber dana. |
+| 🏦 **Sumber dana &amp; rekap PKM** | Tandai tiap belanja berasal dari **Belmawa** (dengan kategori PKM: bahan habis pakai 60%, sewa &amp; jasa 15%, transportasi 30%, lain-lain 15%) atau **Perguruan Tinggi** (batas umum Rp2 juta). Semuanya **opsional** — entri tanpa penanda tetap sah, hanya diberi lencana "belum dipilih". Kartu **Rekap dana PKM** memantau pemakaian tiap kategori. |
+| 📊 **Dashboard** | Ringkasan capaian, total waktu, dana terpakai &amp; sisa dana, rekap ringkas per sumber dana, grafik mini, dan kegiatan terbaru. |
 | 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
 | 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. Pratinjau `.pptx` memakai penampil PowerPoint Online (maks. 10 MB); berkas lebih besar cukup diunduh. |
 | 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
@@ -89,10 +90,17 @@ tampilan: permintaan yang tidak berhak selalu ditolak dengan kode **403**.
 > **⚙️ Pengaturan akun**. Mengganti password otomatis mengeluarkan sesi di
 > perangkat lain.
 
-### 2. Menyiapkan dana awal
+### 2. Menyiapkan dana kegiatan
 
-Buka **Keuangan** lalu isi **Dana awal** dengan total anggaran tim. Angka ini
-dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil ekspor.
+Buka **Dashboard** → kartu **Dana kegiatan**, lalu isi dua nominal sesuai yang
+benar-benar diterima tim:
+
+- **Dana Belmawa** — besarnya berbeda tiap tim.
+- **Dana Perguruan Tinggi** — umumnya maksimal Rp2.000.000 (jika lebih, aplikasi
+  hanya memberi peringatan, bukan menolak).
+
+Totalnya dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil
+ekspor, serta menjadi dasar persentase kategori di **Rekap dana PKM**.
 
 ### 3. Mencatat kegiatan
 
@@ -115,6 +123,23 @@ dipakai untuk menghitung **sisa dana** di dashboard dan pada semua hasil ekspor.
 Buka menu **Keuangan** → **Tambah**, lalu isi nama item, harga satuan, jumlah,
 dan satuan (misalnya "per bulan"). Total dihitung otomatis, dan foto nota dapat
 dilampirkan sebagai bukti.
+
+**Sumber dana (opsional).** Pada form tersedia pilihan **Sumber dana** —
+*Belmawa* atau *Perguruan Tinggi* — dan, khusus Belmawa, **Kategori PKM**.
+Keduanya boleh dibiarkan kosong; entri tanpa penanda hanya diberi lencana
+*"belum dipilih"*. Cara tercepat melengkapinya: klik lencana itu langsung di
+daftar belanja, pilih kategori, selesai — **ACC dosen tidak ikut dibatalkan**
+karena nominalnya tidak berubah.
+
+**Rekap dana PKM.** Di bawah toolbar Keuangan ada kartu rekap: berapa dana
+Belmawa & PT yang terpakai, rincian tiap kategori beserta batas pedoman PKM 2026
+(bahan habis pakai 60%, sewa & jasa 15%, transportasi lokal 30%, lain-lain 15%),
+serta berapa entri yang belum ditandai. Batas yang terlampaui ditandai merah
+sebagai peringatan — bukan penghalang menyimpan. Rekap ini ikut tercetak di
+ekspor **PDF** dan **Excel** (sheet *Rekap Dana*).
+
+> Gunakan filter **bulan** dan **sumber dana** di toolbar untuk menemukan entri
+> tertentu dengan cepat, termasuk memfilter yang *belum dipilih* sumbernya.
 
 ### 5. Laporan kemajuan & presentasi
 
@@ -509,6 +534,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
 | `npm run diag:presentasi-langsung --workspace backend` | Jalur unggah **langsung ke ImageKit**: penerbitan izin, verifikasi metadata, berkas satu bagian & multi-bagian, redirect 302 ke CDN, dan penolakan izin palsu (butuh internet + env `IMAGEKIT_*`) |
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
+| `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
+| `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
 
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
 tidak terganggu.

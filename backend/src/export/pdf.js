@@ -3,7 +3,7 @@ import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
 import { getFileBufferRetry, compressForEmbed } from "../files.js";
-import { teksSumber } from "./pkm.js";
+import { teksSumber, rekapDana, BATAS_DANA_PT } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -97,7 +97,7 @@ export async function buildPdf(userId, namaTim = "") {
       ["KEGIATAN", `${kegiatan.length} entri`, SKY],
       ["TOTAL WAKTU", fmtDur(totalMenit), AMBER],
       ["PENGELUARAN", fmtRp(pengeluaran), ROSE],
-      ["DANA AWAL", fmtRp(danaAwal), MUTED],
+      ["DANA KEGIATAN", fmtRp(danaAwal), MUTED],
       ["SISA DANA", fmtRp(sisaDana), sisaDana >= 0 ? GREEN : ROSE],
     ];
     const bw = (W - 20) / 3;
@@ -210,10 +210,9 @@ export async function buildPdf(userId, namaTim = "") {
     judulBagian("2", "LOGBOOK KEUANGAN");
 
     const cols = [
-      { t: "Tanggal", w: 0.14 }, { t: "Item", w: 0.26 },
-      { t: "Sumber dana", w: 0.15 },
-      { t: "Harga satuan", w: 0.16, kanan: true }, { t: "Jml", w: 0.06, kanan: true },
-      { t: "Total", w: 0.14, kanan: true }, { t: "Bukti", w: 0.09 },
+      { t: "Tanggal", w: 0.16 }, { t: "Item", w: 0.34 },
+      { t: "Harga satuan", w: 0.18, kanan: true }, { t: "Jml", w: 0.07, kanan: true },
+      { t: "Total", w: 0.15, kanan: true }, { t: "Bukti", w: 0.10 },
     ];
     const drawHeader = () => {
       const hy = doc.y;
@@ -234,7 +233,7 @@ export async function buildPdf(userId, namaTim = "") {
       pastikanRuang(46);
       if (doc.y < 70) drawHeader(); // halaman baru → ulangi header
       const ry = doc.y;
-      const vals = [fmtTgl(e.tanggal), e.item, teksSumber(e),
+      const vals = [fmtTgl(e.tanggal), e.item,
         `${fmtRp(e.harga_satuan)}${e.satuan_suffix || ""}`, String(e.jumlah), fmtRp(e.total)];
       // ukur tinggi baris dulu untuk zebra stripe
       doc.font("Helvetica").fontSize(8.5);
@@ -243,6 +242,11 @@ export async function buildPdf(userId, namaTim = "") {
         const h = doc.heightOfString(v, { width: cols[vi].w * W - 12 });
         maxH = Math.max(maxH, h);
       });
+      // Sumber dana ditulis sebagai baris kecil DI BAWAH nama item supaya
+      // kolom Item tetap lebar (nama panjang tidak terpotong 3 baris).
+      const labelSumber = teksSumber(e);
+      const adaSumber = labelSumber !== "-";
+      if (adaSumber) maxH += 11;
       const buktiBufs = (e.bukti_keys || [])
         .map((k) => bufferMap.get(k))
         .filter(Boolean);
@@ -254,17 +258,24 @@ export async function buildPdf(userId, namaTim = "") {
       let cx = X;
       doc.fillColor(INK).font("Helvetica").fontSize(8.5);
       vals.forEach((v, vi) => {
-        if (vi === 5) doc.font("Helvetica-Bold"); // kolom Total ditebalkan
+        if (vi === 4) doc.font("Helvetica-Bold"); // kolom Total ditebalkan
         doc.text(v, cx + 6, ry + 4,
           { width: cols[vi].w * W - 12, align: cols[vi].kanan ? "right" : "left" });
-        if (vi === 5) doc.font("Helvetica");
+        if (vi === 4) doc.font("Helvetica");
+        if (vi === 1 && adaSumber) {
+          // baris kecil abu-abu tepat di bawah nama item
+          const yItem = doc.y;
+          doc.fillColor(MUTED).fontSize(7).text(labelSumber, cx + 6, yItem + 1,
+            { width: cols[1].w * W - 12 });
+          doc.fillColor(INK).fontSize(8.5);
+        }
         cx += cols[vi].w * W;
       });
       // bukti thumbnail — fit + rata tengah agar bukti/nota terlihat UTUH
       // (bukan terpotong seperti saat memakai cover); beberapa bukti
       // ditumpuk vertikal dalam kolom
       try {
-        const bw = cols[6].w * W - 12, bh = 30;
+        const bw = cols[5].w * W - 12, bh = 30;
         let by = ry + 3;
         for (const buf of buktiBufs) {
           doc.save();
@@ -298,6 +309,84 @@ export async function buildPdf(userId, namaTim = "") {
       .text(`Dana kegiatan ${fmtRp(danaAwal)}  ·  Sisa dana ${fmtRp(sisaDana)}`,
         X + W - tw + 14, ty + 38);
     doc.y = ty + 60;
+
+    // ================= Bagian 3: Rekap dana PKM =================
+    // Hanya dicetak bila tim memang memakai penandaan sumber dana —
+    // supaya logbook yang belum memakainya tidak dipenuhi tabel nol.
+    const rekap = rekapDana(keuangan, { belmawa: dana.belmawa, pt: dana.pt });
+    if (rekap.adaPenandaan || rekap.danaBelmawa > 0 || rekap.danaPt > 0) {
+      pastikanRuang(210);
+      judulBagian("3", "REKAP DANA PKM");
+
+      // -- dua kartu sumber dana --
+      const kw = (W - 12) / 2;
+      const ky = doc.y;
+      const kartu = [
+        ["DANA BELMAWA", rekap.totalBelmawa, rekap.danaBelmawa, INDIGO,
+          rekap.danaBelmawa > 0 ? `Sisa ${fmtRp(rekap.sisaBelmawa)}` : "nominal belum diisi"],
+        ["DANA PERGURUAN TINGGI", rekap.totalPt, rekap.danaPt, ROSE,
+          rekap.danaPt > 0 ? `Sisa ${fmtRp(rekap.sisaPt)}`
+            : `maksimal ${fmtRp(BATAS_DANA_PT)}`],
+      ];
+      kartu.forEach(([label, pakai, pagu, warna, ket], i) => {
+        const kx = X + i * (kw + 12);
+        doc.roundedRect(kx, ky, kw, 58, 8).fill(ZEBRA);
+        doc.roundedRect(kx, ky, kw, 58, 8).lineWidth(0.8).stroke(LINE);
+        doc.roundedRect(kx, ky + 9, 3.5, 40, 2).fill(warna);
+        doc.fillColor(MUTED).font("Helvetica").fontSize(7.5).text(label, kx + 14, ky + 10);
+        doc.fillColor(warna).font("Helvetica-Bold").fontSize(13)
+          .text(fmtRp(pakai), kx + 14, ky + 22, { width: kw - 26 });
+        doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+          .text(pagu > 0 ? `dari ${fmtRp(pagu)}  ·  ${ket}` : ket, kx + 14, ky + 42,
+            { width: kw - 26 });
+      });
+      doc.y = ky + 70;
+
+      // -- tabel kategori dana Belmawa (dengan bar proporsi) --
+      doc.fillColor(INK).font("Helvetica-Bold").fontSize(9)
+        .text("Kategori belanja dana Belmawa", X, doc.y);
+      doc.y += 14;
+      const barX = X + 210;
+      const barW = W - 210 - 108;
+      for (const k of rekap.kategori) {
+        pastikanRuang(26);
+        const y0 = doc.y;
+        doc.fillColor(INK).font("Helvetica").fontSize(8.5)
+          .text(k.label, X, y0, { width: 150 });
+        doc.fillColor(MUTED).fontSize(7.5)
+          .text(`maks ${k.maks}%`, X + 152, y0 + 1, { width: 50 });
+        // bar: latar abu + isian sesuai proporsi terhadap batas kategori
+        doc.roundedRect(barX, y0 + 1, barW, 8, 4).fill(ZEBRA);
+        const rasio = k.batas > 0 ? Math.min(1, k.terpakai / k.batas) : 0;
+        if (rasio > 0) {
+          doc.roundedRect(barX, y0 + 1, Math.max(3, barW * rasio), 8, 4)
+            .fill(k.lewat ? ROSE : rasio >= 0.85 ? AMBER : INDIGO);
+        }
+        doc.fillColor(k.lewat ? ROSE : INK).font("Helvetica-Bold").fontSize(8)
+          .text(`${fmtRp(k.terpakai)}${rekap.danaBelmawa > 0 ? ` · ${k.pct}%` : ""}`,
+            X + W - 104, y0, { width: 104, align: "right" });
+        doc.y = y0 + 16;
+      }
+
+      // -- catatan entri yang belum ditandai --
+      const catatan = [];
+      if (rekap.nTanpaSumber > 0) {
+        catatan.push(`${rekap.nTanpaSumber} entri (${fmtRp(rekap.totalTanpaSumber)}) belum diberi sumber dana`);
+      }
+      if (rekap.nBelmawaTanpaKategori > 0) {
+        catatan.push(`${rekap.nBelmawaTanpaKategori} entri Belmawa (${fmtRp(rekap.totalBelmawaTanpaKategori)}) belum diberi kategori`);
+      }
+      if (rekap.ptLewatBatas) {
+        catatan.push(`dana PT melebihi batas ${fmtRp(BATAS_DANA_PT)}`);
+      }
+      if (catatan.length) {
+        pastikanRuang(30);
+        doc.y += 2;
+        doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+          .text(`Catatan: ${catatan.join(" · ")}.`, X, doc.y, { width: W });
+        doc.y += 12;
+      }
+    }
 
     // ================= Footer setiap halaman =================
     // PENTING: teks footer berada DI BAWAH margin bawah halaman — tanpa

@@ -1997,7 +1997,9 @@ function isiKepalaDetail(){
   setHTML($("#dt-chips"),
     chip("ungu","Capaian", r.capaian_total + "%") +
     chip("biru","Total waktu", dur(r.total_menit)) +
-    chip("","Dana awal", rp(r.dana_awal)) +
+    chip("","Dana kegiatan", rp(r.dana_awal)) +
+    (r.dana_belmawa ? chip("biru","Dana Belmawa", rp(r.dana_belmawa)) : "") +
+    (r.dana_pt ? chip("merah","Dana PT", rp(r.dana_pt)) : "") +
     chip("merah","Pengeluaran", rp(r.pengeluaran)) +
     chip("hijau","Sisa dana", rp(r.sisa)), "dt-chips");
 }

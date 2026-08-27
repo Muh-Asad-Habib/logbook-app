@@ -1,18 +1,20 @@
 "use client";
 
-import { forwardRef, useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Save, Wallet, Download } from "lucide-react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Search, Pencil, Trash2, Save, Wallet, Download, FilterX } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
-import { SUMBER_DANA, KATEGORI_PKM, labelSumber, labelKategori } from "@/lib/pkm";
+import { SUMBER_DANA, KATEGORI_PKM } from "@/lib/pkm";
+import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
 import RekapDana from "@/components/RekapDana";
+import BadgeSumber from "@/components/BadgeSumber";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -31,6 +33,23 @@ const labelBulan = (kunci) => {
 /** Daftar key bukti sebuah entri — kompatibel dengan data lama (bukti_key). */
 const buktiKeys = (e) =>
   e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
+
+/** Pilihan filter sumber dana pada toolbar. */
+const FILTER_SUMBER = [
+  { id: "", label: "Semua" },
+  { id: "belmawa", label: "Belmawa" },
+  { id: "pt", label: "PT" },
+  { id: "kosong", label: "Belum dipilih" },
+];
+
+const cocokSumber = (e, filter) =>
+  !filter ? true : filter === "kosong" ? !e.sumber : e.sumber === filter;
+
+/** Daftar bulan unik dari entri (terbaru dulu) untuk dropdown filter. */
+function daftarBulan(items) {
+  const set = new Set((items || []).map((e) => e.tanggal.slice(0, 7)));
+  return [...set].sort().reverse();
+}
 
 /** Tombol unduh semua bukti sebuah entri (1 → JPG, lebih → ZIP). */
 function TombolUnduhBukti({ e, ringkas = false }) {
@@ -58,26 +77,8 @@ function TombolUnduhBukti({ e, ringkas = false }) {
   );
 }
 
-/**
- * Label sumber dana & kategori PKM sebuah entri.
- * Fitur opsional — entri lama/belum dipilih hanya diberi tanda abu-abu.
- */
-function BadgeSumber({ e }) {
-  if (!e.sumber) return <span className="badge netral">sumber belum dipilih</span>;
-  const kelas = e.sumber === "belmawa" ? "badge info" : "badge pink";
-  return (
-    <>
-      <span className={kelas}>{labelSumber(e.sumber)}</span>
-      {e.sumber === "belmawa" && (
-        e.kategori
-          ? <span className="badge ok">{labelKategori(e.kategori)}</span>
-          : <span className="badge netral">kategori belum dipilih</span>
-      )}
-    </>
-  );
-}
-
-/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */function useJumlahKomentar(jenis, timId, aktif = true) {
+/** Hook peta jumlah komentar per entri — untuk badge tombol komentar. */
+function useJumlahKomentar(jenis, timId, aktif = true) {
   const [peta, setPeta] = useState({});
   useEffect(() => {
     if (!aktif) return;
@@ -88,6 +89,50 @@ function BadgeSumber({ e }) {
     return () => { hidup = false; };
   }, [jenis, timId, aktif]);
   return peta;
+}
+
+/** Toolbar filter bersama (cari + bulan + sumber dana). */
+function ToolbarFilter({
+  cari, setCari, bulan, setBulan, sumber, setSumber, bulanTersedia, anak,
+}) {
+  const adaFilter = cari || bulan || sumber;
+  return (
+    <div className="card mt">
+      <div className="row spread toolbar">
+        <div className="input-wrap tb-cari">
+          <span className="in-ic"><Search className="lucide" /></span>
+          <input placeholder="Cari item belanja…" value={cari}
+                 onChange={(e) => setCari(e.target.value)} />
+        </div>
+
+        <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
+                title="Saring per bulan" aria-label="Saring per bulan">
+          <option value="">Semua bulan</option>
+          {bulanTersedia.map((b) => (
+            <option key={b} value={b}>{labelBulan(b)}</option>
+          ))}
+        </select>
+
+        <div className="pills" role="group" aria-label="Saring sumber dana">
+          {FILTER_SUMBER.map((s) => (
+            <button key={s.id || "semua"}
+                    className={`pill ${sumber === s.id ? "on" : ""}`}
+                    onClick={() => setSumber(s.id)}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {adaFilter && (
+          <button className="btn sm tb-reset" onClick={() => { setCari(""); setBulan(""); setSumber(""); }}
+                  title="Bersihkan semua filter">
+            <FilterX className="lucide" /> Reset
+          </button>
+        )}
+        {anak}
+      </div>
+    </div>
+  );
 }
 
 export default function KeuanganPage() {
@@ -104,6 +149,8 @@ function KeuanganFasilitator() {
   const [dana, setDana] = useState(null);
   const [gagal, setGagal] = useState("");
   const [cari, setCari] = useState("");
+  const [bulan, setBulan] = useState("");
+  const [sumber, setSumber] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("keuangan", timId, !!timId);
@@ -138,14 +185,16 @@ function KeuanganFasilitator() {
     // Nominal dana tim — untuk menghitung persentase di rekap (opsional)
     api.fasilitator.statistik(timId)
       .then((s) => { if (hidup) setDana({ belmawa: s.dana_belmawa, pt: s.dana_pt }); })
-      .catch(() => {});
+      .catch(() => { if (hidup) setDana({ belmawa: 0, pt: 0 }); });
     return () => { hidup = false; };
   }, [timId]);
 
-  // Di layar sempit tabel 7 kolom sesak — mulai dengan tampilan kartu (sama seperti tim)
+  // Tabel banyak kolom terasa sesak di layar < 900px → mulai dengan Kartu
   useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 640) setMode("Kartu");
+    if (typeof window !== "undefined" && window.innerWidth < 900) setMode("Kartu");
   }, []);
+
+  const bulanTersedia = useMemo(() => daftarBulan(items), [items]);
 
   if (gagal === "belum-assign")
     return (
@@ -158,11 +207,15 @@ function KeuanganFasilitator() {
   if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
 
   const view = [...items]
-    .filter((e) => !cari || e.item.toLowerCase().includes(cari.toLowerCase()))
+    .filter((e) =>
+      (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
+      (!bulan || e.tanggal.startsWith(bulan)) &&
+      cocokSumber(e, sumber)
+    )
     .reverse();
-  const total = items.reduce((s, e) => s + e.total, 0);
+  const total = view.reduce((s, e) => s + e.total, 0);
 
-  // Baris tabel dengan subtotal per bulan (sama seperti mode tim)
+  // Baris tabel dengan subtotal per bulan
   const subtotal = {};
   for (const e of view) {
     const k = e.tanggal.slice(0, 7);
@@ -189,33 +242,34 @@ function KeuanganFasilitator() {
 
   return (
     <>
-      <div className="card mt">
-        <div className="row spread toolbar">
-          <div className="input-wrap tb-cari">
-            <span className="in-ic"><Search className="lucide" /></span>
-            <input placeholder="Cari item belanja…" value={cari}
-                   onChange={(e) => setCari(e.target.value)} />
-          </div>
-          <div className="pills">
-            {["Tabel", "Kartu"].map((m) => (
-              <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
-            ))}
-          </div>
-          <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
-        </div>
-      </div>
+      <ToolbarFilter
+        cari={cari} setCari={setCari}
+        bulan={bulan} setBulan={setBulan}
+        sumber={sumber} setSumber={setSumber}
+        bulanTersedia={bulanTersedia}
+        anak={
+          <>
+            <div className="pills">
+              {["Tabel", "Kartu"].map((m) => (
+                <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
+              ))}
+            </div>
+            <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
+          </>
+        }
+      />
 
       <p className="muted mt">
-        {view.length} entri belanja tim · total{" "}
+        {view.length} dari {items.length} entri belanja tim · total{" "}
         <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
       </p>
 
-      <RekapDana items={items} dana={dana || {}} milikTim={false} />
+      <RekapDana items={items} dana={dana} milikTim={false} memuat={dana === null} />
 
       {view.length === 0 && (
         <div className="empty">
           <div className="big"><Wallet className="lucide" /></div>
-          <p>Tim belum mencatat belanja.</p>
+          <p>{items.length ? "Tidak ada entri yang cocok dengan filter." : "Tim belum mencatat belanja."}</p>
         </div>
       )}
 
@@ -224,8 +278,8 @@ function KeuanganFasilitator() {
           <table>
             <thead>
               <tr>
-                <th>Tanggal</th><th>Item</th><th className="num">Harga satuan</th>
-                <th className="num">Jml</th><th className="num">Total</th>
+                <th>Tanggal</th><th>Item &amp; sumber dana</th>
+                <th className="num">Harga × jml</th><th className="num">Total</th>
                 <th>Bukti</th><th></th>
               </tr>
             </thead>
@@ -233,7 +287,8 @@ function KeuanganFasilitator() {
               {rows.map((r) =>
                 r.jenis === "sub" ? (
                   <tr key={`sub-${r.kunci}`} className="subtotal">
-                    <td colSpan={4}>{labelBulan(r.kunci)}</td>
+                    <td colSpan={2}>{labelBulan(r.kunci)}</td>
+                    <td className="num">subtotal</td>
                     <td className="num">{fmtRupiah(r.total)}</td>
                     <td colSpan={2}></td>
                   </tr>
@@ -244,12 +299,14 @@ function KeuanganFasilitator() {
                       {r.e.item}
                       <div className="mts"><BadgeSumber e={r.e} /></div>
                     </td>
-                    <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
-                    <td className="num">{r.e.jumlah}</td>
+                    <td className="num nowrap">
+                      {fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}
+                      <small className="muted"> × {r.e.jumlah}</small>
+                    </td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {buktiKeys(r.e).length ? (
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        <div className="bukti-mini">
                           {buktiKeys(r.e).map((k, i) => (
                             <img key={k} className="foto-mini" src={thumbUrl(k, 160)}
                                  alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
@@ -312,11 +369,13 @@ function KeuanganFasilitator() {
   );
 }
 
-/* ===================== MODE TIM (halaman lama + komentar + status ACC) ===================== */
+/* ===================== MODE TIM (kelola penuh + komentar + status ACC) ===================== */
 function KeuanganTim() {
   const { data: items, error: loadErr } = useApi("/api/keuangan");
   const { data: stat } = useApi("/api/statistik");
   const [cari, setCari] = useState("");
+  const [bulan, setBulan] = useState("");
+  const [sumber, setSumber] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [edit, setEdit] = useState(null);
   const [lb, setLb] = useState(null);
@@ -325,9 +384,9 @@ function KeuanganTim() {
   const [acc, muatAcc] = useAcc("keuangan", "");
 
   useEffect(() => { if (edit && dlgRef.current) dlgRef.current.showModal(); }, [edit]);
-  // Di layar sempit tabel 7 kolom sesak — mulai dengan tampilan kartu
+  // Tabel banyak kolom terasa sesak di layar < 900px → mulai dengan Kartu
   useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 640) setMode("Kartu");
+    if (typeof window !== "undefined" && window.innerWidth < 900) setMode("Kartu");
   }, []);
 
   // FAB (mobile) → buka dialog tambah
@@ -336,6 +395,8 @@ function KeuanganTim() {
     window.addEventListener("fab:add", buka);
     return () => window.removeEventListener("fab:add", buka);
   }, []);
+
+  const bulanTersedia = useMemo(() => daftarBulan(items), [items]);
 
   const hapus = async (e) => {
     const ya = await confirmDialog({
@@ -366,12 +427,15 @@ function KeuanganTim() {
   const err = loadErr && items === undefined ? `Gagal memuat: ${loadErr.message}` : "";
   const list = items || [];
   const view = list
-    .filter((e) => !cari || e.item.toLowerCase().includes(cari.toLowerCase()))
+    .filter((e) =>
+      (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
+      (!bulan || e.tanggal.startsWith(bulan)) &&
+      cocokSumber(e, sumber)
+    )
     .reverse();
-  const total = list.reduce((s, e) => s + e.total, 0);
+  const total = view.reduce((s, e) => s + e.total, 0);
 
-  // Baris tabel dengan subtotal per bulan (view terurut terbaru → sisipkan
-  // subtotal ketika bulan berganti; subtotal dihitung dari seluruh view)
+  // Sisipkan baris subtotal saat bulan berganti
   const subtotal = {};
   for (const e of view) {
     const k = e.tanggal.slice(0, 7);
@@ -390,29 +454,28 @@ function KeuanganTim() {
 
   return (
     <>
-      <div className="card mt">
-        <div className="row spread toolbar">
-          <div className="input-wrap tb-cari">
-            <span className="in-ic"><Search className="lucide" /></span>
-            <input
-              placeholder="Cari item belanja…"
-              value={cari} onChange={(e) => setCari(e.target.value)}
-            />
-          </div>
-          <div className="pills">
-            {["Tabel", "Kartu"].map((m) => (
-              <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
-            ))}
-          </div>
-          <button className="btn primary" onClick={() => setEdit("baru")}>
-            <Plus className="lucide" /> Tambah
-          </button>
-        </div>
-      </div>
+      <ToolbarFilter
+        cari={cari} setCari={setCari}
+        bulan={bulan} setBulan={setBulan}
+        sumber={sumber} setSumber={setSumber}
+        bulanTersedia={bulanTersedia}
+        anak={
+          <>
+            <div className="pills">
+              {["Tabel", "Kartu"].map((m) => (
+                <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
+              ))}
+            </div>
+            <button className="btn primary" onClick={() => setEdit("baru")}>
+              <Plus className="lucide" /> Tambah
+            </button>
+          </>
+        }
+      />
 
       {err && <div className="error-box mt">{err}</div>}
       <p className="muted mt">
-        {view.length} dari {list.length} entri · total pengeluaran{" "}
+        {view.length} dari {list.length} entri · total{" "}
         <b style={{ color: "var(--p3)" }}>{fmtRupiah(total)}</b>
       </p>
 
@@ -420,13 +483,18 @@ function KeuanganTim() {
         <RekapDana
           items={list}
           dana={{ belmawa: stat?.dana_belmawa || 0, pt: stat?.dana_pt || 0 }}
+          memuat={stat === undefined}
         />
       )}
 
       {view.length === 0 && !err && (
         <div className="empty">
           <div className="big"><Wallet className="lucide" /></div>
-          <p>Belum ada entri belanja yang cocok.</p>
+          <p>
+            {list.length
+              ? "Tidak ada entri yang cocok dengan filter."
+              : <>Belum ada entri belanja. Klik <b>Tambah</b> untuk mencatat yang pertama.</>}
+          </p>
         </div>
       )}
 
@@ -435,8 +503,8 @@ function KeuanganTim() {
           <table>
             <thead>
               <tr>
-                <th>Tanggal</th><th>Item</th><th className="num">Harga satuan</th>
-                <th className="num">Jml</th><th className="num">Total</th>
+                <th>Tanggal</th><th>Item &amp; sumber dana</th>
+                <th className="num">Harga × jml</th><th className="num">Total</th>
                 <th>Bukti</th><th></th>
               </tr>
             </thead>
@@ -444,7 +512,8 @@ function KeuanganTim() {
               {rows.map((r) =>
                 r.jenis === "sub" ? (
                   <tr key={`sub-${r.kunci}`} className="subtotal">
-                    <td colSpan={4}>{labelBulan(r.kunci)}</td>
+                    <td colSpan={2}>{labelBulan(r.kunci)}</td>
+                    <td className="num">subtotal</td>
                     <td className="num">{fmtRupiah(r.total)}</td>
                     <td colSpan={2}></td>
                   </tr>
@@ -453,14 +522,18 @@ function KeuanganTim() {
                     <td style={{ whiteSpace: "nowrap" }}>{fmtTgl(r.e.tanggal)}</td>
                     <td className="item-col">
                       {r.e.item}
-                      <div className="mts"><BadgeSumber e={r.e} /></div>
+                      <div className="mts">
+                        <BadgeSumber e={r.e} bisaUbah onUbah={refreshData} />
+                      </div>
                     </td>
-                    <td className="num">{fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}</td>
-                    <td className="num">{r.e.jumlah}</td>
+                    <td className="num nowrap">
+                      {fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}
+                      <small className="muted"> × {r.e.jumlah}</small>
+                    </td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
                       {buktiKeys(r.e).length ? (
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        <div className="bukti-mini">
                           {buktiKeys(r.e).map((k, i) => (
                             <img key={k} className="foto-mini" src={thumbUrl(k, 160)}
                                  alt={`Bukti belanja ${i + 1}: ${r.e.item}`} loading="lazy"
@@ -470,13 +543,13 @@ function KeuanganTim() {
                       ) : "—"}
                     </td>
                     <td className="aksi">
-                      <div>
+                      <div className="aksi-btn">
                         <button className="btn sm" onClick={() => setEdit(r.e)} aria-label="Edit">
                           <Pencil className="lucide" />
-                        </button>{" "}
+                        </button>
                         <button className="btn sm danger" onClick={() => hapus(r.e)} aria-label="Hapus">
                           <Trash2 className="lucide" />
-                        </button>{" "}
+                        </button>
                         <TombolUnduhBukti e={r.e} ringkas />
                       </div>
                       <AccBadge acc={acc[r.e.id]} />
@@ -502,7 +575,9 @@ function KeuanganTim() {
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
-                  <div className="mts"><BadgeSumber e={e} /></div>
+                  <div className="mts">
+                    <BadgeSumber e={e} bisaUbah onUbah={refreshData} />
+                  </div>
                   {buktiKeys(e).length > 0 && (
                     <div className="foto-row">
                       {buktiKeys(e).map((k, i) => (
@@ -551,15 +626,27 @@ function KeuanganTim() {
 }
 
 const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, ref) {
+  // Draf hanya untuk entri BARU — mengedit entri lama sudah punya nilai awal
+  const draf = entri ? null : ambilDraf("keuangan");
   const [keep, setKeep] = useState(() => (entri ? buktiKeys(entri) : []));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [harga, setHarga] = useState(entri?.harga_satuan ?? 0);
-  const [jumlah, setJumlah] = useState(entri?.jumlah ?? 1);
+  const [item, setItem] = useState(entri?.item ?? draf?.item ?? "");
+  const [tanggal, setTanggal] = useState(entri?.tanggal ?? draf?.tanggal ?? todayIso());
+  const [harga, setHarga] = useState(entri?.harga_satuan ?? draf?.harga ?? 0);
+  const [satuan, setSatuan] = useState(entri?.satuan_suffix ?? draf?.satuan ?? "");
+  const [jumlah, setJumlah] = useState(entri?.jumlah ?? draf?.jumlah ?? 1);
   // Sumber dana & kategori PKM — opsional, boleh dibiarkan kosong
-  const [sumber, setSumber] = useState(entri?.sumber || "");
-  const [kategori, setKategori] = useState(entri?.kategori || "");
+  const [sumber, setSumber] = useState(entri?.sumber ?? draf?.sumber ?? "");
+  const [kategori, setKategori] = useState(entri?.kategori ?? draf?.kategori ?? "");
   const lama = entri ? buktiKeys(entri) : [];
+
+  // Simpan draf tiap isian berubah (entri baru saja) — pulih bila simpan gagal
+  useEffect(() => {
+    if (entri) return;
+    if (!item && !harga && !satuan) return;
+    simpanDraf("keuangan", { item, tanggal, harga, satuan, jumlah, sumber, kategori });
+  }, [entri, item, tanggal, harga, satuan, jumlah, sumber, kategori]);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -578,11 +665,17 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
       }
       if (entri) await api.updateKeuangan(entri.id, fd);
       else await api.addKeuangan(fd);
+      hapusDraf("keuangan"); // sukses → draf tidak diperlukan lagi
       onSaved(!entri);
     } catch (e) {
       setErr(e.message);
       setBusy(false);
     }
+  };
+
+  const batal = () => {
+    if (!entri) hapusDraf("keuangan");
+    onClose();
   };
 
   return (
@@ -592,15 +685,21 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
         <h3>{entri ? "Edit belanja" : "Tambah belanja"}</h3>
       </div>
       <form onSubmit={submit} className="dlg-body">
+        {!entri && draf && (
+          <p className="muted mts" style={{ fontSize: ".78rem" }}>
+            ✏️ Isian terakhir yang belum tersimpan dipulihkan.
+          </p>
+        )}
         <div className="form-grid">
           <label className="field" style={{ gridColumn: "1 / -1" }}>
             Item belanja
-            <input name="item" required defaultValue={entri?.item || ""}
+            <input name="item" required value={item} onChange={(e) => setItem(e.target.value)}
                    placeholder="mis. Sewa Canva Pro" />
           </label>
           <label className="field">
             Tanggal
-            <input type="date" name="tanggal" required defaultValue={entri?.tanggal || todayIso()} />
+            <input type="date" name="tanggal" required value={tanggal}
+                   onChange={(e) => setTanggal(e.target.value)} />
           </label>
           <label className="field">
             Harga satuan (Rp)
@@ -609,8 +708,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           </label>
           <label className="field">
             Satuan
-            <input name="satuan_suffix" required defaultValue={entri?.satuan_suffix || ""}
-                   placeholder="mis. /bulan" />
+            <input name="satuan_suffix" required value={satuan}
+                   onChange={(e) => setSatuan(e.target.value)} placeholder="mis. /bulan" />
           </label>
           <label className="field">
             Jumlah
@@ -643,11 +742,9 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             </label>
           )}
         </div>
-        <p className="mt">
+        <p className="mt total-form">
           Total:{" "}
-          <b style={{ color: "var(--p1)", fontSize: "1.05rem" }}>
-            {fmtRupiah((parseFloat(harga) || 0) * (parseFloat(jumlah) || 0))}
-          </b>
+          <b>{fmtRupiah((parseFloat(harga) || 0) * (parseFloat(jumlah) || 0))}</b>
         </p>
 
         {lama.length > 0 && (
@@ -676,7 +773,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
 
         {err && <div className="error-box mt">{err}</div>}
         <div className="row mt" style={{ justifyContent: "flex-end" }}>
-          <button type="button" className="btn" onClick={onClose}>Batal</button>
+          <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}
           </button>
@@ -685,3 +782,4 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
     </dialog>
   );
 });
+

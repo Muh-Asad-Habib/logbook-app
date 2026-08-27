@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
+import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
@@ -102,6 +103,7 @@ function KegiatanFasilitator() {
   const [items, setItems] = useState(null);
   const [gagal, setGagal] = useState("");
   const [cari, setCari] = useState("");
+  const [bulan, setBulan] = useState("");
   const [urut, setUrut] = useState("Terbaru");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("kegiatan", timId, !!timId);
@@ -147,9 +149,13 @@ function KegiatanFasilitator() {
   if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
 
   const view = [...items]
-    .filter((e) => !cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase()));
+    .filter((e) =>
+      (!cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase())) &&
+      (!bulan || e.tanggal.startsWith(bulan))
+    );
   if (urut === "Terbaru") view.reverse();
   const grup = grupBulan(view);
+  const bulanTersedia = [...new Set(items.map((e) => e.tanggal.slice(0, 7)))].sort().reverse();
 
   const bukaFoto = (e, idx) =>
     setLb({
@@ -168,6 +174,14 @@ function KegiatanFasilitator() {
             <input placeholder="Cari kegiatan…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
           </div>
+          <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
+                  title="Saring per bulan" aria-label="Saring per bulan">
+            <option value="">Semua bulan</option>
+            {bulanTersedia.map((b) => {
+              const [y, m] = b.split("-").map(Number);
+              return <option key={b} value={b}>{`${NAMA_BULAN[m - 1]} ${y}`}</option>;
+            })}
+          </select>
           <div className="pills">
             {["Terbaru", "Terlama"].map((u) => (
               <button key={u} className={`pill ${urut === u ? "on" : ""}`} onClick={() => setUrut(u)}>{u}</button>
@@ -177,11 +191,11 @@ function KegiatanFasilitator() {
         </div>
       </div>
 
-      <p className="muted mt">{view.length} entri kegiatan tim</p>
+      <p className="muted mt">{view.length} dari {items.length} entri kegiatan tim</p>
       {view.length === 0 && (
         <div className="empty">
           <div className="big"><CalendarDays className="lucide" /></div>
-          <p>Tim belum mencatat kegiatan.</p>
+          <p>{items.length ? "Tidak ada entri yang cocok dengan filter." : "Tim belum mencatat kegiatan."}</p>
         </div>
       )}
 
@@ -399,15 +413,27 @@ function KegiatanTim() {
 }
 
 const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, ref) {
+  // Draf hanya untuk entri BARU — edit entri lama sudah punya nilai awal
+  const draf = entri ? null : ambilDraf("kegiatan");
   const [keep, setKeep] = useState(entri?.foto_keys || []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [tanggal, setTanggal] = useState(entri?.tanggal ?? draf?.tanggal ?? todayIso());
+  const [capaian, setCapaian] = useState(entri?.capaian_delta ?? draf?.capaian ?? 0);
+  const [uraian, setUraian] = useState(entri?.kegiatan ?? draf?.uraian ?? "");
 
   // Waktu tersimpan dalam MENIT (kanonik) — form menerima jam + menit bebas.
   const totalLama = entri?.waktu_menit ?? 0;
-  const [jam, setJam] = useState(entri ? Math.floor(totalLama / 60) : 0);
-  const [menit, setMenit] = useState(entri ? totalLama % 60 : 0);
+  const [jam, setJam] = useState(entri ? Math.floor(totalLama / 60) : (draf?.jam ?? 0));
+  const [menit, setMenit] = useState(entri ? totalLama % 60 : (draf?.menit ?? 0));
   const totalMenit = Math.round((parseFloat(jam) || 0) * 60 + (parseFloat(menit) || 0));
+
+  // Simpan draf tiap isian berubah — pulih bila simpan gagal / jaringan putus
+  useEffect(() => {
+    if (entri) return;
+    if (!uraian && !capaian && !jam && !menit) return;
+    simpanDraf("kegiatan", { tanggal, capaian, uraian, jam, menit });
+  }, [entri, tanggal, capaian, uraian, jam, menit]);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -430,11 +456,17 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
       }
       if (entri) await api.updateKegiatan(entri.id, fd);
       else await api.addKegiatan(fd);
+      hapusDraf("kegiatan"); // sukses → draf tidak diperlukan lagi
       onSaved(!entri);
     } catch (e) {
       setErr(e.message);
       setBusy(false);
     }
+  };
+
+  const batal = () => {
+    if (!entri) hapusDraf("kegiatan");
+    onClose();
   };
 
   return (
@@ -444,15 +476,21 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
         <h3>{entri ? "Edit kegiatan" : "Tambah kegiatan"}</h3>
       </div>
       <form onSubmit={submit} className="dlg-body">
+        {!entri && draf && (
+          <p className="muted mts" style={{ fontSize: ".78rem" }}>
+            ✏️ Isian terakhir yang belum tersimpan dipulihkan.
+          </p>
+        )}
         <div className="form-grid">
           <label className="field">
             Tanggal
-            <input type="date" name="tanggal" required defaultValue={entri?.tanggal || todayIso()} />
+            <input type="date" name="tanggal" required value={tanggal}
+                   onChange={(e) => setTanggal(e.target.value)} />
           </label>
           <label className="field">
             Capaian entri ini (%)
             <input type="number" name="capaian_delta" min="0" max="100"
-                   defaultValue={entri?.capaian_delta ?? 0} />
+                   value={capaian} onChange={(e) => setCapaian(e.target.value)} />
           </label>
           <label className="field">
             Waktu — jam
@@ -474,7 +512,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
         </p>
         <label className="field mt">
           Deskripsi kegiatan
-          <textarea name="kegiatan" required defaultValue={entri?.kegiatan || ""}
+          <textarea name="kegiatan" required value={uraian}
+                    onChange={(e) => setUraian(e.target.value)}
                     placeholder="Apa yang dikerjakan…" />
         </label>
 
@@ -505,7 +544,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
 
         {err && <div className="error-box mt">{err}</div>}
         <div className="row mt" style={{ justifyContent: "flex-end" }}>
-          <button type="button" className="btn" onClick={onClose}>Batal</button>
+          <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}
           </button>
