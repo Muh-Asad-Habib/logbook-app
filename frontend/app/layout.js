@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./ui-v3.css";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import Shell from "@/components/Shell";
 

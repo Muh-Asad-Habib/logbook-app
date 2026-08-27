@@ -1,0 +1,161 @@
+/* ============================================================
+   Tambahan gaya v3 — toolbar filter & kartu rekap yang dapat dilipat.
+   Dipisah dari globals.css agar mudah dirawat; diimpor di layout.
+   ============================================================ */
+
+/* ---------- Toolbar dua baris (halaman Keuangan) ---------- */
+.tb-card { padding-top: 14px; padding-bottom: 14px; }
+.tb-baris { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tb-baris-2 { margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--line); }
+.tb-baris .tb-cari { flex: 1 1 240px; margin-top: 0; }
+.tb-baris .tb-cari input { padding-right: 36px; }
+
+/* Tombol × pembersih di dalam kotak pencarian */
+.in-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: var(--soft); color: var(--muted);
+}
+.in-clear:hover { background: var(--line); color: var(--ink); }
+.in-clear .lucide { width: 13px; height: 13px; }
+
+/* Pemilih bulan dengan ikon di dalam kotak */
+.tb-sel-wrap { position: relative; display: flex; align-items: center; flex: 0 1 190px; }
+.tb-sel-ic {
+  position: absolute; left: 11px; width: 15px; height: 15px;
+  color: var(--muted); pointer-events: none;
+}
+.tb-baris .tb-sel {
+  margin-top: 0; width: 100%; padding: 10px 12px 10px 33px;
+  font-size: 0.82rem; font-weight: 700; border-radius: 12px;
+  appearance: none; cursor: pointer;
+}
+.tb-baris .tb-sel:hover { border-color: var(--line-hover); }
+.tb-reset { flex: 0 0 auto; margin-left: auto; }
+.tb-tambah { margin-left: auto; }
+
+/* Catatan mode pendamping */
+.tb-nota {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  padding: 7px 13px; border-radius: 999px;
+  background: var(--soft); color: var(--muted);
+  font-size: 0.75rem; font-weight: 700;
+}
+.tb-nota .lucide { width: 14px; height: 14px; }
+
+/* ---------- Segmented control (sumber dana & mode tampilan) ---------- */
+.seg {
+  display: inline-flex; gap: 3px; padding: 3px;
+  background: var(--soft); border: 1px solid var(--line); border-radius: 999px;
+}
+.seg-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-family: inherit; font-size: 0.79rem; font-weight: 700;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  white-space: nowrap;
+}
+.seg-btn .lucide { width: 15px; height: 15px; }
+.seg-btn:hover { color: var(--ink); }
+.seg-btn:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; }
+.seg-btn.on {
+  background: var(--card-solid); color: var(--ink);
+  box-shadow: 0 2px 8px rgba(18, 20, 46, 0.12);
+}
+/* Aksen warna sesuai sumber dana saat aktif */
+.seg-btn.on.belmawa { color: var(--p1); }
+.seg-btn.on.pt { color: #db2777; }
+.seg-btn.on.netral { color: var(--muted); }
+.seg-sumber .seg-btn:first-child.on { color: var(--p1); }
+.seg-btn .dot { opacity: 0.5; }
+.seg-btn.on .dot { opacity: 1; }
+
+/* ---------- Kartu rekap yang dapat dilipat ---------- */
+.rekap-card { padding: 0; overflow: visible; }
+.rekap-card::after { display: none; }
+
+.rekap-head {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 15px 18px; border: none; background: transparent; cursor: pointer;
+  font-family: inherit; text-align: left; color: var(--ink); border-radius: var(--r);
+  transition: background-color 0.15s ease;
+}
+.rekap-head:hover { background: var(--soft-2); }
+.rekap-head:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.4); outline-offset: -3px; }
+.rekap-head h3 { font-size: 0.95rem; }
+
+.rekap-ic {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #ede9fe, #fae8ff); color: var(--p2);
+}
+[data-theme="dark"] .rekap-ic { background: linear-gradient(135deg, #2d2760, #3b2358); color: #c4b5fd; }
+.rekap-ic .lucide { width: 19px; height: 19px; }
+
+.rekap-judul { min-width: 0; flex: 1; }
+.rekap-judul b { display: block; font-size: 0.95rem; letter-spacing: -0.01em; }
+.rekap-judul small {
+  display: block; color: var(--muted); font-size: 0.73rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Ringkasan mini di kepala kartu (tetap terbaca saat terlipat) */
+.rekap-mini { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mini-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: 0.74rem; font-weight: 800; white-space: nowrap;
+  background: var(--soft); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.mini-chip.belmawa { color: var(--p1); }
+.mini-chip.pt { color: #db2777; }
+.mini-chip.warn { background: #fef3c7; color: #b45309; padding: 5px 8px; }
+[data-theme="dark"] .mini-chip.warn { background: #4e3c11; color: #fcd34d; }
+.mini-chip .lucide { width: 14px; height: 14px; }
+
+.rekap-caret {
+  width: 18px; height: 18px; flex: 0 0 18px; color: var(--muted);
+  transition: transform 0.22s ease;
+}
+.rekap-card.terbuka .rekap-caret { transform: rotate(180deg); }
+
+.rekap-isi {
+  padding: 4px 18px 18px; border-top: 1px solid var(--line);
+  animation: fadeUp 0.28s ease both;
+}
+.rekap-isi .rekap-sumber { margin-top: 14px; }
+
+/* ---------- Responsif ---------- */
+@media (max-width: 760px) {
+  .rekap-judul small { display: none; }
+}
+
+@media (max-width: 640px) {
+  /* Tiap kelompok toolbar melebar penuh & mudah disentuh */
+  .tb-baris .tb-cari,
+  .tb-sel-wrap { flex: 1 1 100%; }
+  .tb-reset, .tb-tambah, .tb-nota {
+    margin-left: 0; flex: 1 1 100%; justify-content: center; min-height: 42px;
+  }
+  .seg { display: flex; flex: 1 1 100%; }
+  .seg-btn { flex: 1 1 auto; justify-content: center; padding: 10px 8px; min-height: 42px; }
+
+  .rekap-head { padding: 13px 14px; gap: 10px; }
+  .rekap-isi { padding: 4px 14px 16px; }
+  .rekap-ic { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 11px; }
+  /* Ringkasan mini pindah ke baris kedua agar judul tidak terjepit */
+  .rekap-mini { order: 4; flex: 1 1 100%; margin-top: 2px; }
+  .rekap-head { flex-wrap: wrap; }
+  .rekap-judul { flex: 1 1 auto; }
+}
+
+@media (max-width: 430px) {
+  .seg-sumber .seg-btn { font-size: 0.72rem; padding: 10px 6px; gap: 4px; }
+  .seg-mode .seg-teks { display: none; }
+  .seg-mode { flex: 0 0 auto; }
+  .mini-chip { font-size: 0.7rem; padding: 4px 9px; }
+}
+
