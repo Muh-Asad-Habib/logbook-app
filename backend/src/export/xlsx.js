@@ -1,7 +1,7 @@
 /** Ekspor Excel — rekap kegiatan & keuangan (exceljs). */
 import ExcelJS from "exceljs";
 import * as store from "../storage.js";
-import { LABEL_SUMBER, LABEL_KATEGORI } from "./pkm.js";
+import { LABEL_SUMBER, LABEL_KATEGORI, rekapDana, BATAS_DANA_PT } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -161,13 +161,13 @@ export async function buildXlsx(userId, namaTim = "") {
   s2.columns = [
     { key: "no", width: 5 },
     { key: "tgl", width: 18 },
-    { key: "item", width: 42 },
-    { key: "hs", width: 18 },
-    { key: "sf", width: 12 },
-    { key: "jml", width: 9 },
-    { key: "tot", width: 17 },
-    { key: "sum", width: 14 },
-    { key: "kat", width: 20 },
+    { key: "item", width: 40 },
+    { key: "hs", width: 17 },
+    { key: "sf", width: 11 },
+    { key: "jml", width: 8 },
+    { key: "tot", width: 16 },
+    { key: "sum", width: 15 },
+    { key: "kat", width: 19 },
     { key: "bk", width: 10 },
   ];
   judulSheet(s2, "LOGBOOK KEUANGAN", sub, 10);
@@ -212,6 +212,104 @@ export async function buildXlsx(userId, namaTim = "") {
   sisaRow.getCell("tot").font = { bold: true, size: 11, color: { argb: warnaSisa } };
   sisaRow.getCell("tot").numFmt = '"Rp"#,##0';
   sisaRow.height = 24;
+
+  // ================= Sheet 4: Rekap dana PKM =================
+  // Dicetak hanya bila tim memakai penandaan sumber dana atau sudah mengisi
+  // nominal dana — agar logbook yang belum memakainya tidak penuh angka nol.
+  const rekap = rekapDana(keuangan, { belmawa: dana.belmawa, pt: dana.pt });
+  if (rekap.adaPenandaan || rekap.danaBelmawa > 0 || rekap.danaPt > 0) {
+    const s3 = wb.addWorksheet("Rekap Dana", {
+      properties: { tabColor: { argb: C.green } },
+      views: [{ showGridLines: false }],
+    });
+    s3.columns = [
+      { key: "a", width: 34 },
+      { key: "b", width: 20 },
+      { key: "c", width: 20 },
+      { key: "d", width: 14 },
+      { key: "e", width: 26 },
+    ];
+    judulSheet(s3, "REKAP DANA PKM", sub, 5);
+
+    const barisJudul = (teks) => {
+      const r = s3.addRow([teks]);
+      s3.mergeCells(r.number, 1, r.number, 5);
+      r.getCell(1).font = { bold: true, size: 11, color: { argb: C.indigoDark } };
+      r.getCell(1).fill = fill(C.indigoBg);
+      r.getCell(1).alignment = { vertical: "middle", indent: 1 };
+      r.height = 22;
+      return r;
+    };
+
+    // -- ringkasan per sumber --
+    barisJudul("Sumber dana");
+    const hSum = s3.addRow(["Sumber", "Diterima", "Terpakai", "Sisa", "Keterangan"]);
+    styleHeader(hSum);
+    const rowsSumber = [
+      ["Belmawa", rekap.danaBelmawa, rekap.totalBelmawa, rekap.sisaBelmawa,
+        rekap.danaBelmawa > 0 ? "" : "nominal belum diisi"],
+      ["Perguruan Tinggi", rekap.danaPt, rekap.totalPt, rekap.sisaPt,
+        rekap.ptLewatBatas ? `MELEBIHI batas Rp${BATAS_DANA_PT.toLocaleString("id-ID")}`
+          : `maksimal Rp${BATAS_DANA_PT.toLocaleString("id-ID")}`],
+      ["Belum dipilih", 0, rekap.totalTanpaSumber, 0,
+        rekap.nTanpaSumber ? `${rekap.nTanpaSumber} entri belum ditandai` : "—"],
+    ];
+    rowsSumber.forEach(([nama, terima, pakai, sisa, ket], i) => {
+      const r = s3.addRow({ a: nama, b: terima, c: pakai, d: sisa, e: ket });
+      styleData(r, i % 2 === 1);
+      ["b", "c", "d"].forEach((k) => { r.getCell(k).numFmt = '"Rp"#,##0'; });
+      r.getCell("a").font = { bold: true, size: 10, color: { argb: C.ink } };
+      if (i === 1 && rekap.ptLewatBatas) {
+        r.getCell("e").font = { bold: true, color: { argb: C.rose } };
+      }
+    });
+
+    s3.addRow([]);
+
+    // -- rincian kategori dana Belmawa --
+    barisJudul("Kategori belanja dana Belmawa (pedoman PKM 2026)");
+    const hKat = s3.addRow(["Kategori", "Batas maksimum", "Terpakai",
+      "% dari dana", "Status"]);
+    styleHeader(hKat);
+    rekap.kategori.forEach((k, i) => {
+      const r = s3.addRow({
+        a: `${k.label} (maks ${k.maks}%)`,
+        b: k.batas,
+        c: k.terpakai,
+        d: rekap.danaBelmawa > 0 ? k.pct / 100 : 0,
+        e: k.lewat ? "MELEBIHI BATAS" : rekap.danaBelmawa > 0 ? "aman" : "isi dana Belmawa dulu",
+      });
+      styleData(r, i % 2 === 1);
+      ["b", "c"].forEach((x) => { r.getCell(x).numFmt = '"Rp"#,##0'; });
+      r.getCell("d").numFmt = "0.0%";
+      r.getCell("d").alignment = { vertical: "middle", horizontal: "center" };
+      r.getCell("e").alignment = { vertical: "middle", horizontal: "center" };
+      r.getCell("e").font = k.lewat
+        ? { bold: true, color: { argb: C.rose } }
+        : { color: { argb: C.muted } };
+    });
+
+    const totKat = s3.addRow({
+      a: "TOTAL BELANJA DANA BELMAWA", c: rekap.totalBelmawa,
+      e: rekap.nBelmawaTanpaKategori
+        ? `${rekap.nBelmawaTanpaKategori} entri belum berkategori` : "",
+    });
+    totKat.eachCell({ includeEmpty: true }, (c) => {
+      c.fill = fill(C.indigoBg);
+      c.border = BORDER;
+    });
+    totKat.getCell("a").font = { bold: true, size: 10, color: { argb: C.indigoDark } };
+    totKat.getCell("c").font = { bold: true, size: 10, color: { argb: C.indigoDark } };
+    totKat.getCell("c").numFmt = '"Rp"#,##0';
+    totKat.height = 22;
+
+    s3.addRow([]);
+    const nota = s3.addRow([
+      "Catatan: penandaan sumber dana bersifat opsional — entri tanpa penanda tetap dihitung sebagai pengeluaran.",
+    ]);
+    s3.mergeCells(nota.number, 1, nota.number, 5);
+    nota.getCell(1).font = { italic: true, size: 9, color: { argb: C.muted } };
+  }
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

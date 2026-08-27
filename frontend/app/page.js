@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isPendamping } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
-import { BATAS_DANA_PT } from "@/lib/pkm";
+import { BATAS_DANA_PT, rekapDana } from "@/lib/pkm";
 import {
   Gauge, Heatmap, AreaChart, BarChart, Breakdown, Sparkline,
 } from "@/components/Charts";
@@ -53,8 +53,8 @@ function DashboardTim() {
       const pt = Number(danaPt) || 0;
       await api.setSetting("dana_belmawa", String(belmawa));
       await api.setSetting("dana_pt", String(pt));
-      // dana_awal lama tetap disinkronkan = total, agar data/ekspor lama konsisten
-      await api.setSetting("dana_awal", String(belmawa + pt));
+      // dana_awal TIDAK ditulis di sini — server yang menurunkannya dari
+      // (Belmawa + PT) supaya hanya ada satu sumber kebenaran.
       setDanaSaved(true);
       setTimeout(() => setDanaSaved(false), 1800);
       toast.ok("Dana kegiatan tersimpan");
@@ -99,6 +99,11 @@ function DashboardTim() {
 
   const pakaiPct = stat.dana_awal > 0
     ? Math.min(100, Math.round((stat.total_pengeluaran / stat.dana_awal) * 100)) : 0;
+  // Rekap per sumber dana (Belmawa/PT) — ringkasnya ditampilkan di kartu dana
+  const rekap = rekapDana(keuangan, {
+    belmawa: stat.dana_belmawa || 0,
+    pt: stat.dana_pt || 0,
+  });
   const lastDelta = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_delta : 0;
   const terbaru = [...kegiatan].reverse().slice(0, 5);
   const kosong = kegiatan.length === 0 && keuangan.length === 0;
@@ -249,6 +254,35 @@ function DashboardTim() {
                 <span className="muted"><b>{fmtRupiah(stat.sisa_dana)}</b> tersisa</span>
               </div>
             </>
+          )}
+
+          {/* Rekap ringkas per sumber — detail lengkap ada di halaman Keuangan */}
+          {(rekap.totalBelmawa > 0 || rekap.totalPt > 0 || rekap.nTanpaSumber > 0) && (
+            <div className="dana-mini">
+              <div className="dana-mini-row">
+                <span className="dot belmawa" /> Belmawa
+                <b>{fmtRupiah(rekap.totalBelmawa)}</b>
+                <small className="muted">
+                  {rekap.danaBelmawa > 0 ? `sisa ${fmtJt(rekap.sisaBelmawa)}` : "—"}
+                </small>
+              </div>
+              <div className="dana-mini-row">
+                <span className="dot pt" /> Perguruan Tinggi
+                <b>{fmtRupiah(rekap.totalPt)}</b>
+                <small className={rekap.ptLewatBatas ? "bad" : "muted"}>
+                  {rekap.danaPt > 0 ? `sisa ${fmtJt(rekap.sisaPt)}`
+                    : rekap.ptLewatBatas ? "lewat batas" : "—"}
+                </small>
+              </div>
+              {rekap.nTanpaSumber > 0 && (
+                <div className="dana-mini-row">
+                  <span className="dot netral" /> Belum ditandai
+                  <b>{fmtRupiah(rekap.totalTanpaSumber)}</b>
+                  <small className="muted">{rekap.nTanpaSumber} entri</small>
+                </div>
+              )}
+              <Link href="/keuangan" className="dana-mini-link">Lihat rekap lengkap →</Link>
+            </div>
           )}
         </div>
         <div className="card">

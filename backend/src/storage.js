@@ -203,34 +203,45 @@ export async function listUsersWithStats() {
               COALESCE((SELECT MAX(b.created_at) FROM keuangan b WHERE b.user_id = u.id), '')
             )                                                                           AS last_at,
             COALESCE((SELECT p.nilai FROM pengaturan p
-               WHERE p.user_id = u.id AND p.kunci = 'dana_awal'), '')                   AS dana_awal
+               WHERE p.user_id = u.id AND p.kunci = 'dana_awal'), '')                   AS dana_awal,
+            COALESCE((SELECT p.nilai FROM pengaturan p
+               WHERE p.user_id = u.id AND p.kunci = 'dana_belmawa'), '')                AS dana_belmawa,
+            COALESCE((SELECT p.nilai FROM pengaturan p
+               WHERE p.user_id = u.id AND p.kunci = 'dana_pt'), '')                     AS dana_pt
        FROM users u
       ORDER BY u.created_at`
   );
   const ownerId = await getMeta("templateOwnerId");
-  return rows.map((r) => ({
-    id: r.id,
-    username: r.username,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at || "",
-    role: r.role || "tim",
-    kegiatan: angka(r.n_keg),
-    keuangan: angka(r.n_keu),
-    foto: angka(r.n_foto_keg) + angka(r.n_foto_keu),
-    sesi: angka(r.n_sesi),
-    punya_laporan: angka(r.n_laporan) > 0,
-    punya_presentasi: angka(r.n_presentasi) > 0,
-    n_fasilitator: angka(r.n_fasilitator),
-    n_dosen: angka(r.n_dosen),
-    n_tim_diampu: angka(r.n_tim_diampu),
-    n_acc: angka(r.n_acc),
-    n_revisi: angka(r.n_revisi),
-    pengampu: larik(r.pengampu),
-    loginTerakhir: r.last_login_at || "",
-    aktivitasTerakhir: r.last_at || "",
-    pemilikTemplate: ownerId === r.id,
-    dana_awal: r.dana_awal || "",
-  }));
+  return rows.map((r) => {
+    // Dana kegiatan = Belmawa + PT bila salah satu diisi; selain itu pakai
+    // dana_awal lama (akun sebelum fitur sumber dana tetap tampil benar).
+    const gabungan = (Number(r.dana_belmawa) || 0) + (Number(r.dana_pt) || 0);
+    return {
+      id: r.id,
+      username: r.username,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at || "",
+      role: r.role || "tim",
+      kegiatan: angka(r.n_keg),
+      keuangan: angka(r.n_keu),
+      foto: angka(r.n_foto_keg) + angka(r.n_foto_keu),
+      sesi: angka(r.n_sesi),
+      punya_laporan: angka(r.n_laporan) > 0,
+      punya_presentasi: angka(r.n_presentasi) > 0,
+      n_fasilitator: angka(r.n_fasilitator),
+      n_dosen: angka(r.n_dosen),
+      n_tim_diampu: angka(r.n_tim_diampu),
+      n_acc: angka(r.n_acc),
+      n_revisi: angka(r.n_revisi),
+      pengampu: larik(r.pengampu),
+      loginTerakhir: r.last_login_at || "",
+      aktivitasTerakhir: r.last_at || "",
+      pemilikTemplate: ownerId === r.id,
+      dana_awal: gabungan > 0 ? String(gabungan) : (r.dana_awal || ""),
+      dana_belmawa: r.dana_belmawa || "",
+      dana_pt: r.dana_pt || "",
+    };
+  });
 }
 
 /** Detail lengkap satu akun untuk panel admin (tanpa hash password). */
@@ -738,6 +749,22 @@ export async function deleteKeuangan(userId, id) {
     "DELETE FROM keuangan WHERE id = $1 AND user_id = $2 RETURNING *", [id, userId]
   );
   if (rows[0]) await hapusPersetujuan("keuangan", id);
+  return rows[0] ? petaKeuangan(rows[0]) : null;
+}
+
+/**
+ * Ubah HANYA sumber dana & kategori PKM sebuah entri.
+ *
+ * Dipakai tombol cepat di halaman Keuangan. Berbeda dengan updateKeuangan,
+ * fungsi ini TIDAK membatalkan ACC dosen: nominal, tanggal, dan item tidak
+ * berubah sama sekali — hanya penandaan sumber dana yang sifatnya opsional.
+ */
+export async function setSumberKeuangan(userId, id, sumber, kategori) {
+  const rows = await q(
+    `UPDATE keuangan SET sumber = $1, kategori = $2
+      WHERE id = $3 AND user_id = $4 RETURNING *`,
+    [sumber || "", kategori || "", id, userId]
+  );
   return rows[0] ? petaKeuangan(rows[0]) : null;
 }
 

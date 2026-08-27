@@ -493,16 +493,135 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 [data-theme="dark"] .badge.danger { background: #7f1d1d; color: #fecaca; }
 
 /* Rekap dana PKM (halaman Keuangan) */
+.rekap-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rekap-head h3 { margin: 0; }
+.rekap-tag { margin: 0; text-transform: uppercase; letter-spacing: 0.04em; }
+
 .rekap-sumber {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px; margin-top: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px; margin-top: 14px;
 }
 .rekap-box {
-  background: var(--soft); border-radius: 14px; padding: 12px 14px;
+  position: relative; overflow: hidden;
+  background: var(--soft); border: 1px solid var(--line);
+  border-radius: 16px; padding: 13px 15px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.rekap-cap { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; color: var(--muted); }
-.rekap-val { font-size: 1.15rem; font-weight: 800; margin: 2px 0 3px; }
-.rekap-sub { margin-top: 16px; font-size: 0.82rem; font-weight: 800; }
+.rekap-box:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(18, 20, 46, 0.09); }
+.rekap-cap {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.67rem; font-weight: 800; letter-spacing: 0.06em; color: var(--muted);
+}
+.rekap-cap .lucide { width: 14px; height: 14px; }
+.rekap-val { font-size: 1.22rem; font-weight: 800; margin: 3px 0 2px; line-height: 1.2; }
+.rekap-ket { font-size: 0.74rem; color: var(--muted); min-height: 18px; }
+.rekap-warn {
+  display: flex; align-items: center; gap: 5px; margin-top: 7px;
+  font-size: 0.72rem; font-weight: 700; color: var(--bad, #ef4444);
+}
+.rekap-warn .lucide { width: 13px; height: 13px; flex: 0 0 13px; }
+
+.rekap-bar {
+  height: 8px; margin-top: 9px; border-radius: 999px;
+  background: var(--line); overflow: hidden;
+}
+.rekap-bar > div { height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.25, 0.8, 0.35, 1); }
+.rekap-bar.kosong {
+  background: repeating-linear-gradient(90deg,
+    var(--line) 0 7px, transparent 7px 14px);
+}
+
+.rekap-sub {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-top: 18px; font-size: 0.83rem; font-weight: 800; flex-wrap: wrap;
+}
+.rekap-sub small { font-size: 0.72rem; font-weight: 600; }
+
+.rekap-kat { margin-top: 4px; }
+.rekap-row {
+  display: grid; grid-template-columns: minmax(120px, 1.15fr) 1fr minmax(86px, auto);
+  align-items: center; gap: 12px; padding: 8px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.rekap-row:last-child { border-bottom: none; }
+.rekap-label { font-size: 0.81rem; font-weight: 700; min-width: 0; }
+.rekap-label small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); }
+.rekap-row .rekap-bar { margin-top: 0; }
+.rekap-nilai { text-align: right; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+.rekap-nilai small { display: block; font-size: 0.68rem; font-weight: 700; color: var(--muted); }
+.rekap-nilai.lewat, .rekap-nilai.lewat small { color: var(--bad, #ef4444); }
+
+.rekap-note {
+  display: flex; gap: 10px; margin-top: 16px; padding: 11px 13px;
+  border-radius: 13px; background: var(--soft);
+  border-left: 3px solid var(--p1); font-size: 0.78rem; color: var(--muted);
+}
+.rekap-note .lucide { width: 15px; height: 15px; flex: 0 0 15px; color: var(--p1); margin-top: 2px; }
+.rekap-note p + p { margin-top: 5px; }
+
+@media (max-width: 560px) {
+  .rekap-row { grid-template-columns: 1fr auto; gap: 6px 10px; }
+  .rekap-row .rekap-bar { grid-column: 1 / -1; order: 3; }
+  .rekap-nilai { text-align: right; }
+  .rekap-nilai small { display: inline; margin-left: 5px; }
+}
+
+/* Titik warna sumber dana (dipakai menu cepat & rekap mini dashboard) */
+.dot {
+  width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; display: inline-block;
+}
+.dot.belmawa { background: var(--p1, #4f46e5); }
+.dot.pt { background: #db2777; }
+.dot.netral { background: var(--muted); }
+
+/* Lencana sumber dana + menu ubah cepat (tabel & kartu keuangan) */
+.badge-sumber { position: relative; display: inline-flex; }
+.sumber-btn {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: transparent; border: 1px dashed transparent; border-radius: 999px;
+  padding: 1px 4px 1px 1px; cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.sumber-btn:hover { border-color: var(--line-hover); background: var(--soft); }
+.sumber-btn.kosong { border-color: var(--line); }
+.sumber-btn:disabled { opacity: 0.55; cursor: progress; }
+.sumber-caret { width: 13px; height: 13px; color: var(--muted); flex: 0 0 13px; }
+
+.sumber-menu {
+  position: absolute; z-index: 60; top: calc(100% + 6px); left: 0;
+  min-width: 244px; padding: 6px;
+  background: var(--card-solid); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 18px 44px rgba(15, 21, 51, 0.22);
+  animation: pop 0.16s ease;
+}
+.sumber-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; border: none; border-radius: 10px; cursor: pointer;
+  background: transparent; color: var(--ink); font-family: inherit;
+  font-size: 0.82rem; font-weight: 700; text-align: left;
+}
+.sumber-item:hover { background: var(--soft); }
+.sumber-item small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); }
+.sumber-item .lucide { margin-left: auto; width: 15px; height: 15px; color: var(--p1); }
+.sumber-item.hapus { color: var(--bad, #ef4444); }
+
+/* Rekap mini per sumber di kartu "Dana kegiatan" (Dashboard) */
+.dana-mini { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.dana-mini-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.79rem; font-weight: 700; padding: 5px 0;
+}
+.dana-mini-row b { margin-left: auto; }
+.dana-mini-row small { flex: 0 0 auto; font-weight: 600; font-size: 0.7rem; }
+.dana-mini-row small.bad { color: var(--bad, #ef4444); }
+.dana-mini-link {
+  display: inline-block; margin-top: 6px;
+  font-size: 0.76rem; font-weight: 700; color: var(--p1);
+}
+
+/* Total di dialog form belanja */
+.total-form { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+.total-form b { color: var(--p1); font-size: 1.08rem; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
@@ -549,14 +668,21 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 /* ---------- Toolbar filter halaman (kegiatan/keuangan) ---------- */
 .toolbar .tb-cari { flex: 2 1 220px; margin-top: 0; }
 .toolbar .tb-tgl { flex: 1 1 140px; margin-top: 0; }
+.toolbar .tb-sel {
+  flex: 0 1 165px; margin-top: 0; width: auto;
+  font-size: 0.82rem; font-weight: 700; padding: 9px 12px;
+}
+.toolbar .tb-reset { flex: 0 0 auto; }
 
 @media (max-width: 640px) {
   .toolbar { gap: 8px; }
   .toolbar .tb-cari { flex: 1 1 100%; }
   .toolbar .tb-tgl { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .toolbar .tb-sel { flex: 1 1 100%; }
   .toolbar .pills { display: flex; flex: 1 1 100%; }
   .toolbar .pills .pill { flex: 1 1 auto; }
   .toolbar > .btn { flex: 1 1 100%; }
+  .toolbar .tb-reset { flex: 1 1 100%; }
   .toolbar .badge { flex: 1 1 100%; justify-content: center; margin-right: 0; }
 }
 
@@ -951,10 +1077,15 @@ th.num, td.num {
 td.aksi { white-space: nowrap; }
 td.aksi > * { display: block; }
 td.aksi > * + * { margin-top: 6px; }
+.aksi-btn { display: flex; gap: 6px; flex-wrap: wrap; }
 /* Kolom item: beri ruang bernapas agar uraian panjang membungkus wajar */
 td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
-/* Tabel keuangan 7 kolom — lebih lebar supaya scroll, bukan saling menghimpit */
-.keu-table table { min-width: 820px; }
+td.nowrap { white-space: nowrap; }
+td.num small { font-weight: 600; }
+/* Deret bukti kecil dalam sel tabel */
+.bukti-mini { display: flex; gap: 4px; flex-wrap: wrap; max-width: 130px; }
+/* Tabel keuangan kini 6 kolom (harga & jumlah digabung) → lebih ringkas */
+.keu-table table { min-width: 720px; }
 
 @media (max-width: 640px) {
   table { font-size: 0.78rem; }

@@ -213,6 +213,48 @@ router.put("/:id", upload.array("bukti"), async (req, res, next) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/keuangan/{id}/sumber:
+ *   patch:
+ *     tags: [Keuangan]
+ *     summary: Ubah sumber dana & kategori PKM saja (tidak membatalkan ACC dosen)
+ *     description: >
+ *       Penandaan opsional. Nilai tak dikenal otomatis menjadi "" (belum dipilih),
+ *       jadi permintaan tidak pernah gagal karena isian ini.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               sumber: { type: string, example: belmawa }
+ *               kategori: { type: string, example: bahan }
+ *     responses:
+ *       200: { description: Entri diperbarui }
+ *       404: { description: Tidak ditemukan }
+ */
+router.patch("/:id/sumber", async (req, res, next) => {
+  try {
+    const sumber = bersihkanSumber(req.body?.sumber);
+    const kategori = bersihkanKategori(req.body?.kategori, sumber);
+    const hasil = await store.setSumberKeuangan(req.userId, req.params.id, sumber, kategori);
+    if (!hasil) return res.status(404).json({ error: "entri tidak ditemukan" });
+    catatAktivitas(req.userId, "keuangan.sumber", {
+      tanggal: hasil.tanggal, ringkas: String(hasil.item || "").slice(0, 60),
+      sumber: sumber || "-", kategori: kategori || "-",
+    });
+    res.json(hasil);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete("/:id", async (req, res, next) => {
   try {
     const doc = await store.deleteKeuangan(req.userId, req.params.id);

@@ -394,6 +394,13 @@ export const api = {
   listKeuangan: () => aFetch("/api/keuangan", { cache: "no-store" }),
   addKeuangan: (formData) => aFetch("/api/keuangan", { method: "POST", body: formData }),
   updateKeuangan: (id, formData) => aFetch(`/api/keuangan/${id}`, { method: "PUT", body: formData }),
+  /** Ubah sumber dana & kategori PKM saja — tidak membatalkan ACC dosen. */
+  setSumberKeuangan: (id, sumber, kategori = "") =>
+    aFetch(`/api/keuangan/${id}/sumber`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sumber, kategori }),
+    }),
   deleteKeuangan: (id) => aFetch(`/api/keuangan/${id}`, { method: "DELETE" }),
 
   // ---- Pengaturan & statistik ----

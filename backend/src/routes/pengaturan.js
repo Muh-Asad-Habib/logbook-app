@@ -10,8 +10,13 @@ router.use(hanyaTim); // fasilitator tidak punya pengaturan dana
  * Kunci yang dikelola endpoint khusus dan TIDAK boleh ditulis lewat
  * key-value bebas — kalau bisa, seseorang dapat menyetel kode timnya
  * menyamai kode tim lain (tabrakan saat pendamping bergabung).
+ *
+ * `dana_awal` kini ikut dikunci: nilainya SELALU dihitung server dari
+ * dana_belmawa + dana_pt (lihat store.hitungDana) supaya tidak ada dua
+ * sumber kebenaran. Klien lama yang masih mengirimnya diam-diam diabaikan.
  */
 const KUNCI_TERKUNCI = new Set(["kode_tim"]);
+const KUNCI_DIABAIKAN = new Set(["dana_awal"]);
 
 /**
  * @openapi
@@ -48,6 +53,11 @@ const KUNCI_TERKUNCI = new Set(["kode_tim"]);
  */
 router.get("/:kunci", async (req, res, next) => {
   try {
+    // dana_awal = turunan (Belmawa + PT) — dijawab dari hasil hitung server
+    if (req.params.kunci === "dana_awal") {
+      const dana = await store.hitungDana(req.userId);
+      return res.json({ kunci: "dana_awal", nilai: String(dana.total) });
+    }
     res.json({ kunci: req.params.kunci, nilai: await store.getSetting(req.userId, req.params.kunci) });
   } catch (err) {
     next(err);
@@ -58,6 +68,12 @@ router.put("/:kunci", async (req, res, next) => {
   try {
     if (KUNCI_TERKUNCI.has(req.params.kunci)) {
       return res.status(403).json({ error: "Kunci ini dikelola lewat /api/tim/kode" });
+    }
+    // Nilai turunan: terima permintaannya (klien lama tidak error) tapi
+    // jawab dengan angka hasil hitung server, bukan menuliskannya.
+    if (KUNCI_DIABAIKAN.has(req.params.kunci)) {
+      const dana = await store.hitungDana(req.userId);
+      return res.json({ kunci: req.params.kunci, nilai: String(dana.total), turunan: true });
     }
     const nilai = String(req.body?.nilai ?? "");
     await store.setSetting(req.userId, req.params.kunci, nilai);
