@@ -75,6 +75,17 @@ export const swaggerSpec = swaggerJsdoc({
             satuan_suffix: { type: "string", example: "/bulan" },
             jumlah: { type: "number", example: 1 },
             total: { type: "number", example: 99900 },
+            sumber: {
+              type: "string",
+              description: "Sumber dana (opsional): belmawa | pt | '' (belum dipilih)",
+              example: "belmawa",
+            },
+            kategori: {
+              type: "string",
+              description:
+                "Kategori PKM untuk dana Belmawa (opsional): bahan | sewa | transport | lain | ''",
+              example: "bahan",
+            },
             bukti_keys: {
               type: "array",
               items: { type: "string" },

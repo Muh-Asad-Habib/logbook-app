@@ -65,6 +65,9 @@ const petaKeuangan = (r) => {
     satuan_suffix: r.satuan_suffix || "",
     jumlah: angka(r.jumlah),
     total: angka(r.total),
+    // Sumber dana & kategori PKM — opsional; "" = tim belum memilih
+    sumber: r.sumber || "",
+    kategori: r.kategori || "",
     bukti_keys: keys,
     bukti_key: keys[0] || "",
     createdAt: r.created_at,
@@ -252,10 +255,12 @@ export async function getUserDetail(userId) {
     satuan_suffix: e.satuan_suffix,
     jumlah: e.jumlah,
     total: e.total,
+    sumber: e.sumber,
+    kategori: e.kategori,
     bukti_keys: e.bukti_keys,
     bukti_key: e.bukti_key,
   }));
-  const danaAwal = Number(await getSetting(userId, "dana_awal", "0")) || 0;
+  const dana = await hitungDana(userId);
   const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
   return {
     user: { id: u.id, username: u.username, createdAt: u.createdAt, role: u.role },
@@ -264,9 +269,11 @@ export async function getUserDetail(userId) {
     laporan: await infoLaporan(userId),
     presentasi: await infoPresentasi(userId),
     ringkasan: {
-      dana_awal: danaAwal,
+      dana_awal: dana.total,
+      dana_belmawa: dana.belmawa,
+      dana_pt: dana.pt,
       pengeluaran,
-      sisa: danaAwal - pengeluaran,
+      sisa: dana.total - pengeluaran,
       capaian_total: kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0,
       total_menit: kegiatan.reduce((s, e) => s + e.waktu_menit, 0),
     },
@@ -673,7 +680,7 @@ export async function listKeuangan(userId) {
   return rows.map(petaKeuangan);
 }
 
-export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, bukti_keys }) {
+export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, bukti_keys, sumber, kategori }) {
   const keys = Array.isArray(bukti_keys) ? bukti_keys.filter(Boolean) : [];
   const e = {
     id: newId(),
@@ -684,15 +691,18 @@ export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_
     satuan_suffix,
     jumlah,
     total: harga_satuan * jumlah,
+    sumber: sumber || "",
+    kategori: kategori || "",
     bukti_keys: keys,
     bukti_key: keys[0] || "",
     createdAt: nowIso(),
   };
   await q(
-    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at, sumber, kategori)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [e.id, e.userId, e.tanggal, e.item, e.harga_satuan, e.satuan_suffix,
-     e.jumlah, e.total, e.bukti_key, JSON.stringify(e.bukti_keys), e.createdAt]
+     e.jumlah, e.total, e.bukti_key, JSON.stringify(e.bukti_keys), e.createdAt,
+     e.sumber, e.kategori]
   );
   return e;
 }
@@ -709,12 +719,15 @@ export async function updateKeuangan(userId, id, patch) {
   e.bukti_keys = (e.bukti_keys || []).filter(Boolean);
   e.bukti_key = e.bukti_keys[0] || ""; // kolom lama tetap sinkron
   e.total = e.harga_satuan * e.jumlah;
+  e.sumber = e.sumber || "";
+  e.kategori = e.kategori || "";
   await q(
     `UPDATE keuangan SET tanggal = $1, item = $2, harga_satuan = $3, satuan_suffix = $4,
-            jumlah = $5, total = $6, bukti_key = $7, bukti_keys = $8
+            jumlah = $5, total = $6, bukti_key = $7, bukti_keys = $8,
+            sumber = $11, kategori = $12
       WHERE id = $9 AND user_id = $10`,
     [e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total,
-     e.bukti_key, JSON.stringify(e.bukti_keys), id, userId]
+     e.bukti_key, JSON.stringify(e.bukti_keys), id, userId, e.sumber, e.kategori]
   );
   await hapusPersetujuan("keuangan", id); // entri berubah → ACC batal
   return e;
@@ -729,6 +742,26 @@ export async function deleteKeuangan(userId, id) {
 }
 
 /* ---------- Pengaturan ---------- */
+
+/**
+ * Dana kegiatan tim: Belmawa + Perguruan Tinggi.
+ *
+ * Nilai keduanya bebas (tiap tim berbeda). Bila tim belum mengisi keduanya,
+ * `dana_awal` lama dipakai sebagai total supaya data & tampilan lama tetap
+ * benar (kompatibilitas mundur).
+ */
+export async function hitungDana(userId) {
+  const [belmawaStr, ptStr, awalStr] = await Promise.all([
+    getSetting(userId, "dana_belmawa", ""),
+    getSetting(userId, "dana_pt", ""),
+    getSetting(userId, "dana_awal", "0"),
+  ]);
+  const belmawa = Number(belmawaStr) || 0;
+  const pt = Number(ptStr) || 0;
+  const awal = Number(awalStr) || 0;
+  const total = belmawa + pt > 0 ? belmawa + pt : awal;
+  return { belmawa, pt, awal, total };
+}
 
 export async function getSetting(userId, kunci, def = "") {
   const rows = await q(

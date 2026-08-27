@@ -49,23 +49,24 @@ async function pastikanAkses(req, res, next) {
 
 /** Ringkasan statistik sebuah tim (rumus sama dengan /api/statistik). */
 async function hitungStatistik(timId) {
-  const [kegiatan, keuangan, danaAwalStr] = await Promise.all([
+  const [kegiatan, keuangan, dana] = await Promise.all([
     store.listKegiatan(timId),
     store.listKeuangan(timId),
-    store.getSetting(timId, "dana_awal", "0"),
+    store.hitungDana(timId),
   ]);
   const capaian = kegiatan.length ? kegiatan[kegiatan.length - 1].capaian_total : 0;
   const totalMenit = kegiatan.reduce((s, e) => s + e.waktu_menit, 0);
   const pengeluaran = keuangan.reduce((s, e) => s + e.total, 0);
-  const danaAwal = Number(danaAwalStr) || 0;
   return {
     capaian_total: capaian,
     jumlah_kegiatan: kegiatan.length,
     total_waktu_menit: totalMenit,
     jumlah_belanja: keuangan.length,
     total_pengeluaran: pengeluaran,
-    dana_awal: danaAwal,
-    sisa_dana: danaAwal - pengeluaran,
+    dana_awal: dana.total,
+    dana_belmawa: dana.belmawa,
+    dana_pt: dana.pt,
+    sisa_dana: dana.total - pengeluaran,
     _kegiatan: kegiatan, // dipakai internal /ringkasan (tidak diserialisasi)
   };
 }
