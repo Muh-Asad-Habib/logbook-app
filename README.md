@@ -161,7 +161,7 @@ Buka menu **Ekspor**:
 
 | Format | Isi |
 |---|---|
-| **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. |
+| **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. Bagian **keuangan dimulai di halaman baru** agar dokumen enak dibaca dan dicetak. |
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
 
@@ -304,6 +304,7 @@ Utilitas lain di folder `tools/`:
 |---|---|
 | `node tools/superuser.mjs -u NAMA -p SANDI` | Setel ulang kredensial panel admin |
 | `node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"` | Impor dokumen Word besar langsung ke sebuah akun |
+| `node tools/test-pemisah-halaman.mjs` | Uji cepat: bagian keuangan pada ekspor DOCX selalu mulai di halaman baru |
 
 ---
 
