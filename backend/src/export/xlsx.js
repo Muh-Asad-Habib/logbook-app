@@ -22,7 +22,10 @@ const C = {
   line: "FFE2E8F0",
   green: "FF059669",
   greenBg: "FFECFDF5",
-  rose: "FFE11D48",
+  rose: "FFE11D48",      // hanya untuk kondisi lebih/minus
+  violet: "FF7C3AED",    // aksen pengeluaran (netral)
+  violetBg: "FFF5F3FF",
+  teal: "FF0D9488",      // aksen dana PT (netral)
   roseBg: "FFFFF1F2",
   amberBg: "FFFFFBEB",
 };
@@ -106,7 +109,7 @@ export async function buildXlsx(userId, namaTim = "") {
       C.amberBg, C.ink],
     ["Jumlah transaksi belanja", `${keuangan.length} transaksi`, C.amberBg, C.ink],
     ["Dana kegiatan (Belmawa + PT)", danaAwal, C.zebra, C.ink],
-    ["Total pengeluaran", pengeluaran, C.roseBg, C.rose],
+    ["Total pengeluaran", pengeluaran, C.violetBg, C.violet],
     ["Sisa dana", sisaDana, sisaDana >= 0 ? C.greenBg : C.roseBg,
       sisaDana >= 0 ? C.green : C.rose],
   ];
@@ -155,7 +158,7 @@ export async function buildXlsx(userId, namaTim = "") {
 
   // ================= Sheet 3: Keuangan =================
   const s2 = wb.addWorksheet("Keuangan", {
-    properties: { tabColor: { argb: C.rose } },
+    properties: { tabColor: { argb: C.violet } },
     views: [{ state: "frozen", ySplit: 4 }],
   });
   s2.columns = [
@@ -258,7 +261,10 @@ export async function buildXlsx(userId, namaTim = "") {
       const r = s3.addRow({ a: nama, b: terima, c: pakai, d: sisa, e: ket });
       styleData(r, i % 2 === 1);
       ["b", "c", "d"].forEach((k) => { r.getCell(k).numFmt = '"Rp"#,##0'; });
-      r.getCell("a").font = { bold: true, size: 10, color: { argb: C.ink } };
+      // Warna per sumber: Belmawa indigo, PT teal, belum dipilih abu-abu.
+      // Merah hanya dipakai saat ada kondisi yang melebihi batas.
+      const warnaSumber = i === 0 ? C.indigoDark : i === 1 ? C.teal : C.muted;
+      r.getCell("a").font = { bold: true, size: 10, color: { argb: warnaSumber } };
       if (i === 1 && rekap.ptLewatBatas) {
         r.getCell("e").font = { bold: true, color: { argb: C.rose } };
       }

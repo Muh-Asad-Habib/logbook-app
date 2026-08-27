@@ -169,7 +169,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
               label="DANA PERGURUAN TINGGI"
               terpakai={r.totalPt}
               pct={pctPt}
-              warna={r.ptLewatBatas ? "var(--bad, #ef4444)" : "#db2777"}
+              warna={r.ptLewatBatas ? "var(--bad, #ef4444)" : "#0d9488"}
               ket={r.danaPt > 0
                 ? <>dari {fmtRingkas(r.danaPt)} · sisa <b>{fmtRingkas(r.sisaPt)}</b></>
                 : <>batas umum {fmtRingkas(BATAS_DANA_PT)}</>}

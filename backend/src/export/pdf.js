@@ -24,7 +24,9 @@ const LINE = "#e2e8f0";
 const ZEBRA = "#f8fafc";
 const GREEN = "#059669";
 const AMBER = "#d97706";
-const ROSE = "#e11d48";
+const ROSE = "#e11d48";   // hanya untuk kondisi lebih/minus
+const TEAL = "#0d9488";   // aksen dana PT (netral, bukan peringatan)
+const VIOLET = "#7c3aed"; // aksen pengeluaran (netral)
 const SKY = "#0369a1";
 
 export async function buildPdf(userId, namaTim = "") {
@@ -96,7 +98,7 @@ export async function buildPdf(userId, namaTim = "") {
       ["CAPAIAN TOTAL", `${capaian}%`, INDIGO],
       ["KEGIATAN", `${kegiatan.length} entri`, SKY],
       ["TOTAL WAKTU", fmtDur(totalMenit), AMBER],
-      ["PENGELUARAN", fmtRp(pengeluaran), ROSE],
+      ["PENGELUARAN", fmtRp(pengeluaran), VIOLET],
       ["DANA KEGIATAN", fmtRp(danaAwal), MUTED],
       ["SISA DANA", fmtRp(sisaDana), sisaDana >= 0 ? GREEN : ROSE],
     ];
@@ -324,7 +326,8 @@ export async function buildPdf(userId, namaTim = "") {
       const kartu = [
         ["DANA BELMAWA", rekap.totalBelmawa, rekap.danaBelmawa, INDIGO,
           rekap.danaBelmawa > 0 ? `Sisa ${fmtRp(rekap.sisaBelmawa)}` : "nominal belum diisi"],
-        ["DANA PERGURUAN TINGGI", rekap.totalPt, rekap.danaPt, ROSE,
+        ["DANA PERGURUAN TINGGI", rekap.totalPt, rekap.danaPt,
+          rekap.ptLewatBatas ? ROSE : TEAL,
           rekap.danaPt > 0 ? `Sisa ${fmtRp(rekap.sisaPt)}`
             : `maksimal ${fmtRp(BATAS_DANA_PT)}`],
       ];
