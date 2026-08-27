@@ -156,6 +156,11 @@
 /* Ikon pada pill urutan (Terbaru / Terlama) */
 .pill .lucide { width: 14px; height: 14px; vertical-align: -0.16em; margin-right: 3px; }
 
+/* Rincian dana pada kartu metrik (dashboard pendamping) — versi padat */
+.dana-mini.rapat { margin-top: 8px; padding-top: 7px; }
+.dana-mini.rapat .dana-mini-row { font-size: 0.72rem; padding: 2px 0; gap: 6px; }
+.dana-mini.rapat .dot { width: 7px; height: 7px; flex: 0 0 7px; }
+
 /* ---------- Responsif ---------- */
 @media (max-width: 760px) {
   .rekap-judul small { display: none; }
@@ -198,4 +203,3 @@
   .seg-mode { flex: 0 0 auto; }
   .mini-chip { font-size: 0.7rem; padding: 4px 9px; }
 }
-
