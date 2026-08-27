@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import {
   Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange, Download,
+  X, FilterX, ArrowDownUp,
 } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtDurasi, fmtTgl, useApi, refreshData,
@@ -308,26 +309,48 @@ function KegiatanTim() {
 
   return (
     <>
-      {/* Toolbar */}
-      <div className="card mt">
-        <div className="row spread toolbar">
+      {/* Toolbar — dua baris: cari & rentang tanggal, lalu urutan & aksi */}
+      <div className="card mt tb-card">
+        <div className="tb-baris">
           <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input
               placeholder="Cari kegiatan…"
               value={cari} onChange={(e) => setCari(e.target.value)}
             />
+            {cari && (
+              <button type="button" className="in-clear" onClick={() => setCari("")}
+                      aria-label="Hapus pencarian">
+                <X className="lucide" />
+              </button>
+            )}
           </div>
           <input type="date" className="tb-tgl" value={dari}
-                 onChange={(e) => setDari(e.target.value)} title="Dari tanggal" />
+                 onChange={(e) => setDari(e.target.value)} title="Dari tanggal"
+                 aria-label="Dari tanggal" />
           <input type="date" className="tb-tgl" value={sampai}
-                 onChange={(e) => setSampai(e.target.value)} title="Sampai tanggal" />
-          <div className="pills">
+                 onChange={(e) => setSampai(e.target.value)} title="Sampai tanggal"
+                 aria-label="Sampai tanggal" />
+          {(cari || dari || sampai) && (
+            <button className="btn sm tb-reset"
+                    onClick={() => { setCari(""); setDari(""); setSampai(""); }}
+                    title="Bersihkan semua filter">
+              <FilterX className="lucide" /> Reset
+            </button>
+          )}
+        </div>
+
+        <div className="tb-baris tb-baris-2">
+          <div className="seg" role="group" aria-label="Urutan entri">
             {["Terbaru", "Terlama"].map((u) => (
-              <button key={u} className={`pill ${urut === u ? "on" : ""}`} onClick={() => setUrut(u)}>{u}</button>
+              <button key={u} type="button"
+                      className={`seg-btn${urut === u ? " on" : ""}`}
+                      onClick={() => setUrut(u)} aria-pressed={urut === u}>
+                <ArrowDownUp className="lucide" /> <span className="seg-teks">{u}</span>
+              </button>
             ))}
           </div>
-          <button className="btn primary" onClick={() => setEdit("baru")}>
+          <button className="btn primary tb-tambah" onClick={() => setEdit("baru")}>
             <Plus className="lucide" /> Tambah
           </button>
         </div>

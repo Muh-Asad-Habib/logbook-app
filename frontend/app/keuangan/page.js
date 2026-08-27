@@ -1,7 +1,10 @@
 "use client";
 
 import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Save, Wallet, Download, FilterX } from "lucide-react";
+import {
+  Plus, Search, Pencil, Trash2, Save, Wallet, Download, FilterX,
+  X, CalendarRange, Table2, LayoutGrid, Eye,
+} from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
   isPendamping, getTimAktif,
@@ -34,12 +37,12 @@ const labelBulan = (kunci) => {
 const buktiKeys = (e) =>
   e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
 
-/** Pilihan filter sumber dana pada toolbar. */
+/** Pilihan filter sumber dana pada toolbar (warna = kelas titik). */
 const FILTER_SUMBER = [
-  { id: "", label: "Semua" },
-  { id: "belmawa", label: "Belmawa" },
-  { id: "pt", label: "PT" },
-  { id: "kosong", label: "Belum dipilih" },
+  { id: "", label: "Semua", warna: "" },
+  { id: "belmawa", label: "Belmawa", warna: "belmawa" },
+  { id: "pt", label: "PT", warna: "pt" },
+  { id: "kosong", label: "Belum dipilih", warna: "netral" },
 ];
 
 const cocokSumber = (e, filter) =>
@@ -91,45 +94,77 @@ function useJumlahKomentar(jenis, timId, aktif = true) {
   return peta;
 }
 
-/** Toolbar filter bersama (cari + bulan + sumber dana). */
+/**
+ * Toolbar filter — dua baris agar tidak berdesakan:
+ *  baris 1: pencarian · pilih bulan · reset
+ *  baris 2: sumber dana (segmented berwarna) · mode tampilan · aksi
+ */
 function ToolbarFilter({
-  cari, setCari, bulan, setBulan, sumber, setSumber, bulanTersedia, anak,
+  cari, setCari, bulan, setBulan, sumber, setSumber, bulanTersedia,
+  mode, setMode, aksi, catatan,
 }) {
   const adaFilter = cari || bulan || sumber;
   return (
-    <div className="card mt">
-      <div className="row spread toolbar">
+    <div className="card mt tb-card">
+      <div className="tb-baris">
         <div className="input-wrap tb-cari">
           <span className="in-ic"><Search className="lucide" /></span>
           <input placeholder="Cari item belanja…" value={cari}
                  onChange={(e) => setCari(e.target.value)} />
+          {cari && (
+            <button type="button" className="in-clear" onClick={() => setCari("")}
+                    aria-label="Hapus pencarian">
+              <X className="lucide" />
+            </button>
+          )}
         </div>
 
-        <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
-                title="Saring per bulan" aria-label="Saring per bulan">
-          <option value="">Semua bulan</option>
-          {bulanTersedia.map((b) => (
-            <option key={b} value={b}>{labelBulan(b)}</option>
-          ))}
-        </select>
+        <div className="tb-sel-wrap">
+          <CalendarRange className="lucide tb-sel-ic" />
+          <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
+                  title="Saring per bulan" aria-label="Saring per bulan">
+            <option value="">Semua bulan</option>
+            {bulanTersedia.map((b) => (
+              <option key={b} value={b}>{labelBulan(b)}</option>
+            ))}
+          </select>
+        </div>
 
-        <div className="pills" role="group" aria-label="Saring sumber dana">
+        {adaFilter && (
+          <button className="btn sm tb-reset"
+                  onClick={() => { setCari(""); setBulan(""); setSumber(""); }}
+                  title="Bersihkan semua filter">
+            <FilterX className="lucide" /> Reset
+          </button>
+        )}
+      </div>
+
+      <div className="tb-baris tb-baris-2">
+        <div className="seg seg-sumber" role="group" aria-label="Saring sumber dana">
           {FILTER_SUMBER.map((s) => (
-            <button key={s.id || "semua"}
-                    className={`pill ${sumber === s.id ? "on" : ""}`}
-                    onClick={() => setSumber(s.id)}>
+            <button key={s.id || "semua"} type="button"
+                    className={`seg-btn${sumber === s.id ? " on" : ""}${s.warna ? ` ${s.warna}` : ""}`}
+                    onClick={() => setSumber(s.id)}
+                    aria-pressed={sumber === s.id}>
+              {s.warna && <i className={`dot ${s.warna}`} />}
               {s.label}
             </button>
           ))}
         </div>
 
-        {adaFilter && (
-          <button className="btn sm tb-reset" onClick={() => { setCari(""); setBulan(""); setSumber(""); }}
-                  title="Bersihkan semua filter">
-            <FilterX className="lucide" /> Reset
-          </button>
-        )}
-        {anak}
+        <div className="seg seg-mode" role="group" aria-label="Mode tampilan">
+          {[{ id: "Tabel", Ic: Table2 }, { id: "Kartu", Ic: LayoutGrid }].map(({ id, Ic }) => (
+            <button key={id} type="button"
+                    className={`seg-btn${mode === id ? " on" : ""}`}
+                    onClick={() => setMode(id)}
+                    aria-pressed={mode === id} title={`Tampilan ${id}`}>
+              <Ic className="lucide" /> <span className="seg-teks">{id}</span>
+            </button>
+          ))}
+        </div>
+
+        {catatan}
+        {aksi}
       </div>
     </div>
   );
@@ -215,7 +250,7 @@ function KeuanganFasilitator() {
     .reverse();
   const total = view.reduce((s, e) => s + e.total, 0);
 
-  // Baris tabel dengan subtotal per bulan
+  // Sisipkan baris subtotal saat bulan berganti
   const subtotal = {};
   for (const e of view) {
     const k = e.tanggal.slice(0, 7);
@@ -247,15 +282,11 @@ function KeuanganFasilitator() {
         bulan={bulan} setBulan={setBulan}
         sumber={sumber} setSumber={setSumber}
         bulanTersedia={bulanTersedia}
-        anak={
-          <>
-            <div className="pills">
-              {["Tabel", "Kartu"].map((m) => (
-                <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
-              ))}
-            </div>
-            <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
-          </>
+        mode={mode} setMode={setMode}
+        catatan={
+          <span className="tb-nota">
+            <Eye className="lucide" /> Mode pendamping — lihat, komentar &amp; ACC
+          </span>
         }
       />
 
@@ -459,17 +490,11 @@ function KeuanganTim() {
         bulan={bulan} setBulan={setBulan}
         sumber={sumber} setSumber={setSumber}
         bulanTersedia={bulanTersedia}
-        anak={
-          <>
-            <div className="pills">
-              {["Tabel", "Kartu"].map((m) => (
-                <button key={m} className={`pill ${mode === m ? "on" : ""}`} onClick={() => setMode(m)}>{m}</button>
-              ))}
-            </div>
-            <button className="btn primary" onClick={() => setEdit("baru")}>
-              <Plus className="lucide" /> Tambah
-            </button>
-          </>
+        mode={mode} setMode={setMode}
+        aksi={
+          <button className="btn primary tb-tambah" onClick={() => setEdit("baru")}>
+            <Plus className="lucide" /> Tambah
+          </button>
         }
       />
 
@@ -743,8 +768,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           )}
         </div>
         <p className="mt total-form">
-          Total:{" "}
-          <b>{fmtRupiah((parseFloat(harga) || 0) * (parseFloat(jumlah) || 0))}</b>
+          Total: <b>{fmtRupiah((parseFloat(harga) || 0) * (parseFloat(jumlah) || 0))}</b>
         </p>
 
         {lama.length > 0 && (
