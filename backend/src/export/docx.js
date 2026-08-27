@@ -68,6 +68,31 @@ function P(text, st = {}) {
 }
 const emptyP = () => "<w:p/>";
 
+/**
+ * Paragraf PEMISAH HALAMAN (setara Ctrl+Enter di Word) — dipakai agar bagian
+ * keuangan tidak menempel di bawah tabel kegiatan, melainkan mulai di halaman
+ * sendiri sehingga dokumen lebih enak dibaca/dicetak.
+ */
+const pageBreakP = () => `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
+
+/**
+ * Sisipkan pemisah halaman pada potongan XML DI ANTARA tabel kegiatan dan
+ * tabel keuangan: tepat sebelum paragraf judul bagian keuangan (paragraf
+ * berteks pertama), atau — bila tak ada judul — tepat sebelum tabelnya.
+ * Idempoten: dilewati bila di sana sudah ada page break.
+ */
+export function sisipkanPemisahHalaman(antara) {
+  if (/<w:br[^>]*w:type="page"/.test(antara)) return antara;      // sudah ada
+  if (/<w:pageBreakBefore\s*\/>/.test(antara)) return antara;     // gaya lain
+  const paragraf = antara.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || [];
+  const judul = paragraf.find((p) => textOf(p).trim() !== "");
+  // Tanpa judul (template resmi hanya berisi paragraf kosong): break diletakkan
+  // PALING BELAKANG supaya halaman baru langsung dimulai oleh tabel keuangan.
+  if (!judul) return antara + pageBreakP();
+  const at = antara.indexOf(judul);
+  return antara.slice(0, at) + pageBreakP() + antara.slice(at);
+}
+
 /** Ambil gaya per-sel (pPr + rPr) dari baris data terisi pertama sebuah tabel. */
 function cellStyles(tblXml) {
   const rows = rowsOf(tblXml);
@@ -698,13 +723,16 @@ export async function buildDocx(userId) {
   // teks putih tebal, diulang tiap halaman).
   const kegXml = sortRowsByDate(percantikHeader(hasilKeg.xml));
   const keuXml = sortRowsByDate(percantikHeader(hasilKeu.xml));
-  let idx = 0;
-  docXml = docXml.replace(tblRe, (m) => {
-    idx += 1;
-    if (idx === 1) return kegXml;
-    if (idx === 2) return keuXml;
-    return m;
-  });
+
+  // Dirakit lewat INDEKS (bukan replace global) supaya potongan XML di antara
+  // kedua tabel bisa disisipi pemisah halaman — bagian keuangan selalu mulai
+  // di halaman baru, tidak lagi menempel persis di bawah tabel kegiatan.
+  const posisi = [...docXml.matchAll(new RegExp(tblRe.source, "g"))]
+    .map((m) => ({ at: m.index, len: m[0].length }));
+  const [t1, t2] = posisi;
+  const antara = sisipkanPemisahHalaman(docXml.slice(t1.at + t1.len, t2.at));
+  docXml =
+    docXml.slice(0, t1.at) + kegXml + antara + keuXml + docXml.slice(t2.at + t2.len);
 
   zip.file("word/document.xml", docXml);
   zip.file("word/_rels/document.xml.rels", relsRef.value);
