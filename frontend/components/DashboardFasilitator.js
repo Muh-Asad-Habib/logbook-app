@@ -141,6 +141,21 @@ export default function DashboardFasilitator() {
           <div>
             <div className="metric-label">SISA DANA</div>
             <div className="metric-value">{fmtRupiah(s.sisa_dana)}</div>
+            {s.dana_awal > 0 && (
+              <div className="metric-delta">dari {fmtRupiah(s.dana_awal)}</div>
+            )}
+            {(s.dana_belmawa > 0 || s.dana_pt > 0) && (
+              <div className="dana-mini rapat">
+                <div className="dana-mini-row">
+                  <span className="dot belmawa" /> Belmawa
+                  <b>{fmtRupiah(s.dana_belmawa || 0)}</b>
+                </div>
+                <div className="dana-mini-row">
+                  <span className="dot pt" /> PT
+                  <b>{fmtRupiah(s.dana_pt || 0)}</b>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -232,4 +247,3 @@ export default function DashboardFasilitator() {
     </>
   );
 }
-
