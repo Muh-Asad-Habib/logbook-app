@@ -89,6 +89,11 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
     ? Math.min(100, (r.totalPt / r.danaPt) * 100)
     : Math.min(100, (r.totalPt / BATAS_DANA_PT) * 100);
 
+  const totalDana = r.danaBelmawa + r.danaPt;
+  const totalPakai = r.totalBelmawa + r.totalPt;
+  const sisaTotal = totalDana - totalPakai;
+  const pctPakai = totalDana > 0 ? Math.round((totalPakai / totalDana) * 100) : 0;
+
   return (
     <div className={`card mt rekap-card${buka ? " terbuka" : ""}`}>
       {/* ===== Kepala kartu — tombol buka/tutup ===== */}
@@ -126,6 +131,27 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
       {/* ===== Isi kartu ===== */}
       {buka && (
         <div id="rekap-isi" className="rekap-isi">
+          {/* ===== Ikhtisar: diterima → terpakai → sisa ===== */}
+          <div className="rekap-ikhtisar">
+            <div className="ikh-item">
+              <span className="ikh-cap">Total dana diterima</span>
+              <b className="ikh-val">{fmtRupiah(totalDana)}</b>
+              <small>Belmawa {fmtRingkas(r.danaBelmawa)} · PT {fmtRingkas(r.danaPt)}</small>
+            </div>
+            <span className="ikh-op" aria-hidden="true">−</span>
+            <div className="ikh-item">
+              <span className="ikh-cap">Total terpakai</span>
+              <b className="ikh-val pakai">{fmtRupiah(totalPakai)}</b>
+              <small>{pctPakai}% dari dana diterima</small>
+            </div>
+            <span className="ikh-op" aria-hidden="true">=</span>
+            <div className={`ikh-item utama${sisaTotal < 0 ? " minus" : ""}`}>
+              <span className="ikh-cap">Sisa belum terpakai</span>
+              <b className="ikh-val">{fmtRupiah(sisaTotal)}</b>
+              <small>{sisaTotal < 0 ? "melebihi dana yang diterima" : "siap dibelanjakan"}</small>
+            </div>
+          </div>
+
           {/* ===== Ringkasan per sumber ===== */}
           <div className="rekap-sumber">
             <KartuSumber

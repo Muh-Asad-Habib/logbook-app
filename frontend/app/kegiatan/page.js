@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
 import {
   Plus, Search, Pencil, Trash2, Save, CalendarDays, CalendarRange, Download,
-  X, FilterX, ArrowDownUp,
+  ArrowDownWideNarrow, ArrowUpNarrowWide,
 } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtDurasi, fmtTgl, useApi, refreshData,
@@ -27,6 +27,11 @@ const NAMA_BULAN = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
+/** Pilihan urutan daftar - ikon dibedakan agar arah urutan langsung terbaca. */
+const URUTAN = [
+  { id: "Terbaru", Ic: ArrowDownWideNarrow, ket: "Tanggal terbaru di atas" },
+  { id: "Terlama", Ic: ArrowUpNarrowWide, ket: "Tanggal terlama di atas" },
+];
 function DateTile({ iso }) {
   const [y, m, d] = iso.split("-").map(Number);
   return (
@@ -184,8 +189,11 @@ function KegiatanFasilitator() {
             })}
           </select>
           <div className="pills">
-            {["Terbaru", "Terlama"].map((u) => (
-              <button key={u} className={`pill ${urut === u ? "on" : ""}`} onClick={() => setUrut(u)}>{u}</button>
+            {URUTAN.map(({ id, Ic, ket }) => (
+              <button key={id} className={`pill ${urut === id ? "on" : ""}`}
+                      onClick={() => setUrut(id)} title={ket}>
+                <Ic className="lucide" /> {id}
+              </button>
             ))}
           </div>
           <span className="badge info">👁 Mode pendamping — lihat, komentar &amp; ACC</span>
@@ -309,21 +317,15 @@ function KegiatanTim() {
 
   return (
     <>
-      {/* Toolbar — dua baris: cari & rentang tanggal, lalu urutan & aksi */}
-      <div className="card mt tb-card">
-        <div className="tb-baris">
+      {/* Toolbar */}
+      <div className="card mt">
+        <div className="row spread toolbar">
           <div className="input-wrap tb-cari">
             <span className="in-ic"><Search className="lucide" /></span>
             <input
               placeholder="Cari kegiatan…"
               value={cari} onChange={(e) => setCari(e.target.value)}
             />
-            {cari && (
-              <button type="button" className="in-clear" onClick={() => setCari("")}
-                      aria-label="Hapus pencarian">
-                <X className="lucide" />
-              </button>
-            )}
           </div>
           <input type="date" className="tb-tgl" value={dari}
                  onChange={(e) => setDari(e.target.value)} title="Dari tanggal"
@@ -331,26 +333,15 @@ function KegiatanTim() {
           <input type="date" className="tb-tgl" value={sampai}
                  onChange={(e) => setSampai(e.target.value)} title="Sampai tanggal"
                  aria-label="Sampai tanggal" />
-          {(cari || dari || sampai) && (
-            <button className="btn sm tb-reset"
-                    onClick={() => { setCari(""); setDari(""); setSampai(""); }}
-                    title="Bersihkan semua filter">
-              <FilterX className="lucide" /> Reset
-            </button>
-          )}
-        </div>
-
-        <div className="tb-baris tb-baris-2">
-          <div className="seg" role="group" aria-label="Urutan entri">
-            {["Terbaru", "Terlama"].map((u) => (
-              <button key={u} type="button"
-                      className={`seg-btn${urut === u ? " on" : ""}`}
-                      onClick={() => setUrut(u)} aria-pressed={urut === u}>
-                <ArrowDownUp className="lucide" /> <span className="seg-teks">{u}</span>
+          <div className="pills">
+            {URUTAN.map(({ id, Ic, ket }) => (
+              <button key={id} className={`pill ${urut === id ? "on" : ""}`}
+                      onClick={() => setUrut(id)} title={ket}>
+                <Ic className="lucide" /> {id}
               </button>
             ))}
           </div>
-          <button className="btn primary tb-tambah" onClick={() => setEdit("baru")}>
+          <button className="btn primary" onClick={() => setEdit("baru")}>
             <Plus className="lucide" /> Tambah
           </button>
         </div>
@@ -576,3 +567,5 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
     </dialog>
   );
 });
+
+
