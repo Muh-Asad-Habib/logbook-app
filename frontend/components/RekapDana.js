@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import {
   ChartPie, TriangleAlert, Info, Landmark, Building2, ChevronDown,
 } from "lucide-react";
-import { fmtRupiah } from "@/lib/api";
+import { fmtRupiah, fmtNominal } from "@/lib/api";
 import { rekapDana, BATAS_DANA_PT } from "@/lib/pkm";
 
 const KUNCI_BUKA = "logbook_rekap_terbuka";
@@ -22,11 +22,6 @@ const KUNCI_BUKA = "logbook_rekap_terbuka";
 const warnaBar = (lewat, pct) =>
   lewat ? "var(--bad, #ef4444)" : pct >= 85 ? "#f59e0b" : "var(--p1, #4f46e5)";
 
-/** Nominal ringkas untuk layar sempit: Rp1,2 jt */
-const fmtRingkas = (v) =>
-  Math.abs(v) >= 1_000_000
-    ? `Rp${(v / 1_000_000).toFixed(1).replace(".", ",")} jt`
-    : fmtRupiah(v);
 
 function KartuSumber({ Ic, label, terpakai, ket, pct, warna, peringatan }) {
   return (
@@ -113,10 +108,10 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
         {/* Ringkasan mini: tetap terbaca meski kartu terlipat */}
         <span className="rekap-mini">
           <span className="mini-chip belmawa">
-            <i className="dot belmawa" /> {fmtRingkas(r.totalBelmawa)}
+            <i className="dot belmawa" /> {fmtNominal(r.totalBelmawa)}
           </span>
           <span className="mini-chip pt">
-            <i className="dot pt" /> {fmtRingkas(r.totalPt)}
+            <i className="dot pt" /> {fmtNominal(r.totalPt)}
           </span>
           {perluPerhatian && (
             <span className="mini-chip warn" title="Ada yang perlu dicek">
@@ -136,7 +131,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
             <div className="ikh-item">
               <span className="ikh-cap">Total dana diterima</span>
               <b className="ikh-val">{fmtRupiah(totalDana)}</b>
-              <small>Belmawa {fmtRingkas(r.danaBelmawa)} · PT {fmtRingkas(r.danaPt)}</small>
+              <small>Belmawa {fmtNominal(r.danaBelmawa)} · PT {fmtNominal(r.danaPt)}</small>
             </div>
             <span className="ikh-op" aria-hidden="true">−</span>
             <div className="ikh-item">
@@ -161,7 +156,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
               pct={pctBelmawa}
               warna="var(--p1, #4f46e5)"
               ket={r.danaBelmawa > 0
-                ? <>dari {fmtRingkas(r.danaBelmawa)} · sisa <b>{fmtRingkas(r.sisaBelmawa)}</b></>
+                ? <>dari {fmtNominal(r.danaBelmawa)} · sisa <b>{fmtNominal(r.sisaBelmawa)}</b></>
                 : "nominal dana belum diisi"}
             />
             <KartuSumber
@@ -171,8 +166,8 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
               pct={pctPt}
               warna={r.ptLewatBatas ? "var(--bad, #ef4444)" : "#0d9488"}
               ket={r.danaPt > 0
-                ? <>dari {fmtRingkas(r.danaPt)} · sisa <b>{fmtRingkas(r.sisaPt)}</b></>
-                : <>batas umum {fmtRingkas(BATAS_DANA_PT)}</>}
+                ? <>dari {fmtNominal(r.danaPt)} · sisa <b>{fmtNominal(r.sisaPt)}</b></>
+                : <>batas umum {fmtNominal(BATAS_DANA_PT)}</>}
               peringatan={r.ptLewatBatas
                 ? `Melebihi batas dana PT ${fmtRupiah(BATAS_DANA_PT)}` : ""}
             />
@@ -182,7 +177,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
           <div className="rekap-sub">
             <span>Kategori belanja dana Belmawa</span>
             {r.danaBelmawa > 0 && (
-              <small className="muted">% dari {fmtRingkas(r.danaBelmawa)}</small>
+              <small className="muted">% dari {fmtNominal(r.danaBelmawa)}</small>
             )}
           </div>
 
@@ -203,7 +198,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
                   <div className="rekap-bar kosong" title="Isi nominal dana Belmawa untuk melihat persentase" />
                 )}
                 <span className={`rekap-nilai${k.lewat ? " lewat" : ""}`}>
-                  {fmtRingkas(k.terpakai)}
+                  {fmtNominal(k.terpakai)}
                   {r.danaBelmawa > 0 && <small>{k.pct}%</small>}
                 </span>
               </div>

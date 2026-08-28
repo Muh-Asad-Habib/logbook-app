@@ -6,7 +6,7 @@ import {
   Trophy, CalendarCheck, Hourglass, Receipt, Coins, TrendingDown, Rocket, Flame,
   TrendingUp, ChartColumn, ChartPie, Banknote, History, Save, Check, Plus, NotebookPen,
 } from "lucide-react";
-import { api, fotoUrl, fmtRupiah, fmtDurasi, fmtTgl, useApi, revalidate, isPendamping } from "@/lib/api";
+import { api, fotoUrl, fmtRupiah, fmtNominal, fmtDurasi, fmtTgl, useApi, revalidate, isPendamping } from "@/lib/api";
 import { retryFoto } from "@/lib/foto";
 import { BATAS_DANA_PT, rekapDana } from "@/lib/pkm";
 import {
@@ -17,6 +17,9 @@ import DashboardFasilitator from "@/components/DashboardFasilitator";
 import KartuAcc from "@/components/KartuAcc";
 import { toast } from "@/components/Toast";
 
+/* Nominal padat KHUSUS label grafik (sumbu & tooltip) — ruangnya sempit.
+   Untuk angka yang dibaca sebagai nilai uang, pakai fmtNominal/fmtRupiah
+   agar tidak ada digit yang hilang. */
 const fmtJt = (v) => (v >= 1_000_000 ? `Rp${(v / 1_000_000).toFixed(1)}jt` : fmtRupiah(v));
 
 export default function Dashboard() {
@@ -205,7 +208,8 @@ function DashboardTim() {
         <div className="card">
           <h3><ChartPie className="lucide" /> Komposisi pengeluaran</h3>
           <p className="sub">per item belanja</p>
-          <Breakdown rows={bdRows} fmtVal={fmtJt} />
+          {/* Daftar (bukan sumbu grafik) → nominal ditulis utuh */}
+          <Breakdown rows={bdRows} fmtVal={fmtNominal} />
         </div>
         <div className="card">
           <h3><TrendingDown className="lucide" /> Pengeluaran kumulatif</h3>
@@ -263,14 +267,14 @@ function DashboardTim() {
                 <span className="dot belmawa" /> Belmawa
                 <b>{fmtRupiah(rekap.totalBelmawa)}</b>
                 <small className="muted">
-                  {rekap.danaBelmawa > 0 ? `sisa ${fmtJt(rekap.sisaBelmawa)}` : "—"}
+                  {rekap.danaBelmawa > 0 ? `sisa ${fmtNominal(rekap.sisaBelmawa)}` : "—"}
                 </small>
               </div>
               <div className="dana-mini-row">
                 <span className="dot pt" /> Perguruan Tinggi
                 <b>{fmtRupiah(rekap.totalPt)}</b>
                 <small className={rekap.ptLewatBatas ? "bad" : "muted"}>
-                  {rekap.danaPt > 0 ? `sisa ${fmtJt(rekap.sisaPt)}`
+                  {rekap.danaPt > 0 ? `sisa ${fmtNominal(rekap.sisaPt)}`
                     : rekap.ptLewatBatas ? "lewat batas" : "—"}
                 </small>
               </div>
