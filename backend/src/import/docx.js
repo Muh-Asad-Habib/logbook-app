@@ -300,6 +300,18 @@ export async function importDocx(buffer, userId) {
       }
       if (!harga && totalDok > 0) harga = Math.round((totalDok / jumlah) * 100) / 100;
 
+      // Nota sering memuat kode unik transfer (mis. 90.000 → 90.123). Bila
+      // total di dokumen lebih besar dari harga × jumlah, selisih kecil itu
+      // disimpan sebagai kode_unik supaya total tersimpan sama persis dengan
+      // dokumen. Selisih besar diabaikan (kemungkinan salah baca kolom).
+      let kodeUnik = 0;
+      if (totalDok > 0) {
+        const dasar = harga * jumlah;
+        const selisih = Math.round((totalDok - dasar) * 100) / 100;
+        if (selisih > 0 && selisih < Math.max(1000, dasar * 0.01)) kodeUnik = selisih;
+      }
+
+
       const buktiKeys = [];
       // Utamakan kolom Bukti/Gambar, tetapi terima juga bila foto diletakkan
       // di sel lain pada baris yang sama — SEMUA gambar disimpan.
@@ -318,6 +330,7 @@ export async function importDocx(buffer, userId) {
         harga_satuan: harga,
         satuan_suffix: parseSuffix(teks[kolomKeu.harga]),
         jumlah,
+        kode_unik: kodeUnik,
         bukti_keys: buktiKeys,
       });
       keuAda.add(`${tanggal}|${norm(item)}`);

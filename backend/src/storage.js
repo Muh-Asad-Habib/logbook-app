@@ -64,6 +64,8 @@ const petaKeuangan = (r) => {
     harga_satuan: angka(r.harga_satuan),
     satuan_suffix: r.satuan_suffix || "",
     jumlah: angka(r.jumlah),
+    // Kode unik transfer (opsional, 0 = tidak ada) — sudah termasuk di total
+    kode_unik: angka(r.kode_unik),
     total: angka(r.total),
     // Sumber dana & kategori PKM — opsional; "" = tim belum memilih
     sumber: r.sumber || "",
@@ -265,6 +267,7 @@ export async function getUserDetail(userId) {
     harga_satuan: e.harga_satuan,
     satuan_suffix: e.satuan_suffix,
     jumlah: e.jumlah,
+    kode_unik: e.kode_unik,
     total: e.total,
     sumber: e.sumber,
     kategori: e.kategori,
@@ -691,8 +694,9 @@ export async function listKeuangan(userId) {
   return rows.map(petaKeuangan);
 }
 
-export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, bukti_keys, sumber, kategori }) {
+export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_suffix, jumlah, kode_unik, bukti_keys, sumber, kategori }) {
   const keys = Array.isArray(bukti_keys) ? bukti_keys.filter(Boolean) : [];
+  const kode = Number(kode_unik) || 0;
   const e = {
     id: newId(),
     userId,
@@ -701,7 +705,9 @@ export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_
     harga_satuan,
     satuan_suffix,
     jumlah,
-    total: harga_satuan * jumlah,
+    kode_unik: kode,
+    // Kode unik ikut dijumlahkan supaya total = nominal yang benar-benar dibayar
+    total: harga_satuan * jumlah + kode,
     sumber: sumber || "",
     kategori: kategori || "",
     bukti_keys: keys,
@@ -709,11 +715,11 @@ export async function addKeuangan(userId, { tanggal, item, harga_satuan, satuan_
     createdAt: nowIso(),
   };
   await q(
-    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at, sumber, kategori)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at, sumber, kategori, kode_unik)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
     [e.id, e.userId, e.tanggal, e.item, e.harga_satuan, e.satuan_suffix,
      e.jumlah, e.total, e.bukti_key, JSON.stringify(e.bukti_keys), e.createdAt,
-     e.sumber, e.kategori]
+     e.sumber, e.kategori, e.kode_unik]
   );
   return e;
 }
@@ -729,16 +735,18 @@ export async function updateKeuangan(userId, id, patch) {
   Object.assign(e, patch);
   e.bukti_keys = (e.bukti_keys || []).filter(Boolean);
   e.bukti_key = e.bukti_keys[0] || ""; // kolom lama tetap sinkron
-  e.total = e.harga_satuan * e.jumlah;
+  e.kode_unik = Number(e.kode_unik) || 0;
+  e.total = e.harga_satuan * e.jumlah + e.kode_unik;
   e.sumber = e.sumber || "";
   e.kategori = e.kategori || "";
   await q(
     `UPDATE keuangan SET tanggal = $1, item = $2, harga_satuan = $3, satuan_suffix = $4,
             jumlah = $5, total = $6, bukti_key = $7, bukti_keys = $8,
-            sumber = $11, kategori = $12
+            sumber = $11, kategori = $12, kode_unik = $13
       WHERE id = $9 AND user_id = $10`,
     [e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total,
-     e.bukti_key, JSON.stringify(e.bukti_keys), id, userId, e.sumber, e.kategori]
+     e.bukti_key, JSON.stringify(e.bukti_keys), id, userId, e.sumber, e.kategori,
+     e.kode_unik]
   );
   await hapusPersetujuan("keuangan", id); // entri berubah → ACC batal
   return e;
