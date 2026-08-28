@@ -104,6 +104,10 @@ const SKEMA = [
   // memilih, entri lama tetap valid dan hanya diberi tanda di UI.
   `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS sumber   TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS kategori TEXT NOT NULL DEFAULT ''`,
+  // Kode unik transfer — nominal kecil yang membuat angka di nota tidak bulat
+  // (mis. sewa GPU Rp90.000 tetapi terbayar Rp90.123). OPSIONAL, bawaan 0;
+  // ikut dijumlahkan ke total supaya angka tersimpan sama persis dengan nota.
+  `ALTER TABLE keuangan ADD COLUMN IF NOT EXISTS kode_unik DOUBLE PRECISION NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS pengaturan (
      user_id TEXT NOT NULL,
      kunci   TEXT NOT NULL,

@@ -56,9 +56,9 @@ for (const e of keg) {
 for (const e of keu) {
   const bk = typeof e.bukti_keys === "string" ? e.bukti_keys : JSON.stringify(e.bukti_keys || []);
   await q(
-    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [crypto.randomUUID(), baru.id, e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total, e.bukti_key || "", bk, e.created_at]
+    `INSERT INTO keuangan (id, user_id, tanggal, item, harga_satuan, satuan_suffix, jumlah, total, bukti_key, bukti_keys, created_at, kode_unik)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [crypto.randomUUID(), baru.id, e.tanggal, e.item, e.harga_satuan, e.satuan_suffix, e.jumlah, e.total, e.bukti_key || "", bk, e.created_at, Number(e.kode_unik) || 0]
   );
 }
 for (const s of set) {

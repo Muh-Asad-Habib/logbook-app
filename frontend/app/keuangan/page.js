@@ -37,6 +37,28 @@ const labelBulan = (kunci) => {
 const buktiKeys = (e) =>
   e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
 
+/**
+ * Rincian "Harga × jml" sebuah entri, plus kode unik transfer bila ada.
+ *
+ * Kode unik TIDAK ditampilkan sebagai kolom/total terpisah — ia sudah menyatu
+ * di kolom Total (seperti angka pada nota), di sini hanya diberi keterangan
+ * kecil supaya jelas dari mana selisihnya berasal.
+ */
+function RincianHarga({ e }) {
+  const kode = Number(e.kode_unik) || 0;
+  return (
+    <>
+      {fmtRupiah(e.harga_satuan)}{e.satuan_suffix}
+      <small className="muted"> × {e.jumlah}</small>
+      {kode > 0 && (
+        <small className="muted" title="Kode unik transfer — sudah termasuk di total">
+          {" "}+ {fmtRupiah(kode)} kode unik
+        </small>
+      )}
+    </>
+  );
+}
+
 /** Pilihan filter sumber dana pada toolbar (warna = kelas titik). */
 const FILTER_SUMBER = [
   { id: "", label: "Semua", warna: "" },
@@ -331,8 +353,7 @@ function KeuanganFasilitator() {
                       <div className="mts"><BadgeSumber e={r.e} /></div>
                     </td>
                     <td className="num nowrap">
-                      {fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}
-                      <small className="muted"> × {r.e.jumlah}</small>
+                      <RincianHarga e={r.e} />
                     </td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
@@ -369,7 +390,8 @@ function KeuanganFasilitator() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{fmtTgl(e.tanggal)}</b> — {e.item}
                   <p className="muted mts">
-                    {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
+                    {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah}
+                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} kode unik</>} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
                   <div className="mts"><BadgeSumber e={e} /></div>
@@ -552,8 +574,7 @@ function KeuanganTim() {
                       </div>
                     </td>
                     <td className="num nowrap">
-                      {fmtRupiah(r.e.harga_satuan)}{r.e.satuan_suffix}
-                      <small className="muted"> × {r.e.jumlah}</small>
+                      <RincianHarga e={r.e} />
                     </td>
                     <td className="num"><b>{fmtRupiah(r.e.total)}</b></td>
                     <td>
@@ -597,7 +618,8 @@ function KeuanganTim() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b>{fmtTgl(e.tanggal)}</b> — {e.item}
                   <p className="muted mts">
-                    {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah} ={" "}
+                    {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah}
+                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} kode unik</>} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
                   <div className="mts">
@@ -661,6 +683,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   const [harga, setHarga] = useState(entri?.harga_satuan ?? draf?.harga ?? 0);
   const [satuan, setSatuan] = useState(entri?.satuan_suffix ?? draf?.satuan ?? "");
   const [jumlah, setJumlah] = useState(entri?.jumlah ?? draf?.jumlah ?? 1);
+  // Kode unik transfer — opsional; ditambahkan ke total (mis. 90.000 → 90.123)
+  const [kodeUnik, setKodeUnik] = useState(entri?.kode_unik ?? draf?.kodeUnik ?? 0);
   // Sumber dana & kategori PKM — opsional, boleh dibiarkan kosong
   const [sumber, setSumber] = useState(entri?.sumber ?? draf?.sumber ?? "");
   const [kategori, setKategori] = useState(entri?.kategori ?? draf?.kategori ?? "");
@@ -670,8 +694,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   useEffect(() => {
     if (entri) return;
     if (!item && !harga && !satuan) return;
-    simpanDraf("keuangan", { item, tanggal, harga, satuan, jumlah, sumber, kategori });
-  }, [entri, item, tanggal, harga, satuan, jumlah, sumber, kategori]);
+    simpanDraf("keuangan", { item, tanggal, harga, satuan, jumlah, kodeUnik, sumber, kategori });
+  }, [entri, item, tanggal, harga, satuan, jumlah, kodeUnik, sumber, kategori]);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -742,6 +766,11 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
                    onChange={(e) => setJumlah(e.target.value)} />
           </label>
           <label className="field">
+            Kode unik (Rp) <span className="muted">(opsional)</span>
+            <input type="number" name="kode_unik" min="0" step="any" value={kodeUnik}
+                   onChange={(e) => setKodeUnik(e.target.value)} placeholder="mis. 123" />
+          </label>
+          <label className="field">
             Sumber dana <span className="muted">(opsional)</span>
             <select name="sumber" value={sumber}
                     onChange={(e) => {
@@ -768,7 +797,15 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           )}
         </div>
         <p className="mt total-form">
-          Total: <b>{fmtRupiah((parseFloat(harga) || 0) * (parseFloat(jumlah) || 0))}</b>
+          Total:{" "}
+          <b>
+            {fmtRupiah(
+              (parseFloat(harga) || 0) * (parseFloat(jumlah) || 0) + (parseFloat(kodeUnik) || 0)
+            )}
+          </b>
+          {(parseFloat(kodeUnik) || 0) > 0 && (
+            <small className="muted"> (termasuk kode unik {fmtRupiah(parseFloat(kodeUnik) || 0)})</small>
+          )}
         </p>
 
         {lama.length > 0 && (

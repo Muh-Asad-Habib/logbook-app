@@ -124,6 +124,14 @@ Buka menu **Keuangan** → **Tambah**, lalu isi nama item, harga satuan, jumlah,
 dan satuan (misalnya "per bulan"). Total dihitung otomatis, dan foto nota dapat
 dilampirkan sebagai bukti.
 
+**Kode unik (opsional).** Banyak pembayaran transfer memakai kode unik sehingga
+nominalnya tidak bulat — misalnya sewa GPU Rp90.000/jam yang terbayar Rp90.123.
+Isi selisih itu pada kolom **Kode unik (Rp)**; nilainya langsung dijumlahkan ke
+total (`harga × jumlah + kode unik`) supaya angka tersimpan sama persis dengan
+nota. Biarkan 0 bila tidak ada. Di daftar belanja kode unik tampil sebagai
+keterangan kecil pada kolom harga, sedangkan kolom Total dan semua ekspor
+(DOCX/PDF/Excel) menampilkan satu angka gabungan — sama seperti di nota.
+
 **Sumber dana (opsional).** Pada form tersedia pilihan **Sumber dana** —
 *Belmawa* atau *Perguruan Tinggi* — dan, khusus Belmawa, **Kategori PKM**.
 Keduanya boleh dibiarkan kosong; entri tanpa penanda hanya diberi lencana
