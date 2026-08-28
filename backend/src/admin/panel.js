@@ -388,6 +388,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   .acts-cell{text-align:right;white-space:nowrap}
   .acts{display:inline-flex;gap:6px;flex-wrap:nowrap}
+  tr.baris-total td{background:#0b1024;font-weight:800}
 
   /* ---------- avatar & badge ---------- */
   .ava{width:34px;height:34px;border-radius:50%;flex:0 0 34px;display:inline-flex;align-items:center;
@@ -628,6 +629,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       letter-spacing:.02em;text-transform:uppercase}
     .main{margin-left:0}
     .wrap{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+    /* dock menutupi sudut kanan-bawah → toast dinaikkan agar tetap terbaca */
+    #toast{bottom:calc(88px + env(safe-area-inset-bottom,0px))}
   }
   @media(max-width:640px){
     /* --- topbar ringkas --- */
@@ -677,22 +680,73 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .chips{gap:7px}
     .chip{flex:1 1 calc(50% - 7px);min-width:0}
     .login-body{padding:22px 20px 0}
-    /* --- tabel: gulir horizontal + sel lebih rapat --- */
-    table{min-width:620px;font-size:.78rem}
-    th,td{padding:10px 11px}
-    .u-cell{min-width:150px}
+    /* --- tabel: lihat blok "TABEL → KARTU BERTUMPUK" di bawah --- */
+    .u-cell{min-width:0}
     /* --- tombol ramah sentuh --- */
     .btn{min-height:40px}
     .btn.sm{min-height:36px}
     .acts{gap:7px}
     .acts .btn.sm{padding:8px 10px}
     .acts .btn.sm.ic{padding:8px 11px}
+
+    /* ---------- TABEL → KARTU BERTUMPUK ----------
+       Di layar sempit, menggeser tabel ke samping itu menyiksa. Setiap baris
+       diubah jadi satu kartu: sel utama (nama akun / tanggal) jadi kepalanya,
+       sel lain tampil "Label : nilai" memakai atribut data-l. */
+    .tbl{border:none;border-radius:0;overflow:visible;background:transparent;margin-top:6px}
+    .tbl table,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+    .tbl table{min-width:0;font-size:.8rem}
+    .tbl thead{display:none}
+    .tbl tbody tr{
+      background:var(--panel);border:1px solid var(--line);border-radius:14px;
+      margin-top:10px;overflow:hidden;
+      box-shadow:0 14px 30px -24px rgba(0,0,0,.8);
+    }
+    .tbl tbody tr:hover{background:var(--panel)}
+    .tbl td{
+      display:flex;align-items:center;justify-content:space-between;gap:4px 12px;
+      flex-wrap:wrap;
+      padding:9px 13px;text-align:right;border-bottom:1px solid #141a36;
+      white-space:normal!important;overflow-wrap:anywhere;
+    }
+    .tbl tr td:last-child{border-bottom:none}
+    .tbl td:empty{display:none}
+    .tbl td[data-l]::before{
+      content:attr(data-l);flex:0 0 auto;text-align:left;color:var(--mut);
+      font-size:.63rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    }
+    /* keterangan tambahan (tanggal jam, catatan perangkat) turun ke baris sendiri */
+    .tbl td>.mut{flex:1 1 100%;text-align:right}
+    /* kepala kartu: nama akun / tanggal — tanpa label, rata kiri */
+    .tbl td.sel-utama{
+      display:block;text-align:left;padding:12px 13px;
+      background:linear-gradient(120deg,rgba(109,124,255,.14),rgba(34,211,238,.05));
+      border-bottom:1px solid var(--line);
+    }
+    .tbl td.nomor{display:none}           /* nomor urut tidak berguna di kartu */
+    .tbl td.sel-utama>.mut,.tbl td.sel-utama .mut{text-align:left}
+    .tbl .u-cell{min-width:0}
+    /* tombol aksi: satu baris penuh, boleh melipat */
+    .tbl td.acts-cell{display:block;text-align:left;padding:11px 13px}
+    .tbl td.acts-cell::before{display:none}
+    .tbl .acts{display:flex;flex-wrap:wrap;gap:7px;width:100%}
+    .tbl .acts .btn{flex:0 0 auto}
+    .tbl .acts .btn.p{flex:1 1 auto;justify-content:center}
+    /* baris kosong & baris TOTAL tetap utuh */
+    .tbl td[colspan]{display:block;text-align:center}
+    .tbl td[colspan]::before{display:none}
+    .tbl tr.baris-total td[colspan]{text-align:right}
+    .tbl .ths{justify-content:flex-end}
+    .tbl .prog{min-width:60px}
     /* --- dialog nyaris layar penuh --- */
     dialog{width:calc(100% - 20px);max-height:calc(100dvh - 16px)}
     dialog.besar{width:calc(100vw - 12px);height:calc(100dvh - 16px)}
     dialog.besar .dlg-b{max-height:none;padding:13px 13px 17px}
-    dialog.besar table{min-width:620px;font-size:.8rem}
-    dialog.besar th,dialog.besar td{padding:11px 12px}
+    /* tabel di dalam dialog ikut mode kartu (lihat blok "TABEL → KARTU") */
+    dialog.besar .tbl table{min-width:0;font-size:.8rem}
+    dialog.besar .tbl td{padding:9px 13px}
+    dialog.besar .tbl td.sel-utama,dialog.besar .tbl td.acts-cell{padding:11px 13px}
+    dialog.besar .th{width:46px;height:46px}
     dialog.besar .chip{padding:9px 12px;font-size:.76rem;min-width:0}
     dialog.besar .chip b{font-size:.92rem}
     dialog.besar .tabs button{font-size:.78rem;padding:9px 14px}
@@ -704,6 +758,16 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     /* --- audit & linimasa --- */
     .audit{-webkit-overflow-scrolling:touch}
     .tline{-webkit-overflow-scrolling:touch;max-height:58vh}
+    /* baris audit: biar tidak terpotong, IP turun ke baris berikutnya */
+    .audit .row-a{flex-wrap:wrap;row-gap:3px;padding:8px 5px}
+    .audit .tg{white-space:normal;overflow-wrap:anywhere;flex:1 1 100%;order:3}
+    .audit .ip{order:4;margin-left:0}
+    /* --- toast: naik ke atas dock navigasi & selebar layar --- */
+    #toast{
+      left:12px;right:12px;
+      bottom:calc(92px + env(safe-area-inset-bottom,0px));
+    }
+    .tst{min-width:0;max-width:none}
   }
   @media(max-width:420px){
     /* layar sangat sempit (≤420px): chips & tombol memenuhi lebar, teks pas */
@@ -716,6 +780,27 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .crumb .sep,#upd{display:none}
     .side-nav a::after,.side-out::after{font-size:.58rem}
     .side-out{min-width:48px;padding:8px 6px}
+    /* kartu tabel makin padat, label tetap terbaca */
+    .tbl td{padding:8px 11px;gap:8px}
+    .tbl td[data-l]::before{font-size:.6rem}
+    .tbl td.sel-utama,.tbl td.acts-cell{padding:10px 11px}
+    .tbl .acts .btn.sm{flex:1 1 auto;justify-content:center}
+  }
+  @media(max-width:360px){
+    /* dock: sisakan ikon saja, label hanya pada menu yang sedang aktif */
+    .stats{grid-template-columns:1fr}
+    .side-nav a::after{display:none}
+    .side-nav a.on::after{display:block}
+    .side-out::after{display:none}
+    .side-out{min-width:44px}
+  }
+  @media(max-height:520px) and (orientation:landscape){
+    /* HP telentang: dialog jangan lebih tinggi dari layar */
+    dialog{max-height:calc(100dvh - 12px)}
+    dialog.besar[open]{height:calc(100dvh - 12px)}
+    .dlg-b{max-height:calc(100dvh - 96px)}
+    .dlg-h{padding:10px 14px}
+    .tline{max-height:none}
   }
   @media(prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none!important;transition:none!important}
@@ -1627,7 +1712,7 @@ function renderUsers(){
 function barisUser(u){
   var ini = (u.username || "?").charAt(0).toUpperCase();
   return "<tr>" +
-    '<td><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
+    '<td class="sel-utama"><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
       "<b>" + esc(u.username) + "</b>" +
       (u.pemilikTemplate ? ' <span class="badge b">arsip</span>' : "") +
       (u.punya_laporan ? ' <span class="badge c">📄 laporan</span>' : "") +
@@ -1640,11 +1725,11 @@ function barisUser(u){
         (u.loginTerakhir ? " · login terakhir " + sejak(u.loginTerakhir) : " · belum pernah login") +
       "</div>" +
     "</div></div></td>" +
-    '<td class="num">' + u.kegiatan + "</td>" +
-    '<td class="num">' + u.keuangan + "</td>" +
-    '<td class="num">' + u.foto + "</td>" +
-    "<td>" + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
-    "<td style='white-space:nowrap'>" + tgl(u.aktivitasTerakhir) + "</td>" +
+    '<td class="num" data-l="Kegiatan">' + u.kegiatan + "</td>" +
+    '<td class="num" data-l="Belanja">' + u.keuangan + "</td>" +
+    '<td class="num" data-l="Foto">' + u.foto + "</td>" +
+    '<td data-l="Sesi">' + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
+    '<td data-l="Aktivitas" style="white-space:nowrap">' + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
       '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '">🎓</button>' +
@@ -1659,7 +1744,7 @@ function barisPendamping(u){
   var ini = (u.username || "?").charAt(0).toUpperCase();
   var role = u.role || "fasilitator";
   return "<tr>" +
-    '<td><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
+    '<td class="sel-utama"><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
       "<b>" + esc(u.username) + "</b> <span class='badge " + (role === "dosen" ? "c" : "y") + "'>" +
       labelPeran(role) + "</span>" +
       (role === "dosen" ? ' <span class="badge g" title="Boleh memberi ACC / minta revisi">✔ ACC</span>' : "") +
@@ -1667,11 +1752,11 @@ function barisPendamping(u){
         (u.loginTerakhir ? " · login terakhir " + sejak(u.loginTerakhir) : " · belum pernah login") +
       "</div>" +
     "</div></div></td>" +
-    "<td>" + (u.n_tim_diampu
+    '<td data-l="Tim diampu">' + (u.n_tim_diampu
       ? '<span class="badge b">' + u.n_tim_diampu + " tim</span>"
       : '<span class="mut">belum di-assign</span>') + "</td>" +
-    "<td>" + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
-    "<td style='white-space:nowrap'>" + tgl(u.createdAt) + "</td>" +
+    '<td data-l="Sesi">' + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
+    '<td data-l="Dibuat" style="white-space:nowrap">' + tgl(u.createdAt) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="tim" data-id="' + u.id + '">🔗 Tim</button>' +
       '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
@@ -1918,20 +2003,20 @@ function barisSesi(s){
   var ini = (s.username || "?").charAt(0).toUpperCase();
   var role = s.role || "tim";
   return "<tr>" +
-    '<td><div class="u-cell"><span class="ava" style="' + avaStyle(s.username) + '">' + esc(ini) + '</span><div>' +
+    '<td class="sel-utama"><div class="u-cell"><span class="ava" style="' + avaStyle(s.username) + '">' + esc(ini) + '</span><div>' +
       "<b>" + esc(s.username) + "</b> " +
       '<span class="badge ' + (role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b") + '">' +
       labelPeran(role) + "</span>" +
     "</div></div></td>" +
-    "<td>" + ikonSesi(s.perangkat) + " " +
+    '<td data-l="Perangkat">' + ikonSesi(s.perangkat) + " " +
       (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
       catatanPerangkat(s.perangkat) + "</td>" +
-    "<td style='white-space:nowrap'>" + (s.ip
+    '<td data-l="Alamat IP" style="white-space:nowrap">' + (s.ip
       ? "<code>" + esc(s.ip) + "</code>" + (s.penuh ? "" : ' <span class="badge b" title="Sesi lama: hanya tersimpan versi tersamar">samar</span>')
       : '<span class="mut">tidak terekam</span>') + "</td>" +
-    "<td style='white-space:nowrap'>" + esc(sejak(s.terakhir)) +
+    '<td data-l="Terakhir aktif" style="white-space:nowrap">' + esc(sejak(s.terakhir)) +
       '<div class="mut">' + esc(tglJam(s.terakhir)) + "</div></td>" +
-    "<td style='white-space:nowrap'>" + esc(tgl(s.dibuat)) + "</td>" +
+    '<td data-l="Mulai login" style="white-space:nowrap">' + esc(tgl(s.dibuat)) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
       'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + '</button>' +
@@ -1947,13 +2032,13 @@ function tabelSesiUser(list){
     '<th style="text-align:right">Aksi</th></tr></thead><tbody>';
   list.forEach(function(s){
     out += "<tr>" +
-      "<td>" + ikonSesi(s.perangkat) + " " +
+      '<td class="sel-utama">' + ikonSesi(s.perangkat) + " " +
         (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
         catatanPerangkat(s.perangkat) + "</td>" +
-      "<td style='white-space:nowrap'>" + (s.ip ? "<code>" + esc(s.ip) + "</code>" : '<span class="mut">tidak terekam</span>') + "</td>" +
-      "<td style='white-space:nowrap'>" + esc(sejak(s.terakhir)) +
+      '<td data-l="Alamat IP" style="white-space:nowrap">' + (s.ip ? "<code>" + esc(s.ip) + "</code>" : '<span class="mut">tidak terekam</span>') + "</td>" +
+      '<td data-l="Terakhir aktif" style="white-space:nowrap">' + esc(sejak(s.terakhir)) +
         '<div class="mut">' + esc(tglJam(s.terakhir)) + "</div></td>" +
-      "<td style='white-space:nowrap'>" + esc(tgl(s.dibuat)) + "</td>" +
+      '<td data-l="Mulai login" style="white-space:nowrap">' + esc(tgl(s.dibuat)) + "</td>" +
       '<td class="acts-cell"><div class="acts">' +
         '<button class="btn sm ic d" title="Keluarkan perangkat ini" data-act="sesi-satu" ' +
         'data-sid="' + esc(s.id) + '" data-nama="' + esc(s.username) + '">' + sv("power") + '</button>' +
@@ -2161,15 +2246,15 @@ function tabelKegiatan(list){
       return '<img class="th" loading="lazy" src="' + fotoUrl(k) + '" data-act="foto" data-key="' + esc(k) + '" alt="">';
     }).join("");
     out += "<tr>" +
-      '<td class="mut">' + (i + 1) + "</td>" +
-      "<td style='white-space:nowrap'>" + tgl(e.tanggal) + "</td>" +
-      "<td>" + esc(e.kegiatan) + "</td>" +
-      "<td><div class='row' style='gap:7px;flex-wrap:nowrap'><div class='prog'><i style='width:" +
+      '<td class="mut nomor">' + (i + 1) + "</td>" +
+      '<td class="sel-utama" style="white-space:nowrap">' + tgl(e.tanggal) + "</td>" +
+      '<td data-l="Kegiatan">' + esc(e.kegiatan) + "</td>" +
+      "<td data-l='Capaian'><div class='row' style='gap:7px;flex-wrap:nowrap'><div class='prog'><i style='width:" +
         Math.min(100, e.capaian_total) + "%'></i></div>" +
         "<span class='mut' style='white-space:nowrap'>+" + e.capaian_delta + "% → <b style='color:var(--p2)'>" +
         e.capaian_total + "%</b></span></div></td>" +
-      '<td class="num" style="white-space:nowrap">' + dur(e.waktu_menit) + "</td>" +
-      "<td>" + (fotos ? '<div class="ths">' + fotos + "</div>" : '<span class="mut">—</span>') + "</td>" +
+      '<td class="num" data-l="Waktu" style="white-space:nowrap">' + dur(e.waktu_menit) + "</td>" +
+      '<td data-l="Foto">' + (fotos ? '<div class="ths">' + fotos + "</div>" : '<span class="mut">—</span>') + "</td>" +
     "</tr>";
   });
   return out + "</tbody></table></div>";
@@ -2183,13 +2268,13 @@ function tabelKeuangan(list){
   list.forEach(function(e, i){
     total += e.total;
     out += "<tr>" +
-      '<td class="mut">' + (i + 1) + "</td>" +
-      "<td style='white-space:nowrap'>" + tgl(e.tanggal) + "</td>" +
-      "<td>" + esc(e.item) + "</td>" +
-      '<td class="num" style="white-space:nowrap">' + rp(e.harga_satuan) + esc(e.satuan_suffix || "") + "</td>" +
-      '<td class="num">' + e.jumlah + "</td>" +
-      '<td class="num" style="white-space:nowrap"><b>' + rp(e.total) + "</b></td>" +
-      "<td>" + (function(){
+      '<td class="mut nomor">' + (i + 1) + "</td>" +
+      '<td class="sel-utama" style="white-space:nowrap">' + tgl(e.tanggal) + "</td>" +
+      '<td data-l="Item">' + esc(e.item) + "</td>" +
+      '<td class="num" data-l="Harga satuan" style="white-space:nowrap">' + rp(e.harga_satuan) + esc(e.satuan_suffix || "") + "</td>" +
+      '<td class="num" data-l="Jumlah">' + e.jumlah + "</td>" +
+      '<td class="num" data-l="Total" style="white-space:nowrap"><b>' + rp(e.total) + "</b></td>" +
+      '<td data-l="Bukti">' + (function(){
         var keys = (e.bukti_keys && e.bukti_keys.length) ? e.bukti_keys
                  : (e.bukti_key ? [e.bukti_key] : []);
         if (!keys.length) return '<span class="mut">—</span>';
@@ -2199,8 +2284,8 @@ function tabelKeuangan(list){
       })() + "</td>" +
     "</tr>";
   });
-  out += '<tr><td colspan="5" style="text-align:right;font-weight:800">TOTAL</td>' +
-    '<td class="num" style="white-space:nowrap"><b style="color:var(--bad)">' + rp(total) + "</b></td><td></td></tr>";
+  out += '<tr class="baris-total"><td colspan="5" style="text-align:right;font-weight:800">TOTAL</td>' +
+    '<td class="num" data-l="Total belanja" style="white-space:nowrap"><b style="color:var(--bad)">' + rp(total) + "</b></td><td></td></tr>";
   return out + "</tbody></table></div>";
 }
 

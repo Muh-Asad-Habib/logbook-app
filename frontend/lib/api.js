@@ -671,6 +671,19 @@ export const exportUrl = (path) => `${API_URL}${path}`;
 
 export const fmtRupiah = (n) => "Rp" + Number(n || 0).toLocaleString("id-ID");
 
+/**
+ * Nominal rupiah versi ringkas yang TIDAK PERNAH membulatkan.
+ *
+ * Bentuk "Rp9,5 jt" hanya dipakai bila angkanya memang pas (kelipatan
+ * Rp100.000) sehingga penulisan singkat itu tetap persis sama nilainya.
+ * Selain itu — misalnya Rp9.699.528 — ditulis lengkap sampai digit terakhir.
+ */
+export const fmtNominal = (n) => {
+  const v = Number(n) || 0;
+  if (Math.abs(v) < 1_000_000 || v % 100_000 !== 0) return fmtRupiah(v);
+  return `Rp${String(v / 1_000_000).replace(".", ",")} jt`;
+};
+
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 export const fmtTgl = (iso) => {
   if (!iso) return "-";

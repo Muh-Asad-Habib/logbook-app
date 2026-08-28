@@ -515,8 +515,12 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   font-size: 0.67rem; font-weight: 800; letter-spacing: 0.06em; color: var(--muted);
 }
 .rekap-cap .lucide { width: 14px; height: 14px; }
-.rekap-val { font-size: 1.22rem; font-weight: 800; margin: 3px 0 2px; line-height: 1.2; }
-.rekap-ket { font-size: 0.74rem; color: var(--muted); min-height: 18px; }
+.rekap-val { font-size: 1.22rem; font-weight: 800; margin: 3px 0 2px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.rekap-ket {
+  font-size: 0.74rem; color: var(--muted); min-height: 18px;
+  line-height: 1.5; overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+}
+.rekap-ket b { white-space: nowrap; }
 .rekap-warn {
   display: flex; align-items: center; gap: 5px; margin-top: 7px;
   font-size: 0.72rem; font-weight: 700; color: var(--bad, #ef4444);
@@ -541,7 +545,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 .rekap-kat { margin-top: 4px; }
 .rekap-row {
-  display: grid; grid-template-columns: minmax(120px, 1.15fr) 1fr minmax(86px, auto);
+  display: grid; grid-template-columns: minmax(110px, 1.15fr) 1fr minmax(112px, auto);
   align-items: center; gap: 12px; padding: 8px 0;
   border-bottom: 1px dashed var(--line);
 }
@@ -549,7 +553,10 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .rekap-label { font-size: 0.81rem; font-weight: 700; min-width: 0; }
 .rekap-label small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); }
 .rekap-row .rekap-bar { margin-top: 0; }
-.rekap-nilai { text-align: right; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+.rekap-nilai {
+  text-align: right; font-size: 0.8rem; font-weight: 800; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .rekap-nilai small { display: block; font-size: 0.68rem; font-weight: 700; color: var(--muted); }
 .rekap-nilai.lewat, .rekap-nilai.lewat small { color: var(--bad, #ef4444); }
 
@@ -566,6 +573,11 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .rekap-row .rekap-bar { grid-column: 1 / -1; order: 3; }
   .rekap-nilai { text-align: right; }
   .rekap-nilai small { display: inline; margin-left: 5px; }
+}
+
+@media (max-width: 400px) {
+  /* Nominal lengkap butuh ruang — biarkan turun baris ketimbang terpotong */
+  .rekap-nilai { white-space: normal; overflow-wrap: anywhere; }
 }
 
 /* Titik warna sumber dana (dipakai menu cepat & rekap mini dashboard) */
@@ -612,13 +624,21 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .dana-mini-row {
   display: flex; align-items: center; gap: 8px;
   font-size: 0.79rem; font-weight: 700; padding: 5px 0;
+  flex-wrap: wrap;
 }
-.dana-mini-row b { margin-left: auto; }
-.dana-mini-row small { flex: 0 0 auto; font-weight: 600; font-size: 0.7rem; }
+.dana-mini-row b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dana-mini-row small { flex: 0 0 auto; font-weight: 600; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
 .dana-mini-row small.bad { color: var(--bad, #ef4444); }
 .dana-mini-link {
   display: inline-block; margin-top: 6px;
   font-size: 0.76rem; font-weight: 700; color: var(--p1);
+}
+
+@media (max-width: 480px) {
+  /* Nominal utuh + keterangan sisa tidak muat sebaris di HP:
+     nilai tetap di kanan, keterangan "sisa …" turun ke baris bawah. */
+  .dana-mini-row { row-gap: 2px; }
+  .dana-mini-row small { flex: 1 1 100%; text-align: right; }
 }
 
 /* Total di dialog form belanja */
@@ -1042,12 +1062,15 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
   height: 100%; background: var(--grad3); border-radius: 999px;
   animation: growWide 0.8s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.bd-val { flex: 0 0 88px; text-align: right; font-weight: 700; font-size: 0.74rem; color: var(--muted); }
+.bd-val {
+  flex: 0 0 100px; text-align: right; font-weight: 700; font-size: 0.74rem;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
 
 @media (max-width: 640px) {
   .bd-row { gap: 8px; font-size: 0.75rem; }
-  .bd-label { flex: 0 0 32%; }
-  .bd-val { flex: 0 0 72px; font-size: 0.7rem; }
+  .bd-label { flex: 0 0 30%; }
+  .bd-val { flex: 0 0 86px; font-size: 0.68rem; }
 }
 
 /* ================= Tabel ================= */
