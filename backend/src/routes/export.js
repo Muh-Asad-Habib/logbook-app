@@ -220,9 +220,12 @@ router.get("/xlsx", async (req, res, next) => {
  *     tags: [Export]
  *     summary: Unduh DOCX KHUSUS KEUANGAN — tabel Belmawa (dipisah per kategori) & tabel Perguruan Tinggi
  *     description: >
- *       Dokumen Word berisi teks & tabel biasa (mudah disalin/diedit), tanpa
- *       foto bukti. Belanja dana Belmawa dikelompokkan per kategori PKM dengan
- *       baris pemisah + subtotal, lalu tabel dana Perguruan Tinggi terpisah.
+ *       Dokumen Word berisi teks, tabel, dan gambar biasa (mudah disalin/diedit).
+ *       Belanja dana Belmawa dikelompokkan per kategori PKM dengan baris
+ *       pemisah + subtotal, lalu tabel dana Perguruan Tinggi terpisah. Nota
+ *       tiap belanja disematkan sebagai cuplikan di kolom Nota sekaligus
+ *       lampiran besar bernomor (L-1, L-2, …); satu berkas gambar hanya
+ *       disimpan sekali sehingga dokumen tetap hemat.
  *       Ekspor gabungan (/api/export/docx) tidak terpengaruh.
  *     responses:
  *       200:

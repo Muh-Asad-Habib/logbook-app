@@ -1,6 +1,6 @@
 /**
  * Ekspor DOCX KHUSUS KEUANGAN — dokumen Word dirakit dari nol (bukan template
- * resmi), berisi TEKS & TABEL saja sehingga isinya mudah disalin dan diedit.
+ * resmi), berisi TEKS & TABEL sehingga isinya mudah disalin dan diedit.
  *
  * Beda dengan ekspor gabungan (kegiatan + keuangan) yang memakai template
  * resmi: berkas ini memisahkan belanja menurut SUMBER DANA —
@@ -8,14 +8,19 @@
  *                       pemisah ("BAHAN HABIS PAKAI") dan ditutup subtotal.
  *   B. Dana Perguruan Tinggi → satu tabel tanpa kategori.
  *   C. Belum ditandai  → hanya muncul bila ada entri tanpa penanda.
- * Ditutup rekap dana (pemakaian vs batas pedoman PKM).
+ * Ditutup rekap dana (pemakaian vs batas pedoman PKM) dan LAMPIRAN NOTA.
  *
- * Tidak menyertakan foto bukti — dokumen ringan & siap diolah ulang.
+ * Nota/bukti pembayaran ikut disematkan: thumbnail pada kolom "Nota" tiap
+ * baris (penanda cepat) dan versi besarnya di bagian lampiran, bertanda
+ * "L-1", "L-2", … sesuai nomor pada tabel. Satu berkas gambar hanya disimpan
+ * SEKALI di dalam paket lalu dipakai ulang oleh kedua tampilan itu, sehingga
+ * ukuran dokumen tetap hemat.
  */
 import JSZip from "jszip";
 import * as store from "../storage.js";
+import { getFileBufferRetry, siapkanEmbed } from "../files.js";
 import {
-  KATEGORI_PKM, LABEL_KATEGORI, rekapDana, BATAS_DANA_PT,
+  KATEGORI_PKM, LABEL_KATEGORI, LABEL_SUMBER, rekapDana, BATAS_DANA_PT,
 } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -47,32 +52,66 @@ const WHITE = "FFFFFF";
 
 /* ------------------------------------------------------- helper OOXML ----- */
 /** Lebar kolom tabel belanja (twips) — totalnya = lebar area konten A4 (9638). */
-const KOL = [640, 1450, 3268, 1620, 720, 1940];
+const KOL = [560, 1290, 2690, 1520, 620, 1760, 1198];
+
+/** Ukuran tampil gambar (cm) di dokumen. */
+const LEBAR_NOTA_TABEL = 1.7;   // thumbnail pada kolom "Nota"
+const TINGGI_NOTA_TABEL = 2.6;
+const LEBAR_NOTA_LAMPIRAN = 7.4; // 1 nota per baris lampiran
+const LEBAR_NOTA_LAMPIRAN_2 = 5.4; // bila satu entri punya >1 nota
+const TINGGI_NOTA_LAMPIRAN = 9.5;
+
+const cmKeEmu = (cm) => Math.round(cm * 360000);
+
+/**
+ * Ukuran tampil (EMU) yang memuat gambar UTUH: lebar mengikuti kolom, tinggi
+ * mengikuti rasio asli; bila terlalu tinggi (nota memanjang) tinggi dipatok
+ * lalu lebarnya menyesuaikan — tanpa distorsi maupun pemotongan.
+ */
+function ukuranGambar(lebarCm, w, h, tinggiMaksCm) {
+  const rasio = w > 0 && h > 0 ? h / w : 4 / 3;
+  let cx = cmKeEmu(lebarCm);
+  let cy = Math.round(cx * rasio);
+  const cyMaks = cmKeEmu(tinggiMaksCm);
+  if (cy > cyMaks) {
+    cy = cyMaks;
+    cx = Math.round(cy / rasio);
+  }
+  return { cx, cy };
+}
 
 const runPr = ({ b, i, sz = 19, color = INK } = {}) =>
   `<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>` +
   `${b ? "<w:b/>" : ""}${i ? "<w:i/>" : ""}` +
   `<w:color w:val="${color}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`;
 
-/** Satu paragraf; teks multi-baris dipisah <w:br/> agar tetap satu paragraf. */
+/**
+ * Satu paragraf; teks multi-baris dipisah <w:br/> agar tetap satu paragraf.
+ * `xml` dipakai untuk isi run mentah (mis. gambar nota) — kalau diisi, teks
+ * diabaikan.
+ */
 function P(teks, opt = {}) {
-  const { align = "left", after = 0, before = 0, ...r } = opt;
+  const { align = "left", after = 0, before = 0, xml = "", ...r } = opt;
   const pPr =
     `<w:pPr><w:spacing w:before="${before}" w:after="${after}" w:line="240" w:lineRule="auto"/>` +
     `<w:jc w:val="${align}"/></w:pPr>`;
+  if (xml) return `<w:p>${pPr}<w:r>${runPr(r)}${xml}</w:r></w:p>`;
   const isi = String(teks ?? "").split(/\r?\n/)
     .map((l, i) => `${i ? "<w:br/>" : ""}<w:t xml:space="preserve">${esc(l)}</w:t>`)
     .join("");
   return `<w:p>${pPr}<w:r>${runPr(r)}${isi}</w:r></w:p>`;
 }
 
-/** Sel tabel. `span` = jumlah kolom yang digabung (baris pemisah kategori). */
-function TC(teks, { w, bg, span, ...opt } = {}) {
+/**
+ * Sel tabel. `span` = jumlah kolom yang digabung (baris pemisah kategori),
+ * `isi` = paragraf siap pakai (dipakai sel Nota yang memuat gambar + label).
+ */
+function TC(teks, { w, bg, span, isi, ...opt } = {}) {
   const lebar = span ? KOL.slice(0, span).reduce((s, x) => s + x, 0) : w;
   return `<w:tc><w:tcPr><w:tcW w:w="${lebar}" w:type="dxa"/>` +
     `${span ? `<w:gridSpan w:val="${span}"/>` : ""}` +
     `${bg ? `<w:shd w:val="clear" w:color="auto" w:fill="${bg}"/>` : ""}` +
-    `<w:vAlign w:val="center"/></w:tcPr>${P(teks, opt)}</w:tc>`;
+    `<w:vAlign w:val="center"/></w:tcPr>${isi || P(teks, opt)}</w:tc>`;
 }
 
 /** Baris tabel; `head` menandai baris judul agar berulang di tiap halaman. */
@@ -121,14 +160,29 @@ const HEAD_BELANJA = (warna) => TR([
   TC("Harga satuan", { w: KOL[3], bg: warna, color: WHITE, b: true, align: "center" }),
   TC("Jml", { w: KOL[4], bg: warna, color: WHITE, b: true, align: "center" }),
   TC("Total", { w: KOL[5], bg: warna, color: WHITE, b: true, align: "center" }),
+  TC("Nota", { w: KOL[6], bg: warna, color: WHITE, b: true, align: "center" }),
 ], { head: true, tinggi: 340 });
 
-/** Baris entri belanja; nomor urut mengikuti urutan di tabelnya. */
-function barisEntri(e, no, genap) {
+/**
+ * Baris entri belanja; nomor urut mengikuti urutan di tabelnya.
+ * `nota` = { gambar: XML thumbnail (boleh ""), label: "L-3" } bila entri
+ * punya bukti; bila tidak, kolom Nota diisi tanda "—".
+ */
+function barisEntri(e, no, genap, nota = null) {
   const bg = genap ? ZEBRA : "";
   const kode = Number(e.kode_unik) || 0;
   const harga = fmtRp(e.harga_satuan) + (e.satuan_suffix || "") +
     (kode > 0 ? `\n+ ${fmtRp(kode)} kode unik` : "");
+  const selNota = nota
+    ? TC("", {
+      w: KOL[6], bg,
+      isi: (nota.gambar
+        ? P("", { xml: nota.gambar, align: "center", after: 20 })
+        : "") +
+        P(nota.label, { align: "center", sz: 15, b: true, color: INDIGO_DARK }) +
+        (nota.n > 1 ? P(`${nota.n} nota`, { align: "center", sz: 13, color: MUTED }) : ""),
+    })
+    : TC("—", { w: KOL[6], bg, align: "center", color: MUTED });
   return TR([
     TC(String(no), { w: KOL[0], bg, align: "center", color: MUTED }),
     TC(fmtTgl(e.tanggal), { w: KOL[1], bg, align: "center" }),
@@ -136,6 +190,7 @@ function barisEntri(e, no, genap) {
     TC(harga, { w: KOL[3], bg, align: "right", color: MUTED }),
     TC(String(e.jumlah ?? ""), { w: KOL[4], bg, align: "center" }),
     TC(fmtRp(e.total), { w: KOL[5], bg, align: "right", b: true }),
+    selNota,
   ]);
 }
 
@@ -154,7 +209,106 @@ const barisTotal = (label, nominal, { bg = INDIGO_BG, warna = INDIGO_DARK, ket =
     TC(ket, { w: KOL[3], bg, i: true, sz: 16, color: MUTED, align: "right" }),
     TC("", { w: KOL[4], bg }),
     TC(fmtRp(nominal), { w: KOL[5], bg, b: true, color: warna, align: "right" }),
+    TC("", { w: KOL[6], bg }),
   ], { tinggi: 320 });
+
+/* ------------------------------------------------ gambar nota / bukti ----- */
+/** Daftar kunci bukti sebuah entri — kompatibel dengan data lama (bukti_key). */
+const buktiKeys = (e) =>
+  e?.bukti_keys?.length ? e.bukti_keys : e?.bukti_key ? [e.bukti_key] : [];
+
+/** XML gambar inline (drawing) — dipakai thumbnail tabel & lampiran. */
+const drawingXml = (rid, id, cx, cy) =>
+  `<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" ` +
+  `xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+  `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+  `<wp:docPr id="${id}" name="nota${id}"/>` +
+  `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+  `<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+  `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+  `<pic:nvPicPr><pic:cNvPr id="${id}" name="nota${id}"/><pic:cNvPicPr/></pic:nvPicPr>` +
+  `<pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+  `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
+  `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+  `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`;
+
+/**
+ * Kumpulan nota yang siap disematkan.
+ *
+ * Tiap berkas hanya disimpan SEKALI di `word/media/` lalu dipakai ulang oleh
+ * thumbnail tabel maupun gambar besar di lampiran (rId sama, hanya id
+ * <wp:docPr> yang berbeda karena Word mewajibkannya unik).
+ */
+function bikinMedia() {
+  const berkas = [];               // { nama, buffer }
+  const peta = new Map();          // key foto → { rid, w, h }
+  const ext = new Set();           // ekstensi untuk [Content_Types].xml
+  let nRel = 100;
+  let nDocPr = 1000;
+
+  return {
+    /** Daftarkan satu foto hasil siapkanEmbed(). */
+    tambah(key, buffer, w, h) {
+      // jpeg/png dikenali dari isinya — nama berkas di cloud belum tentu benar
+      const jpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+      const png = buffer[0] === 0x89 && buffer[1] === 0x50;
+      if (!jpeg && !png) return; // format lain (webp/gif) dilewati
+      const e = jpeg ? "jpeg" : "png";
+      ext.add(e);
+      const nama = `media/nota_${berkas.length + 1}.${e}`;
+      berkas.push({ nama, buffer });
+      peta.set(key, { rid: `rId${nRel++}`, w, h });
+      peta.get(key).nama = nama;
+    },
+    ada: (key) => peta.has(key),
+    /** XML gambar untuk satu foto pada lebar tertentu (cm). */
+    gambar(key, lebarCm, tinggiMaksCm) {
+      const m = peta.get(key);
+      if (!m) return "";
+      const { cx, cy } = ukuranGambar(lebarCm, m.w, m.h, tinggiMaksCm);
+      return drawingXml(m.rid, nDocPr++, cx, cy);
+    },
+    get berkasMedia() { return berkas; },
+    /** Relationship gambar untuk word/_rels/document.xml.rels. */
+    get relsXml() {
+      return [...peta.values()].map((m) =>
+        `<Relationship Id="${m.rid}" Type="http://schemas.openxmlformats.org/` +
+        `officeDocument/2006/relationships/image" Target="${m.nama}"/>`).join("");
+    },
+    /** Default Extension untuk [Content_Types].xml. */
+    get ctypesXml() {
+      return [...ext].map((e) =>
+        `<Default Extension="${e}" ContentType="image/${e}"/>`).join("");
+    },
+    get jumlah() { return berkas.length; },
+  };
+}
+
+/**
+ * Unduh & siapkan seluruh nota milik daftar entri.
+ * Ukuran sedang (1000 px, mutu 80): tajam saat dicetak selebar ±7,4 cm namun
+ * dokumen tetap ringan walau notanya puluhan.
+ */
+async function siapkanNota(entri) {
+  const media = bikinMedia();
+  const keys = [...new Set(entri.flatMap((e) => buktiKeys(e)))];
+  const hasil = await Promise.all(keys.map(async (k) => {
+    try {
+      const buf = await getFileBufferRetry(k, 3, 800);
+      if (!buf) return null;
+      const r = await siapkanEmbed(buf, 1000, 80);
+      return r.ok ? { key: k, ...r } : null;
+    } catch {
+      return null; // satu nota gagal diambil → dokumen tetap dibuat
+    }
+  }));
+  // urutan pendaftaran dijaga stabil supaya penomoran media mudah dilacak
+  for (const k of keys) {
+    const r = hasil.find((x) => x?.key === k);
+    if (r) media.tambah(k, r.buffer, r.w, r.h);
+  }
+  return media;
+}
 
 /* --------------------------------------------------------- dokumen -------- */
 /**
@@ -177,6 +331,26 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
   const belmawa = urut.filter((e) => e.sumber === "belmawa");
   const pt = urut.filter((e) => e.sumber === "pt");
   const lain = urut.filter((e) => e.sumber !== "belmawa" && e.sumber !== "pt");
+
+  // Nota/bukti diunduh & disiapkan lebih dulu supaya penyisipan ke XML sinkron
+  const media = await siapkanNota(urut);
+
+  // Penomoran lampiran (L-1, L-2, …) mengikuti urutan tabel: Belmawa → PT →
+  // belum ditandai; entri tanpa nota tidak mendapat nomor.
+  const lampiran = [];                 // { e, label, keys }
+  const notaEntri = new Map();         // id entri → { label, gambar, n }
+  for (const e of [...belmawa, ...pt, ...lain]) {
+    const keys = buktiKeys(e).filter((k) => media.ada(k));
+    if (!keys.length) continue;
+    const label = `L-${lampiran.length + 1}`;
+    lampiran.push({ e, label, keys });
+    notaEntri.set(e.id, {
+      label,
+      n: keys.length,
+      gambar: media.gambar(keys[0], LEBAR_NOTA_TABEL, TINGGI_NOTA_TABEL),
+    });
+  }
+  const nota = (e) => notaEntri.get(e.id) || null;
 
   const tglEkspor = new Date().toLocaleDateString("id-ID",
     { day: "numeric", month: "long", year: "numeric" });
@@ -241,7 +415,8 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
     isi.push(P(
       "Tabel di bawah dikelompokkan per kategori belanja pedoman PKM. " +
       "Baris berwarna adalah pemisah kategori — seluruh entri di bawahnya " +
-      "termasuk kategori tersebut.",
+      "termasuk kategori tersebut. Kolom Nota memuat cuplikan bukti " +
+      "pembayaran; versi besarnya ada di bagian Lampiran dengan nomor yang sama.",
       { sz: 17, color: MUTED, after: 120 }));
 
     const baris = [HEAD_BELANJA(INDIGO)];
@@ -275,7 +450,7 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
       let sub = 0;
       g.items.forEach((e, i) => {
         sub += Number(e.total) || 0;
-        baris.push(barisEntri(e, ++no, i % 2 === 1));
+        baris.push(barisEntri(e, ++no, i % 2 === 1, nota(e)));
       });
       const info = g.id && rekap.danaBelmawa > 0
         ? (() => {
@@ -306,7 +481,7 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
       `Dana Perguruan Tinggi tidak dipecah per kategori. Acuan pedoman PKM: maksimum ${fmtRp(BATAS_DANA_PT)}.`,
       { sz: 17, color: MUTED, after: 120 }));
     const baris = [HEAD_BELANJA(TEAL)];
-    pt.forEach((e, i) => baris.push(barisEntri(e, i + 1, i % 2 === 1)));
+    pt.forEach((e, i) => baris.push(barisEntri(e, i + 1, i % 2 === 1, nota(e))));
     baris.push(barisTotal("TOTAL DANA PERGURUAN TINGGI", rekap.totalPt, {
       bg: TEAL_BG, warna: TEAL,
       ket: rekap.danaPt > 0 ? `sisa ${fmtRp(rekap.sisaPt)}` : "",
@@ -322,7 +497,7 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
       "sebagai pengeluaran, namun belum masuk tabel Belmawa maupun Perguruan Tinggi.",
       { sz: 17, color: MUTED, after: 120 }));
     const baris = [HEAD_BELANJA(MUTED)];
-    lain.forEach((e, i) => baris.push(barisEntri(e, i + 1, i % 2 === 1)));
+    lain.forEach((e, i) => baris.push(barisEntri(e, i + 1, i % 2 === 1, nota(e))));
     baris.push(barisTotal("TOTAL BELUM DITANDAI", rekap.totalTanpaSumber, {
       bg: AMBER_BG, warna: MUTED,
     }));
@@ -367,13 +542,55 @@ export async function buildDocxKeuangan(userId, namaTim = "") {
   ], { tinggi: 340 }));
   isi.push(TBL(barisRekap, KOL_REKAP));
 
+  /* ---------- LAMPIRAN: nota / bukti pembayaran ---------- */
+  if (lampiran.length) {
+    isi.push(PAGE_BREAK());
+    isi.push(judulBagian("LAMPIRAN — NOTA & BUKTI PEMBAYARAN", INDIGO_DARK));
+    isi.push(P(
+      `${lampiran.length} entri belanja disertai bukti. Nomor lampiran (L-1, L-2, …) ` +
+      "sama dengan yang tertera pada kolom Nota di tabel belanja.",
+      { sz: 17, color: MUTED, after: 160 }));
+
+    let bagianAktif = "";
+    for (const { e, label, keys } of lampiran) {
+      // Sub-judul saat berpindah kelompok sumber dana
+      const bagian = e.sumber === "belmawa" ? "belmawa" : e.sumber === "pt" ? "pt" : "lain";
+      if (bagian !== bagianAktif) {
+        bagianAktif = bagian;
+        const judul = bagian === "belmawa" ? "Dana Belmawa"
+          : bagian === "pt" ? "Dana Perguruan Tinggi"
+            : "Belum ditandai sumber dananya";
+        isi.push(P(judul.toUpperCase(), {
+          b: true, sz: 19, before: 220, after: 60,
+          color: bagian === "pt" ? TEAL : bagian === "belmawa" ? INDIGO_DARK : MUTED,
+        }));
+      }
+
+      const penanda = e.sumber === "belmawa" && LABEL_KATEGORI[e.kategori]
+        ? `${LABEL_SUMBER.belmawa} · ${LABEL_KATEGORI[e.kategori]}`
+        : LABEL_SUMBER[e.sumber] || "belum ditandai";
+      isi.push(P(`${label} · ${fmtTgl(e.tanggal)} — ${e.item || "-"}`, {
+        b: true, sz: 19, color: INK, before: 140, after: 20,
+      }));
+      isi.push(P(`${fmtRp(e.total)} · ${penanda}${keys.length > 1 ? ` · ${keys.length} nota` : ""}`, {
+        sz: 16, color: MUTED, after: 60,
+      }));
+      // Satu nota → besar; beberapa nota → berdampingan agar hemat halaman
+      const lebar = keys.length > 1 ? LEBAR_NOTA_LAMPIRAN_2 : LEBAR_NOTA_LAMPIRAN;
+      isi.push(P("", {
+        align: "left", after: 120,
+        xml: keys.map((k) => media.gambar(k, lebar, TINGGI_NOTA_LAMPIRAN)).join(""),
+      }));
+    }
+  }
+
   isi.push(P(
     "Catatan: penandaan sumber dana & kategori bersifat opsional — entri tanpa " +
-    "penanda tetap dihitung sebagai pengeluaran. Dokumen ini berisi teks dan " +
-    "tabel biasa sehingga bebas disalin maupun diedit ulang di Word.",
+    "penanda tetap dihitung sebagai pengeluaran. Seluruh isi dokumen ini berupa " +
+    "teks, tabel, dan gambar biasa sehingga bebas disalin maupun diedit ulang di Word.",
     { i: true, sz: 16, color: MUTED, before: 200 }));
 
-  return rakitDocx(isi.join(""), namaTim);
+  return rakitDocx(isi.join(""), namaTim, media);
 }
 
 /* ------------------------------------------------ perakitan paket docx ---- */
@@ -421,12 +638,16 @@ const DOC_RELS =
   `</Relationships>`;
 
 /** Bungkus body XML menjadi paket .docx utuh (Buffer). */
-async function rakitDocx(bodyXml, namaTim) {
+async function rakitDocx(bodyXml, namaTim, media = null) {
   const zip = new JSZip();
   const judul = `Laporan Keuangan${namaTim ? ` — Tim ${namaTim}` : ""}`;
   const iso = new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
-  zip.file("[Content_Types].xml", CONTENT_TYPES);
+  // Gambar nota butuh <Default Extension="jpeg|png"> dan relationship sendiri
+  zip.file("[Content_Types].xml",
+    media?.jumlah
+      ? CONTENT_TYPES.replace("</Types>", `${media.ctypesXml}</Types>`)
+      : CONTENT_TYPES);
   zip.folder("_rels").file(".rels", RELS);
   zip.folder("docProps").file("core.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
@@ -445,7 +666,11 @@ async function rakitDocx(bodyXml, namaTim) {
     `<Application>Logbook Amerta Sign</Application></Properties>`);
   const word = zip.folder("word");
   word.file("styles.xml", STYLES_XML);
-  word.folder("_rels").file("document.xml.rels", DOC_RELS);
+  word.folder("_rels").file("document.xml.rels",
+    media?.jumlah
+      ? DOC_RELS.replace("</Relationships>", `${media.relsXml}</Relationships>`)
+      : DOC_RELS);
+  for (const m of media?.berkasMedia || []) word.file(m.nama, m.buffer);
   word.file("document.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ` +
