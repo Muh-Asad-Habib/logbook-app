@@ -180,14 +180,17 @@ function KegiatanFasilitator() {
             <input placeholder="Cari kegiatan…" value={cari}
                    onChange={(e) => setCari(e.target.value)} />
           </div>
-          <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
-                  title="Saring per bulan" aria-label="Saring per bulan">
-            <option value="">Semua bulan</option>
-            {bulanTersedia.map((b) => {
-              const [y, m] = b.split("-").map(Number);
-              return <option key={b} value={b}>{`${NAMA_BULAN[m - 1]} ${y}`}</option>;
-            })}
-          </select>
+          <div className="tb-sel-wrap">
+            <CalendarRange className="lucide tb-sel-ic" />
+            <select className="tb-sel" value={bulan} onChange={(e) => setBulan(e.target.value)}
+                    title="Saring per bulan" aria-label="Saring per bulan">
+              <option value="">Semua bulan</option>
+              {bulanTersedia.map((b) => {
+                const [y, m] = b.split("-").map(Number);
+                return <option key={b} value={b}>{`${NAMA_BULAN[m - 1]} ${y}`}</option>;
+              })}
+            </select>
+          </div>
           <div className="pills">
             {URUTAN.map(({ id, Ic, ket }) => (
               <button key={id} className={`pill ${urut === id ? "on" : ""}`}
@@ -327,12 +330,20 @@ function KegiatanTim() {
               value={cari} onChange={(e) => setCari(e.target.value)}
             />
           </div>
-          <input type="date" className="tb-tgl" value={dari}
-                 onChange={(e) => setDari(e.target.value)} title="Dari tanggal"
-                 aria-label="Dari tanggal" />
-          <input type="date" className="tb-tgl" value={sampai}
-                 onChange={(e) => setSampai(e.target.value)} title="Sampai tanggal"
-                 aria-label="Sampai tanggal" />
+          <div className="tb-tgl-grp">
+            <label className="tb-tgl-box">
+              <span>Dari</span>
+              <input type="date" value={dari}
+                     onChange={(e) => setDari(e.target.value)}
+                     aria-label="Dari tanggal" />
+            </label>
+            <label className="tb-tgl-box">
+              <span>Sampai</span>
+              <input type="date" value={sampai}
+                     onChange={(e) => setSampai(e.target.value)}
+                     aria-label="Sampai tanggal" />
+            </label>
+          </div>
           <div className="pills">
             {URUTAN.map(({ id, Ic, ket }) => (
               <button key={id} className={`pill ${urut === id ? "on" : ""}`}
@@ -519,7 +530,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
                    placeholder="0" />
           </label>
         </div>
-        <p className="muted mts">
+        <p className="muted mts form-note">
           Boleh diisi salah satu atau keduanya (mis. 1 jam 22 menit, 82 menit, atau 2 jam) —
           tersimpan &amp; diekspor sebagai <b>{Math.max(0, totalMenit)} menit</b>
           {totalMenit >= 60 ? ` (${fmtDurasi(Math.max(0, totalMenit))})` : ""}.

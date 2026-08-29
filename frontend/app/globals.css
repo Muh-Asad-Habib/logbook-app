@@ -751,7 +751,6 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 /* ---------- Toolbar filter halaman (kegiatan/keuangan) ---------- */
 .toolbar .tb-cari { flex: 2 1 220px; margin-top: 0; }
-.toolbar .tb-tgl { flex: 1 1 140px; margin-top: 0; }
 .toolbar .tb-sel {
   flex: 0 1 165px; margin-top: 0; width: auto;
   font-size: 0.82rem; font-weight: 700; padding: 9px 12px;
@@ -761,7 +760,6 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 @media (max-width: 640px) {
   .toolbar { gap: 8px; }
   .toolbar .tb-cari { flex: 1 1 100%; }
-  .toolbar .tb-tgl { flex: 1 1 calc(50% - 4px); min-width: 0; }
   .toolbar .tb-sel { flex: 1 1 100%; }
   .toolbar .pills { display: flex; flex: 1 1 100%; }
   .toolbar .pills .pill { flex: 1 1 auto; }
@@ -1576,5 +1574,60 @@ td.num small { font-weight: 600; }
   .kat-chip { flex: 1 1 auto; justify-content: center; min-height: 36px; }
   .kat-chip small { display: none; }
 }
+
+/* ================================================================
+   RESPONSIF PONSEL — toolbar, isian, & dialog
+   Input <input type="date"> TIDAK punya placeholder di Android: kotaknya
+   tampak kosong sehingga pengguna tak tahu itu saringan tanggal. Karena
+   itu tiap kotak diberi label kecil di atasnya.
+   ================================================================ */
+.toolbar .tb-tgl-grp {
+  display: flex; gap: 8px; flex: 1 1 300px; min-width: 0; margin-top: 0;
+}
+.tb-tgl-box {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px;
+}
+.tb-tgl-box > span {
+  font-size: 0.63rem; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted); padding-left: 5px;
+}
+.tb-tgl-box input {
+  margin-top: 0; width: 100%; font-size: 0.84rem; padding: 9px 11px;
+}
+
+/* Catatan kecil di bawah isian (mis. keterangan jam + menit) */
+.dlg-body .form-note { font-size: 0.74rem; line-height: 1.55; }
+
+/* Tombol "Pilih File" bawaan browser dipoles agar senada dengan tema */
+input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 700; font-size: 0.78rem;
+  padding: 8px 14px; margin-right: 10px;
+  border: none; border-radius: 9px; cursor: pointer;
+  background: var(--soft); color: var(--p1);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+input[type="file"]::file-selector-button:hover { transform: translateY(-1px); }
+
+@media (max-width: 640px) {
+  .toolbar .tb-tgl-grp { flex: 1 1 100%; }
+  .tb-tgl-box input { font-size: 16px; }  /* cegah auto-zoom iOS */
+
+  /* Dialog di HP: kepala menempel saat digulir supaya judul selalu terlihat */
+  .dlg-head { position: sticky; top: 0; z-index: 6; }
+  .dlg-body { padding: 16px 16px 20px; }
+  .dlg-body .form-note { font-size: 0.72rem; }
+  .dlg-body .row.mt { gap: 10px; }
+  .dlg-body input[type="file"] { font-size: 0.82rem; }
+  .dlg-body input[type="file"]::file-selector-button {
+    padding: 9px 12px; margin-right: 8px; font-size: 0.76rem;
+  }
+}
+
+/* Bottom-nav 7 menu — label mengecil di layar sangat sempit agar utuh */
+@media (max-width: 420px) {
+  .bottom-nav a { font-size: 0.6rem; gap: 2px; }
+  .bottom-nav a svg.lucide { width: 19px; height: 19px; }
+}
+
 
 
