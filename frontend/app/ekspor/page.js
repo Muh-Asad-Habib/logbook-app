@@ -11,29 +11,24 @@ import { toast } from "@/components/Toast";
 
 const KARTU = [
   {
-    Ic: FileText, judul: "Dokumen Word (.docx)", warna: "v1",
-    ket: "Dokumen logbook rapi berisi seluruh kegiatan & keuangan akunmu " +
-      "beserta fotonya — siap dikumpulkan atau dicetak.",
-    jenis: "docx", tombol: "Unduh DOCX",
+    Ic: FileText, judul: "Dokumen Word", ext: "DOCX", warna: "v1",
+    ket: "Logbook lengkap — seluruh kegiatan & keuangan beserta fotonya.",
+    jenis: "docx",
   },
   {
-    Ic: Printer, judul: "Dokumen PDF (.pdf)", warna: "v4",
-    ket: "Rekap siap cetak: ringkasan dana, seluruh kegiatan lengkap dengan foto, " +
-      "dan tabel keuangan bertotal.",
-    jenis: "pdf", tombol: "Unduh PDF",
+    Ic: Printer, judul: "Dokumen PDF", ext: "PDF", warna: "v4",
+    ket: "Rekap siap cetak: ringkasan dana, kegiatan berfoto & tabel keuangan.",
+    jenis: "pdf",
   },
   {
-    Ic: Sheet, judul: "Rekap Excel (.xlsx)", warna: "v5",
-    ket: "Tiga sheet: Kegiatan, Keuangan, dan Ringkasan — siap diolah lebih lanjut.",
-    jenis: "xlsx", tombol: "Unduh Excel",
+    Ic: Sheet, judul: "Rekap Excel", ext: "XLSX", warna: "v5",
+    ket: "Sheet Kegiatan, Keuangan & Ringkasan — siap diolah lebih lanjut.",
+    jenis: "xlsx",
   },
   {
-    Ic: Wallet, judul: "Word Khusus Keuangan (.docx)", warna: "v3",
-    ket: "Hanya keuangan: tabel dana Belmawa dipisah per kategori (Bahan habis pakai, " +
-      "Sewa & jasa, …) lengkap dengan subtotal, lalu tabel dana Perguruan Tinggi " +
-      "terpisah. Nota tiap belanja ikut disematkan beserta lampiran bernomor — " +
-      "teks, tabel, dan gambar biasa yang bebas disalin dan diedit di Word.",
-    jenis: "keuangan-docx", tombol: "Unduh DOCX Keuangan",
+    Ic: Wallet, judul: "Khusus Keuangan", ext: "DOCX", warna: "v3",
+    ket: "Tabel Belmawa per kategori + tabel PT, lengkap dengan nota & lampiran.",
+    jenis: "keuangan-docx",
   },
 ];
 
@@ -124,7 +119,7 @@ export default function EksporPage() {
       {err && <div className="error-box mt">{err}</div>}
 
       {stat && (
-        <div className="card mt">
+        <div className="card mt eks-ringkas">
           <div className="row spread">
             <div>
               <h3><FileOutput className="lucide" /> Ekspor logbook</h3>
@@ -133,63 +128,70 @@ export default function EksporPage() {
               </p>
             </div>
             {info && (
-              <div>
-                <span className="badge ok">{info.kegiatan} kegiatan baru → dokumen</span>
-                <span className="badge info">{info.keuangan} belanja baru → dokumen</span>
+              <div className="eks-status">
+                {info.kegiatan === 0 && info.keuangan === 0 ? (
+                  <span className="badge ok">✓ semua entri terkini</span>
+                ) : (
+                  <>
+                    <span className="badge ok">{info.kegiatan} kegiatan baru</span>
+                    <span className="badge info">{info.keuangan} belanja baru</span>
+                  </>
+                )}
               </div>
             )}
           </div>
-          {info && info.kegiatan === 0 && info.keuangan === 0 && (
-            <p className="muted mts">
-              Semua entri sudah masuk ke dokumen — DOCX yang diunduh berisi data terkini akunmu.
-            </p>
-          )}
         </div>
       )}
 
-      <div className="grid metrics mt stagger" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))" }}>
+      <div className="eks-grid mt stagger">
         {KARTU.map((k) => (
-          <div key={k.judul} className="card" style={{ display: "flex", flexDirection: "column" }}>
-            <div className="metric" style={{ marginBottom: 10 }}>
+          <div key={k.jenis} className="card eks-card">
+            <div className="eks-head">
               <div className={`metric-ic ${k.warna}`}><k.Ic className="lucide" /></div>
-              <div className="metric-value" style={{ fontSize: "1.02rem" }}>{k.judul}</div>
+              <div className="eks-judul">
+                {k.judul}
+                <span className="eks-tag">{k.ext}</span>
+              </div>
             </div>
-            <p className="muted" style={{ flex: 1 }}>{k.ket}</p>
+            <p className="eks-ket">{k.ket}</p>
             <button
-              className="btn primary mt"
+              className="btn primary"
               onClick={() => unduhBerkas(k.jenis, k.judul)}
               disabled={busyEkspor === k.jenis}
             >
               <Download className="lucide" />{" "}
-              {busyEkspor === k.jenis ? "Menyiapkan…" : k.tombol}
+              {busyEkspor === k.jenis ? "Menyiapkan…" : "Unduh"}
             </button>
           </div>
         ))}
-        <div className="card" style={{ display: "flex", flexDirection: "column" }}>
-          <div className="metric" style={{ marginBottom: 10 }}>
+        <div className="card eks-card">
+          <div className="eks-head">
             <div className="metric-ic v2"><Images className="lucide" /></div>
-            <div className="metric-value" style={{ fontSize: "1.02rem" }}>Semua Foto (.zip)</div>
+            <div className="eks-judul">
+              Semua Foto
+              <span className="eks-tag">ZIP</span>
+            </div>
           </div>
-          <p className="muted" style={{ flex: 1 }}>
-            Seluruh foto kegiatan &amp; bukti keuangan dalam format JPG, tersusun dalam
-            folder per tanggal (mis. <code>kegiatan/2026-06-03/foto-1.jpg</code>).
+          <p className="eks-ket">
+            Seluruh foto &amp; bukti belanja (JPG), rapi dalam folder per tanggal.
           </p>
-          <button className="btn primary mt" onClick={unduhSemuaFoto} disabled={busyZip}>
-            <Download className="lucide" /> {busyZip ? (progresZip || "Menyiapkan…") : "Unduh ZIP Foto"}
+          <button className="btn primary" onClick={unduhSemuaFoto} disabled={busyZip}>
+            <Download className="lucide" /> {busyZip ? (progresZip || "Menyiapkan…") : "Unduh"}
           </button>
         </div>
       </div>
 
       <div className="card mt">
-        <div className="metric" style={{ marginBottom: 10 }}>
+        <div className="eks-head" style={{ marginBottom: 10 }}>
           <div className="metric-ic v3"><Upload className="lucide" /></div>
-          <div>
-            <div className="metric-value" style={{ fontSize: "1.02rem" }}>Impor dari Word (.docx)</div>
-            <div className="muted">
-              Entri &amp; foto dari dokumen yang belum ada di aplikasi akan ditambahkan — yang sudah ada dilewati.
-            </div>
+          <div className="eks-judul">
+            Impor dari Word
+            <span className="eks-tag">DOCX</span>
           </div>
         </div>
+        <p className="eks-ket" style={{ marginBottom: 12 }}>
+          Entri &amp; foto dari logbook Word lamamu ditambahkan ke akunmu — yang sudah ada dilewati.
+        </p>
         <div className="row">
           <input
             type="file" accept=".docx" style={{ flex: "1 1 260px", marginTop: 0 }}
@@ -198,13 +200,9 @@ export default function EksporPage() {
           <button className="btn primary" onClick={impor} disabled={busyImpor}>
             {busyImpor
               ? (progres > 0 ? `Mengunggah… ${progres}%` : "Mengimpor…")
-              : <><Upload className="lucide" /> Impor sekarang</>}
+              : <><Upload className="lucide" /> Impor</>}
           </button>
         </div>
-        <p className="muted mts">
-          Entri diimpor <b>ke akunmu sendiri</b> — unggah berkas .docx logbook milikmu
-          lalu klik Impor sekarang.
-        </p>
         {hasilImpor && (
           <div className="mts">
             <span className="badge ok">kegiatan: {hasilImpor.keg_baru} baru</span>
@@ -220,16 +218,14 @@ export default function EksporPage() {
 
       <div className="card mt">
         <h3><Lightbulb className="lucide" /> Catatan</h3>
-        <p className="muted mts">
-          • Ekspor tidak mengubah data — berkas yang diunduh adalah salinan berisi data terkini.<br />
-          • Entri dicocokkan dengan isi dokumen; yang sudah ada dilewati, jadi aman diunduh berulang.<br />
-          • Foto disematkan <b>utuh</b> (tidak dipangkas) dengan resolusi tinggi; berkasnya
-          ditarik langsung dari penyimpanan awan, jadi tidak ada batas ukuran unduhan.<br />
-          • <b>Word Khusus Keuangan</b> adalah berkas terpisah — tidak menggantikan
-          ekspor gabungan kegiatan &amp; keuangan. Nota tiap belanja tampil kecil di
-          kolom <i>Nota</i> dan berukuran besar di bagian <b>Lampiran</b> dengan nomor
-          yang sama (L-1, L-2, …).
-        </p>
+        <ul className="eks-list">
+          <li>Ekspor tidak mengubah data — berkas selalu salinan terbaru, aman diunduh berulang.</li>
+          <li>Foto disematkan utuh beresolusi tinggi, tanpa batas ukuran unduhan.</li>
+          <li>
+            <b>Khusus Keuangan</b> berdiri sendiri: nota tampil di kolom <i>Nota</i> dan
+            berukuran besar di Lampiran dengan nomor sama (L-1, L-2, …).
+          </li>
+        </ul>
       </div>
     </>
   );

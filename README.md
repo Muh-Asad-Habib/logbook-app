@@ -152,6 +152,9 @@ ekspor **PDF**, **Excel** (sheet *Rekap Dana*), dan **Word khusus keuangan**.
 
 > Gunakan filter **bulan** dan **sumber dana** di toolbar untuk menemukan entri
 > tertentu dengan cepat, termasuk memfilter yang *belum dipilih* sumbernya.
+> Begitu chip **Belmawa** dipilih, muncul baris **Kategori** untuk menyaring
+> lebih dalam (Bahan habis pakai, Sewa & jasa, Transportasi lokal, Lain-lain,
+> atau yang *tanpa kategori*).
 
 ### 5. Laporan kemajuan & presentasi
 
