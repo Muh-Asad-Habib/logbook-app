@@ -1462,3 +1462,119 @@ td.num small { font-weight: 600; }
   .docx-tools { flex-wrap: wrap; }
 }
 
+/* ================================================================
+   POLES TAMPILAN MENYELURUH
+   Aturan di bawah sengaja ditaruh paling akhir agar berlaku untuk
+   SEMUA halaman (Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
+   Galeri, Profil, Ekspor) tanpa perlu menyentuh berkas tiap halaman.
+   ================================================================ */
+
+/* Kartu: hover seragam & lembut di seluruh aplikasi */
+.card {
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
+}
+.card:hover {
+  border-color: var(--line-hover);
+  box-shadow: 0 12px 32px rgba(18, 20, 46, 0.09);
+}
+
+/* Judul kartu: ikon beraksen & jarak konsisten */
+.card h3 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.95rem; letter-spacing: -0.01em;
+}
+.card h3 .lucide { width: 17px; height: 17px; color: var(--p1); flex: 0 0 17px; }
+
+/* Lencana sedikit lebih lega supaya terbaca jelas */
+.badge { padding: 4px 10px; border-radius: 999px; font-weight: 700; }
+
+/* Tabel: kepala tegas, baris menyala saat disorot */
+.table-wrap thead th {
+  font-size: 0.68rem; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted);
+}
+.table-wrap tbody tr { transition: background-color 0.14s ease; }
+.table-wrap tbody tr:not(.subtotal):hover { background: var(--soft); }
+
+/* Empty state lebih lapang & ikonnya beraksen */
+.empty { padding: 34px 16px; }
+.empty .big .lucide { width: 34px; height: 34px; color: var(--p1); opacity: 0.55; }
+
+/* Isian form menyala halus saat disorot (dipakai semua dialog) */
+.dlg-body input:hover, .dlg-body select:hover, .dlg-body textarea:hover {
+  border-color: var(--line-hover);
+}
+
+/* ---------- Halaman Ekspor ---------- */
+.eks-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(232px, 100%), 1fr));
+}
+.eks-card { display: flex; flex-direction: column; gap: 10px; }
+.eks-head { display: flex; align-items: center; gap: 11px; }
+.eks-judul {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;
+  font-weight: 800; font-size: 0.93rem; letter-spacing: -0.01em;
+}
+.eks-tag {
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--soft); color: var(--p1); border: 1px solid var(--line);
+}
+.eks-ket {
+  flex: 1; margin: 0; color: var(--muted);
+  font-size: 0.8rem; line-height: 1.55;
+}
+.eks-status { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.eks-list {
+  margin: 8px 0 0; padding-left: 18px;
+  color: var(--muted); font-size: 0.8rem; line-height: 1.85;
+}
+.eks-list li::marker { color: var(--p1); }
+.eks-list b { color: var(--ink); }
+
+@media (max-width: 560px) {
+  .eks-ringkas .row.spread { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .eks-status { justify-content: flex-start; }
+}
+
+/* ---------- Saringan kategori PKM (muncul saat filter "Belmawa" aktif) ---------- */
+.tb-baris-kat {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 11px; padding-top: 11px;
+  border-top: 1px dashed var(--line);
+  animation: pop 0.18s ease;
+}
+.kat-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.73rem; font-weight: 800; letter-spacing: 0.02em; color: var(--muted);
+}
+.kat-label .lucide { width: 14px; height: 14px; color: var(--p1); }
+.kat-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.kat-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 0.76rem; font-weight: 700;
+  background: var(--card-solid); color: var(--muted);
+  border: 1.5px solid var(--line);
+  transition: color 0.15s ease, border-color 0.15s ease,
+    background-color 0.15s ease, transform 0.15s ease;
+}
+.kat-chip small { font-size: 0.64rem; font-weight: 600; opacity: 0.75; }
+.kat-chip:hover { border-color: var(--line-hover); color: var(--p1); transform: translateY(-1px); }
+.kat-chip:active { transform: scale(0.97); }
+.kat-chip.on {
+  background: rgba(79, 70, 229, 0.1); color: var(--p1); border-color: var(--p1);
+}
+.kat-chip.netral.on { background: var(--soft); color: var(--ink); border-color: var(--line-hover); }
+.kat-chip:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  /* Layar sempit: chip memenuhi baris agar mudah disentuh */
+  .tb-baris-kat { gap: 8px; }
+  .kat-chips { width: 100%; }
+  .kat-chip { flex: 1 1 auto; justify-content: center; min-height: 36px; }
+  .kat-chip small { display: none; }
+}
+
+

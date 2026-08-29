@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Search, Pencil, Trash2, Save, Wallet, Download, FilterX,
-  X, CalendarRange, Table2, LayoutGrid, Eye,
+  X, CalendarRange, Table2, LayoutGrid, Eye, Layers,
 } from "lucide-react";
 import {
   api, fotoUrl, thumbUrl, fmtRupiah, fmtTgl, useApi, refreshData,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
+import { KATEGORI_PKM } from "@/lib/pkm";
 import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
@@ -70,6 +71,18 @@ const FILTER_SUMBER = [
 const cocokSumber = (e, filter) =>
   !filter ? true : filter === "kosong" ? !e.sumber : e.sumber === filter;
 
+/**
+ * Saringan KATEGORI PKM — hanya berlaku saat filter sumber = Belmawa, sebab
+ * kategori memang cuma dimiliki dana Belmawa. "kosong" = entri Belmawa yang
+ * kategorinya belum dipilih.
+ */
+const cocokKategori = (e, sumber, kat) =>
+  sumber !== "belmawa" || !kat
+    ? true
+    : kat === "kosong"
+      ? !KATEGORI_PKM.some((k) => k.id === e.kategori)
+      : e.kategori === kat;
+
 /** Daftar bulan unik dari entri (terbaru dulu) untuk dropdown filter. */
 function daftarBulan(items) {
   const set = new Set((items || []).map((e) => e.tanggal.slice(0, 7)));
@@ -117,15 +130,22 @@ function useJumlahKomentar(jenis, timId, aktif = true) {
 }
 
 /**
- * Toolbar filter — dua baris agar tidak berdesakan:
+ * Toolbar filter — tersusun agar tidak berdesakan:
  *  baris 1: pencarian · pilih bulan · reset
  *  baris 2: sumber dana (segmented berwarna) · mode tampilan · aksi
+ *  baris 3: kategori PKM — muncul HANYA saat sumber "Belmawa" dipilih,
+ *           sebab kategori belanja hanya berlaku untuk dana Belmawa.
  */
 function ToolbarFilter({
-  cari, setCari, bulan, setBulan, sumber, setSumber, bulanTersedia,
-  mode, setMode, aksi, catatan,
+  cari, setCari, bulan, setBulan, sumber, setSumber, kat, setKat,
+  bulanTersedia, mode, setMode, aksi, catatan,
 }) {
-  const adaFilter = cari || bulan || sumber;
+  const adaFilter = cari || bulan || sumber || kat;
+  // Pindah dari Belmawa ke sumber lain → saringan kategori ikut dilepas
+  const pilihSumber = (id) => {
+    setSumber(id);
+    if (id !== "belmawa") setKat("");
+  };
   return (
     <div className="card mt tb-card">
       <div className="tb-baris">
@@ -154,7 +174,7 @@ function ToolbarFilter({
 
         {adaFilter && (
           <button className="btn sm tb-reset"
-                  onClick={() => { setCari(""); setBulan(""); setSumber(""); }}
+                  onClick={() => { setCari(""); setBulan(""); setSumber(""); setKat(""); }}
                   title="Bersihkan semua filter">
             <FilterX className="lucide" /> Reset
           </button>
@@ -166,7 +186,7 @@ function ToolbarFilter({
           {FILTER_SUMBER.map((s) => (
             <button key={s.id || "semua"} type="button"
                     className={`seg-btn${sumber === s.id ? " on" : ""}${s.warna ? ` ${s.warna}` : ""}`}
-                    onClick={() => setSumber(s.id)}
+                    onClick={() => pilihSumber(s.id)}
                     aria-pressed={sumber === s.id}>
               {s.warna && <i className={`dot ${s.warna}`} />}
               {s.label}
@@ -188,6 +208,33 @@ function ToolbarFilter({
         {catatan}
         {aksi}
       </div>
+
+      {sumber === "belmawa" && (
+        <div className="tb-baris tb-baris-kat">
+          <span className="kat-label">
+            <Layers className="lucide" /> Kategori
+          </span>
+          <div className="kat-chips" role="group" aria-label="Saring kategori belanja PKM">
+            <button type="button" className={`kat-chip${!kat ? " on" : ""}`}
+                    onClick={() => setKat("")} aria-pressed={!kat}>
+              Semua
+            </button>
+            {KATEGORI_PKM.map((k) => (
+              <button key={k.id} type="button"
+                      className={`kat-chip${kat === k.id ? " on" : ""}`}
+                      onClick={() => setKat(k.id)} aria-pressed={kat === k.id}
+                      title={`${k.label} — maksimum ${k.maks}% dana Belmawa`}>
+                {k.label}
+                <small>maks {k.maks}%</small>
+              </button>
+            ))}
+            <button type="button" className={`kat-chip netral${kat === "kosong" ? " on" : ""}`}
+                    onClick={() => setKat("kosong")} aria-pressed={kat === "kosong"}>
+              Tanpa kategori
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -208,6 +255,7 @@ function KeuanganFasilitator() {
   const [cari, setCari] = useState("");
   const [bulan, setBulan] = useState("");
   const [sumber, setSumber] = useState("");
+  const [kat, setKat] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [lb, setLb] = useState(null);
   const peta = useJumlahKomentar("keuangan", timId, !!timId);
@@ -267,7 +315,8 @@ function KeuanganFasilitator() {
     .filter((e) =>
       (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
       (!bulan || e.tanggal.startsWith(bulan)) &&
-      cocokSumber(e, sumber)
+      cocokSumber(e, sumber) &&
+      cocokKategori(e, sumber, kat)
     )
     .reverse();
   const total = view.reduce((s, e) => s + e.total, 0);
@@ -303,6 +352,7 @@ function KeuanganFasilitator() {
         cari={cari} setCari={setCari}
         bulan={bulan} setBulan={setBulan}
         sumber={sumber} setSumber={setSumber}
+        kat={kat} setKat={setKat}
         bulanTersedia={bulanTersedia}
         mode={mode} setMode={setMode}
         catatan={
@@ -429,6 +479,7 @@ function KeuanganTim() {
   const [cari, setCari] = useState("");
   const [bulan, setBulan] = useState("");
   const [sumber, setSumber] = useState("");
+  const [kat, setKat] = useState("");
   const [mode, setMode] = useState("Tabel");
   const [edit, setEdit] = useState(null);
   const [lb, setLb] = useState(null);
@@ -483,7 +534,8 @@ function KeuanganTim() {
     .filter((e) =>
       (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
       (!bulan || e.tanggal.startsWith(bulan)) &&
-      cocokSumber(e, sumber)
+      cocokSumber(e, sumber) &&
+      cocokKategori(e, sumber, kat)
     )
     .reverse();
   const total = view.reduce((s, e) => s + e.total, 0);
@@ -511,6 +563,7 @@ function KeuanganTim() {
         cari={cari} setCari={setCari}
         bulan={bulan} setBulan={setBulan}
         sumber={sumber} setSumber={setSumber}
+        kat={kat} setKat={setKat}
         bulanTersedia={bulanTersedia}
         mode={mode} setMode={setMode}
         aksi={
