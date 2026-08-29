@@ -21,6 +21,8 @@ cek("POST /tautan/:jenis terdaftar", rute.includes("POST /tautan/:jenis"));
 cek("GET /docx tetap ada (jalur cadangan)", rute.includes("GET /docx"));
 cek("GET /pdf tetap ada (jalur cadangan)", rute.includes("GET /pdf"));
 cek("GET /xlsx tetap ada (jalur cadangan)", rute.includes("GET /xlsx"));
+cek("GET /keuangan-docx (ekspor khusus keuangan) terdaftar",
+  rute.includes("GET /keuangan-docx"));
 cek("GET /info tetap ada", rute.includes("GET /info"));
 
 console.log(gagal ? `\n${gagal} PENGUJIAN GAGAL` : "\nSEMUA PENGUJIAN LULUS");

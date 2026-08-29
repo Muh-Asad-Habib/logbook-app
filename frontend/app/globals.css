@@ -603,21 +603,83 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 .sumber-menu {
   position: absolute; z-index: 60; top: calc(100% + 6px); left: 0;
-  min-width: 244px; padding: 6px;
+  width: max-content; min-width: 268px; max-width: min(360px, calc(100vw - 32px));
+  padding: 10px;
   background: var(--card-solid); border: 1px solid var(--line);
-  border-radius: 14px; box-shadow: 0 18px 44px rgba(15, 21, 51, 0.22);
+  border-radius: 16px; box-shadow: 0 18px 44px rgba(15, 21, 51, 0.22);
   animation: pop 0.16s ease;
 }
-.sumber-item {
-  display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 8px 10px; border: none; border-radius: 10px; cursor: pointer;
-  background: transparent; color: var(--ink); font-family: inherit;
-  font-size: 0.82rem; font-weight: 700; text-align: left;
+.sumber-menu .menu-judul {
+  padding: 2px 2px 6px; font-size: 0.66rem; font-weight: 800;
+  letter-spacing: 0.06em; color: var(--muted);
 }
-.sumber-item:hover { background: var(--soft); }
-.sumber-item small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); }
-.sumber-item .lucide { margin-left: auto; width: 15px; height: 15px; color: var(--p1); }
-.sumber-item.hapus { color: var(--bad, #ef4444); }
+.sumber-menu .dana-chips + .menu-judul {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+}
+
+/* ---------- Chip pemilih sumber dana & kategori PKM ----------
+   Dipakai bersama oleh dialog belanja (components/PilihSumberDana.js) dan
+   menu ubah cepat pada lencana keuangan, supaya tampilannya konsisten. */
+.dana-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.dana-chips.kat { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+.dana-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 8px 12px; border-radius: 13px; cursor: pointer;
+  background: var(--card-solid); border: 1.5px solid var(--line); color: var(--ink);
+  font-family: inherit; font-size: 0.8rem; font-weight: 700; text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    transform 0.16s ease, box-shadow 0.16s ease;
+}
+.dana-chip:hover { border-color: var(--line-hover); transform: translateY(-1px); }
+.dana-chip:active { transform: scale(0.98); }
+.dana-chip .dot { flex: 0 0 9px; }
+.dana-chip .lucide { width: 15px; height: 15px; flex: 0 0 15px; color: var(--muted); }
+.dana-chip-teks { min-width: 0; overflow-wrap: anywhere; }
+.dana-chip-teks small {
+  display: block; font-size: 0.67rem; font-weight: 600; color: var(--muted);
+  margin-top: 1px;
+}
+.dana-chip-cek { margin-left: auto; }
+
+.dana-chip.on { border-width: 1.5px; box-shadow: 0 6px 16px rgba(15, 21, 51, 0.08); }
+.dana-chip.belmawa.on {
+  border-color: var(--p1, #4f46e5); background: rgba(79, 70, 229, 0.09);
+}
+.dana-chip.belmawa.on .dana-chip-cek { color: var(--p1, #4f46e5); }
+.dana-chip.pt.on { border-color: #0d9488; background: rgba(13, 148, 136, 0.1); }
+.dana-chip.pt.on .dana-chip-cek { color: #0d9488; }
+.dana-chip.netral.on { border-color: var(--line-hover); background: var(--soft); }
+.dana-chip:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }
+
+/* Panel pemilih di dialog belanja */
+.field-blok { grid-column: 1 / -1; min-width: 0; }
+.pilih-dana {
+  padding: 12px; border-radius: 15px;
+  background: var(--soft); border: 1px solid var(--line);
+}
+.pilih-dana-judul {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 800; color: var(--ink); margin-bottom: 8px;
+}
+.pilih-dana-judul .lucide { width: 15px; height: 15px; color: var(--p1); }
+.pilih-dana-judul .muted { font-weight: 600; }
+.pilih-dana-kat {
+  margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line);
+  animation: pop 0.18s ease;
+}
+
+@media (max-width: 560px) {
+  /* Layar sempit: chip memenuhi lebar agar mudah disentuh & tidak terpotong */
+  .dana-chips.kat { grid-template-columns: 1fr 1fr; }
+  .dana-chips > .dana-chip { flex: 1 1 140px; }
+  .dana-chip { padding: 9px 11px; }
+  .sumber-menu { left: auto; right: 0; min-width: min(300px, calc(100vw - 32px)); }
+}
+
+@media (max-width: 380px) {
+  .dana-chips.kat { grid-template-columns: 1fr; }
+}
 
 /* Rekap mini per sumber di kartu "Dana kegiatan" (Dashboard) */
 .dana-mini { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }

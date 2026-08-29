@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { buildDocx, entriesToExport } from "../export/docx.js";
+import { buildDocxKeuangan } from "../export/keuangan-docx.js";
 import { buildPdf } from "../export/pdf.js";
 import { buildXlsx } from "../export/xlsx.js";
 import { authRequired, hanyaTim } from "../auth.js";
@@ -23,27 +24,48 @@ function tanggalUnduh() {
 const bersihkanNama = (s) =>
   String(s || "").replace(/[\\/:*?"<>|\r\n]+/g, " ").replace(/\s+/g, " ").trim() || "Tim";
 
+const MIME_DOCX =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const MIME_XLSX =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * Katalog jenis ekspor. `ekstensi` sengaja dipisah dari kunci karena satu
+ * ekstensi bisa dipakai beberapa jenis (mis. `docx` gabungan & `keuangan-docx`
+ * khusus keuangan).
+ */
 const JENIS = {
   docx: {
+    ekstensi: "docx",
     akhiran: "Kegiatan & Keuangan",
-    tipe: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    tipe: MIME_DOCX,
     buat: async (req) => (await buildDocx(req.userId)).buffer,
   },
   pdf: {
+    ekstensi: "pdf",
     akhiran: "Kegiatan & Keuangan",
     tipe: "application/pdf",
     buat: (req) => buildPdf(req.userId, bersihkanNama(req.user?.username)),
   },
   xlsx: {
+    ekstensi: "xlsx",
     akhiran: "Rekap Kegiatan & Keuangan",
-    tipe: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    tipe: MIME_XLSX,
     buat: (req) => buildXlsx(req.userId, bersihkanNama(req.user?.username)),
+  },
+  // Khusus keuangan — dokumen terpisah, tidak mengubah ekspor gabungan di atas
+  "keuangan-docx": {
+    ekstensi: "docx",
+    akhiran: "Khusus Keuangan",
+    tipe: MIME_DOCX,
+    buat: (req) => buildDocxKeuangan(req.userId, bersihkanNama(req.user?.username)),
   },
 };
 
 /** Nama berkas unduhan khas tiap tim, mis. "Logbook Tim Alpha - … (04-08-2026).docx". */
 const namaBerkas = (req, jenis) =>
-  `Logbook ${bersihkanNama(req.user?.username)} - ${JENIS[jenis].akhiran} (${tanggalUnduh()}).${jenis}`;
+  `Logbook ${bersihkanNama(req.user?.username)} - ${JENIS[jenis].akhiran} ` +
+  `(${tanggalUnduh()}).${JENIS[jenis].ekstensi}`;
 
 /**
  * Pasang header unduhan dengan nama berkas khas tiap tim, mis.
@@ -79,7 +101,7 @@ function kirimBerkas(req, res, buffer, { ekstensi, tipe, akhiran = "Kegiatan & K
  *       - in: path
  *         name: jenis
  *         required: true
- *         schema: { type: string, enum: [docx, pdf, xlsx] }
+ *         schema: { type: string, enum: [docx, pdf, xlsx, keuangan-docx] }
  *     responses:
  *       200: { description: "{ mode, url, nama, ukuran }" }
  *       400: { description: Jenis ekspor tidak dikenali }
@@ -97,7 +119,7 @@ router.post("/tautan/:jenis", async (req, res, next) => {
     }
 
     const buffer = await JENIS[jenis].buat(req);
-    const key = await putFileEkspor(`ekspor.${jenis}`, buffer, "eksp");
+    const key = await putFileEkspor(`ekspor.${JENIS[jenis].ekstensi}`, buffer, "eksp");
 
     // Satu berkas ekspor tersimpan per jenis: hasil sebelumnya dibuang supaya
     // penyimpanan cloud tidak menumpuk berkas usang.
@@ -142,7 +164,7 @@ router.get("/docx", async (req, res, next) => {
     const { buffer } = await buildDocx(req.userId);
     kirimBerkas(req, res, buffer, {
       ekstensi: "docx",
-      tipe: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      tipe: MIME_DOCX,
     });
   } catch (err) { next(err); }
 });
@@ -185,8 +207,37 @@ router.get("/xlsx", async (req, res, next) => {
     const buffer = await buildXlsx(req.userId, bersihkanNama(req.user?.username));
     kirimBerkas(req, res, buffer, {
       ekstensi: "xlsx",
-      tipe: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      tipe: MIME_XLSX,
       akhiran: "Rekap Kegiatan & Keuangan",
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /api/export/keuangan-docx:
+ *   get:
+ *     tags: [Export]
+ *     summary: Unduh DOCX KHUSUS KEUANGAN — tabel Belmawa (dipisah per kategori) & tabel Perguruan Tinggi
+ *     description: >
+ *       Dokumen Word berisi teks & tabel biasa (mudah disalin/diedit), tanpa
+ *       foto bukti. Belanja dana Belmawa dikelompokkan per kategori PKM dengan
+ *       baris pemisah + subtotal, lalu tabel dana Perguruan Tinggi terpisah.
+ *       Ekspor gabungan (/api/export/docx) tidak terpengaruh.
+ *     responses:
+ *       200:
+ *         description: Berkas .docx
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+ *             schema: { type: string, format: binary }
+ */
+router.get("/keuangan-docx", async (req, res, next) => {
+  try {
+    const buffer = await buildDocxKeuangan(req.userId, bersihkanNama(req.user?.username));
+    kirimBerkas(req, res, buffer, {
+      ekstensi: "docx",
+      tipe: MIME_DOCX,
+      akhiran: "Khusus Keuangan",
     });
   } catch (err) { next(err); }
 });

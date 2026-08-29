@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   FileText, Printer, Sheet, Download, Upload, FileOutput, Lightbulb, TriangleAlert,
-  Images,
+  Images, Wallet,
 } from "lucide-react";
 import { api, useApi, refreshData } from "@/lib/api";
 import { unduhZipFoto, susunDaftarZip, unduhEkspor } from "@/lib/unduh";
@@ -26,6 +26,13 @@ const KARTU = [
     Ic: Sheet, judul: "Rekap Excel (.xlsx)", warna: "v5",
     ket: "Tiga sheet: Kegiatan, Keuangan, dan Ringkasan — siap diolah lebih lanjut.",
     jenis: "xlsx", tombol: "Unduh Excel",
+  },
+  {
+    Ic: Wallet, judul: "Word Khusus Keuangan (.docx)", warna: "v3",
+    ket: "Hanya keuangan: tabel dana Belmawa dipisah per kategori (Bahan habis pakai, " +
+      "Sewa & jasa, …) lengkap dengan subtotal, lalu tabel dana Perguruan Tinggi " +
+      "terpisah. Teks & tabel biasa — bebas disalin dan diedit di Word.",
+    jenis: "keuangan-docx", tombol: "Unduh DOCX Keuangan",
   },
 ];
 
@@ -216,7 +223,10 @@ export default function EksporPage() {
           • Ekspor tidak mengubah data — berkas yang diunduh adalah salinan berisi data terkini.<br />
           • Entri dicocokkan dengan isi dokumen; yang sudah ada dilewati, jadi aman diunduh berulang.<br />
           • Foto disematkan <b>utuh</b> (tidak dipangkas) dengan resolusi tinggi; berkasnya
-          ditarik langsung dari penyimpanan awan, jadi tidak ada batas ukuran unduhan.
+          ditarik langsung dari penyimpanan awan, jadi tidak ada batas ukuran unduhan.<br />
+          • <b>Word Khusus Keuangan</b> adalah berkas terpisah — tidak menggantikan
+          ekspor gabungan kegiatan &amp; keuangan, dan tidak memuat foto agar ringan
+          serta mudah diedit ulang.
         </p>
       </div>
     </>

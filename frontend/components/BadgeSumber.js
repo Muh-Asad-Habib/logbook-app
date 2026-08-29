@@ -10,9 +10,10 @@
  * Mode pendamping (bisaUbah = false) hanya menampilkan lencananya.
  */
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { SUMBER_DANA, KATEGORI_PKM, labelSumber, labelKategori } from "@/lib/pkm";
+import { SUMBER_DANA, labelSumber, labelKategori } from "@/lib/pkm";
+import { ChipDana, ChipsKategori } from "@/components/PilihSumberDana";
 import { toast } from "@/components/Toast";
 
 /** Tampilan lencana saja (dipakai mode pendamping & sebagai isi tombol). */
@@ -35,7 +36,12 @@ function IsiBadge({ e }) {
 export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
   const [buka, setBuka] = useState(false);
   const [sibuk, setSibuk] = useState(false);
+  // Sumber yang SEDANG ditampilkan di menu — dipakai agar panel kategori
+  // langsung muncul begitu chip "Belmawa" diklik, tanpa menunggu data segar.
+  const [sumberTampil, setSumberTampil] = useState(e.sumber || "");
   const boxRef = useRef(null);
+
+  useEffect(() => { setSumberTampil(e.sumber || ""); }, [e.sumber]);
 
   // Klik di luar / Esc → tutup menu
   useEffect(() => {
@@ -52,23 +58,24 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
 
   if (!bisaUbah) return <span className="badge-sumber"><IsiBadge e={e} /></span>;
 
-  const simpan = async (sumber, kategori = "") => {
+  /** Simpan penanda; `tutup=false` dipakai saat pengguna masih memilih kategori. */
+  const simpan = async (sumber, kategori = "", tutup = true) => {
     setSibuk(true);
+    setSumberTampil(sumber);
     try {
       await api.setSumberKeuangan(e.id, sumber, kategori);
-      setBuka(false);
+      if (tutup) setBuka(false);
       toast.ok(sumber
         ? `Ditandai: ${labelSumber(sumber)}${kategori ? ` · ${labelKategori(kategori)}` : ""}`
         : "Penanda sumber dana dihapus");
       onUbah?.();
     } catch (err) {
+      setSumberTampil(e.sumber || "");
       toast.err(`Gagal menandai: ${err.message}`);
     } finally {
       setSibuk(false);
     }
   };
-
-  const aktif = (s, k = "") => e.sumber === s && (s !== "belmawa" || e.kategori === k);
 
   return (
     <span className="badge-sumber" ref={boxRef}>
@@ -88,59 +95,37 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
       {buka && (
         <div className="sumber-menu" role="menu">
           <div className="menu-judul">SUMBER DANA</div>
+          <div className="dana-chips">
+            {SUMBER_DANA.map((s) => (
+              <ChipDana
+                key={s.id}
+                warna={s.id}
+                aktif={sumberTampil === s.id}
+                judul={s.label}
+                ket={s.id === "belmawa" ? "pilih kategori di bawah" : "tanpa kategori"}
+                onClick={() =>
+                  simpan(s.id, s.id === "belmawa" ? (e.kategori || "") : "",
+                    s.id !== "belmawa")}
+              />
+            ))}
+            {e.sumber && (
+              <ChipDana
+                warna="netral"
+                judul="Kosongkan"
+                onClick={() => simpan("", "")}
+                ikon={<X className="lucide" />}
+              />
+            )}
+          </div>
 
-          {KATEGORI_PKM.map((k) => (
-            <button
-              key={k.id}
-              type="button"
-              role="menuitem"
-              className="sumber-item"
-              onClick={() => simpan("belmawa", k.id)}
-            >
-              <span className="dot belmawa" />
-              <span>
-                {k.label}
-                <small>Belmawa · maks {k.maks}%</small>
-              </span>
-              {aktif("belmawa", k.id) && <Check className="lucide" />}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            role="menuitem"
-            className="sumber-item menu-pisah"
-            onClick={() => simpan("belmawa", "")}
-          >
-            <span className="dot belmawa" />
-            <span>Belmawa <small>tanpa kategori</small></span>
-            {aktif("belmawa", "") && <Check className="lucide" />}
-          </button>
-
-          <button
-            type="button"
-            role="menuitem"
-            className="sumber-item"
-            onClick={() => simpan("pt")}
-          >
-            <span className="dot pt" />
-            <span>
-              {SUMBER_DANA[1].label}
-              <small>tanpa kategori</small>
-            </span>
-            {aktif("pt") && <Check className="lucide" />}
-          </button>
-
-          {e.sumber && (
-            <button
-              type="button"
-              role="menuitem"
-              className="sumber-item menu-pisah hapus"
-              onClick={() => simpan("", "")}
-            >
-              <span className="dot netral" />
-              <span>Kosongkan penanda</span>
-            </button>
+          {sumberTampil === "belmawa" && (
+            <>
+              <div className="menu-judul">KATEGORI PKM</div>
+              <ChipsKategori
+                kategori={e.kategori || ""}
+                onPilih={(id) => simpan("belmawa", id)}
+              />
+            </>
           )}
         </div>
       )}
