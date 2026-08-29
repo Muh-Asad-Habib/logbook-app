@@ -31,7 +31,8 @@ const KARTU = [
     Ic: Wallet, judul: "Word Khusus Keuangan (.docx)", warna: "v3",
     ket: "Hanya keuangan: tabel dana Belmawa dipisah per kategori (Bahan habis pakai, " +
       "Sewa & jasa, …) lengkap dengan subtotal, lalu tabel dana Perguruan Tinggi " +
-      "terpisah. Teks & tabel biasa — bebas disalin dan diedit di Word.",
+      "terpisah. Nota tiap belanja ikut disematkan beserta lampiran bernomor — " +
+      "teks, tabel, dan gambar biasa yang bebas disalin dan diedit di Word.",
     jenis: "keuangan-docx", tombol: "Unduh DOCX Keuangan",
   },
 ];
@@ -225,8 +226,9 @@ export default function EksporPage() {
           • Foto disematkan <b>utuh</b> (tidak dipangkas) dengan resolusi tinggi; berkasnya
           ditarik langsung dari penyimpanan awan, jadi tidak ada batas ukuran unduhan.<br />
           • <b>Word Khusus Keuangan</b> adalah berkas terpisah — tidak menggantikan
-          ekspor gabungan kegiatan &amp; keuangan, dan tidak memuat foto agar ringan
-          serta mudah diedit ulang.
+          ekspor gabungan kegiatan &amp; keuangan. Nota tiap belanja tampil kecil di
+          kolom <i>Nota</i> dan berukuran besar di bagian <b>Lampiran</b> dengan nomor
+          yang sama (L-1, L-2, …).
         </p>
       </div>
     </>

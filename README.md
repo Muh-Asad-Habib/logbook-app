@@ -201,7 +201,7 @@ Buka menu **Ekspor**:
 | **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. Bagian **keuangan dimulai di halaman baru** agar dokumen enak dibaca dan dicetak. |
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
-| **Word Khusus Keuangan (.docx)** | Berkas **terpisah** berisi keuangan saja: tabel **dana Belmawa** dipecah per kategori PKM (tiap kategori diawali baris pemisah *Bahan habis pakai*, *Sewa & jasa*, … dan ditutup subtotal), lalu tabel **dana Perguruan Tinggi** sendiri, ditutup rekap pemakaian dana. Tanpa foto — isinya teks & tabel biasa sehingga **bebas disalin dan diedit** di Word. |
+| **Word Khusus Keuangan (.docx)** | Berkas **terpisah** berisi keuangan saja: tabel **dana Belmawa** dipecah per kategori PKM (tiap kategori diawali baris pemisah *Bahan habis pakai*, *Sewa & jasa*, … dan ditutup subtotal), lalu tabel **dana Perguruan Tinggi** sendiri, rekap pemakaian dana, dan **lampiran nota**. Bukti tiap belanja tampil kecil di kolom *Nota* serta berukuran besar di lampiran dengan nomor sama (**L-1**, **L-2**, …). Isinya teks, tabel, dan gambar biasa sehingga **bebas disalin dan diedit** di Word. |
 
 Nama berkas hasil unduhan dibuat khas untuk tiap tim beserta tanggal unduhnya,
 sehingga tidak tertukar saat dikumpulkan bersama tim lain:
@@ -553,7 +553,7 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
-| `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, dan dokumen bebas gambar agar mudah diedit |
+| `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, serta **nota tersemat** (thumbnail + lampiran bernomor, relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |
 | `node tools/test-rute-ekspor.mjs` | Seluruh rute ekspor terdaftar, termasuk `GET /keuangan-docx` dan `POST /tautan/:jenis` |
 | `node --env-file=.env tools/cek-kode-unik.mjs` | Memastikan kolom **kode unik** sudah termigrasi di database dan tiap entri belanja konsisten (`harga × jumlah + kode unik = total`) |
 
