@@ -11,13 +11,13 @@ import {
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
-import { SUMBER_DANA, KATEGORI_PKM } from "@/lib/pkm";
 import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
 import RekapDana from "@/components/RekapDana";
 import BadgeSumber from "@/components/BadgeSumber";
+import PilihSumberDana from "@/components/PilihSumberDana";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -770,31 +770,13 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             <input type="number" name="kode_unik" min="0" step="any" value={kodeUnik}
                    onChange={(e) => setKodeUnik(e.target.value)} placeholder="mis. 123" />
           </label>
-          <label className="field">
-            Sumber dana <span className="muted">(opsional)</span>
-            <select name="sumber" value={sumber}
-                    onChange={(e) => {
-                      setSumber(e.target.value);
-                      if (e.target.value !== "belmawa") setKategori("");
-                    }}>
-              <option value="">— belum dipilih —</option>
-              {SUMBER_DANA.map((s) => (
-                <option key={s.id} value={s.id}>{s.label}</option>
-              ))}
-            </select>
-          </label>
-          {sumber === "belmawa" && (
-            <label className="field">
-              Kategori PKM <span className="muted">(opsional)</span>
-              <select name="kategori" value={kategori}
-                      onChange={(e) => setKategori(e.target.value)}>
-                <option value="">— belum dipilih —</option>
-                {KATEGORI_PKM.map((k) => (
-                  <option key={k.id} value={k.id}>{k.label} (maks {k.maks}%)</option>
-                ))}
-              </select>
-            </label>
-          )}
+          <div className="field-blok">
+            <PilihSumberDana
+              sumber={sumber}
+              kategori={kategori}
+              onChange={(s, k) => { setSumber(s); setKategori(k); }}
+            />
+          </div>
         </div>
         <p className="mt total-form">
           Total:{" "}

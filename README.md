@@ -46,7 +46,7 @@ bisa dicetak menjadi dokumen laporan.
 | 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
 | 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. Pratinjau `.pptx` memakai penampil PowerPoint Online (maks. 10 MB); berkas lebih besar cukup diunduh. |
 | 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
-| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. |
+| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. Tersedia pula **Word khusus keuangan** (dana Belmawa per kategori & dana PT terpisah). |
 | 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
 | 💬 **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
 | ✅ **Pengesahan (ACC)** | Dosen menyetujui atau meminta revisi tiap entri; statusnya terlihat jelas oleh tim. |
@@ -132,19 +132,23 @@ nota. Biarkan 0 bila tidak ada. Di daftar belanja kode unik tampil sebagai
 keterangan kecil pada kolom harga, sedangkan kolom Total dan semua ekspor
 (DOCX/PDF/Excel) menampilkan satu angka gabungan — sama seperti di nota.
 
-**Sumber dana (opsional).** Pada form tersedia pilihan **Sumber dana** —
-*Belmawa* atau *Perguruan Tinggi* — dan, khusus Belmawa, **Kategori PKM**.
-Keduanya boleh dibiarkan kosong; entri tanpa penanda hanya diberi lencana
-*"belum dipilih"*. Cara tercepat melengkapinya: klik lencana itu langsung di
-daftar belanja, pilih kategori, selesai — **ACC dosen tidak ikut dibatalkan**
-karena nominalnya tidak berubah.
+**Sumber dana (opsional).** Pada form tersedia pemilih **Sumber dana** berbentuk
+chip berwarna — *Belmawa* atau *Perguruan Tinggi*. Begitu **Belmawa** dipilih,
+panel **Kategori belanja PKM** terbuka di bawahnya (bahan habis pakai, sewa &
+jasa, transportasi lokal, lain-lain) lengkap dengan batas persentasenya; kategori
+tidak ditampilkan untuk dana PT karena memang tidak berlaku. Chip menyesuaikan
+lebar layar sehingga tetap nyaman di ponsel. Keduanya boleh dibiarkan kosong;
+entri tanpa penanda hanya diberi lencana *"belum dipilih"*. Cara tercepat
+melengkapinya: klik lencana itu langsung di daftar belanja lalu pilih chip
+sumber & kategori — **ACC dosen tidak ikut dibatalkan** karena nominalnya tidak
+berubah.
 
 **Rekap dana PKM.** Di bawah toolbar Keuangan ada kartu rekap: berapa dana
 Belmawa & PT yang terpakai, rincian tiap kategori beserta batas pedoman PKM 2026
 (bahan habis pakai 60%, sewa & jasa 15%, transportasi lokal 30%, lain-lain 15%),
 serta berapa entri yang belum ditandai. Batas yang terlampaui ditandai merah
 sebagai peringatan — bukan penghalang menyimpan. Rekap ini ikut tercetak di
-ekspor **PDF** dan **Excel** (sheet *Rekap Dana*).
+ekspor **PDF**, **Excel** (sheet *Rekap Dana*), dan **Word khusus keuangan**.
 
 > Gunakan filter **bulan** dan **sumber dana** di toolbar untuk menemukan entri
 > tertentu dengan cepat, termasuk memfilter yang *belum dipilih* sumbernya.
@@ -197,6 +201,7 @@ Buka menu **Ekspor**:
 | **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. Bagian **keuangan dimulai di halaman baru** agar dokumen enak dibaca dan dicetak. |
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
+| **Word Khusus Keuangan (.docx)** | Berkas **terpisah** berisi keuangan saja: tabel **dana Belmawa** dipecah per kategori PKM (tiap kategori diawali baris pemisah *Bahan habis pakai*, *Sewa & jasa*, … dan ditutup subtotal), lalu tabel **dana Perguruan Tinggi** sendiri, ditutup rekap pemakaian dana. Tanpa foto — isinya teks & tabel biasa sehingga **bebas disalin dan diedit** di Word. |
 
 Nama berkas hasil unduhan dibuat khas untuk tiap tim beserta tanggal unduhnya,
 sehingga tidak tertukar saat dikumpulkan bersama tim lain:
@@ -205,10 +210,12 @@ sehingga tidak tertukar saat dikumpulkan bersama tim lain:
 Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).docx
 Logbook Tim Alpha - Kegiatan & Keuangan (04-08-2026).pdf
 Logbook Tim Alpha - Rekap Kegiatan & Keuangan (04-08-2026).xlsx
+Logbook Tim Alpha - Khusus Keuangan (04-08-2026).docx
 ```
 
 Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan baru dan
-aman diulang berkali-kali.
+aman diulang berkali-kali. Ekspor khusus keuangan juga **tidak mengganggu**
+ekspor gabungan kegiatan & keuangan; keduanya berdiri sendiri.
 
 **Impor:** pada halaman yang sama, unggah logbook Word lama lalu klik **Impor
 sekarang**. Entri yang belum ada akan ditambahkan lengkap dengan fotonya; entri
@@ -425,6 +432,8 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/files/{key}` | Ambil gambar |
 | GET | `/api/export/info` | Jumlah entri baru yang akan masuk ke dokumen |
 | GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
+| GET | `/api/export/keuangan-docx` | Unduh Word **khusus keuangan** (Belmawa per kategori + tabel PT terpisah) |
+| POST | `/api/export/tautan/{jenis}` | Siapkan berkas ekspor lalu kembalikan tautan CDN (`docx`, `pdf`, `xlsx`, `keuangan-docx`) |
 | POST | `/api/import/docx` | Impor entri + foto dari dokumen Word |
 | POST | `/api/import/docx/chunk` \| `/docx/selesai` | Impor berkas besar secara terpotong |
 
@@ -544,6 +553,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
+| `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, dan dokumen bebas gambar agar mudah diedit |
+| `node tools/test-rute-ekspor.mjs` | Seluruh rute ekspor terdaftar, termasuk `GET /keuangan-docx` dan `POST /tautan/:jenis` |
 | `node --env-file=.env tools/cek-kode-unik.mjs` | Memastikan kolom **kode unik** sudah termigrasi di database dan tiap entri belanja konsisten (`harga × jumlah + kode unik = total`) |
 
 Akun uji dibuat dan dihapus kembali secara otomatis sehingga data sungguhan
