@@ -26,12 +26,14 @@
   position: absolute; left: 11px; width: 15px; height: 15px;
   color: var(--muted); pointer-events: none;
 }
-.tb-baris .tb-sel {
+/* Berlaku di toolbar mana pun (halaman Keuangan & Kegiatan) — ruang kiri
+   disediakan untuk ikon supaya teks pilihan tidak tertimpa. */
+.tb-sel-wrap .tb-sel {
   margin-top: 0; width: 100%; padding: 10px 12px 10px 33px;
   font-size: 0.82rem; font-weight: 700; border-radius: 12px;
   appearance: none; cursor: pointer;
 }
-.tb-baris .tb-sel:hover { border-color: var(--line-hover); }
+.tb-sel-wrap .tb-sel:hover { border-color: var(--line-hover); }
 .tb-reset { flex: 0 0 auto; margin-left: auto; }
 .tb-tambah { margin-left: auto; }
 
