@@ -493,7 +493,8 @@ export const idSesiDariToken = (token) => hashToken(String(token || "")).slice(0
  */
 export async function listSessions(userId, tokenSekarang = "") {
   const rows = await q(
-    `SELECT LEFT(token, ${ID_PANJANG}) AS id, created_at, last_used_at, perangkat, ip_samar
+    `SELECT LEFT(token, ${ID_PANJANG}) AS id, created_at, last_used_at, perangkat, ip_samar,
+            denyut_at, denyut_layar
        FROM sessions
       WHERE user_id = $1
       ORDER BY COALESCE(NULLIF(last_used_at, ''), created_at) DESC`,
@@ -507,7 +508,42 @@ export async function listSessions(userId, tokenSekarang = "") {
     dibuat: r.created_at,
     terakhir: r.last_used_at || r.created_at,
     ini_perangkat: !!idSaya && r.id === idSaya,
+    ...statusDenyut(r),
   }));
+}
+
+/* ---------- Denyut tab (kehadiran nyata) ----------
+ * `last_used_at` hanya berarti "sesi ini masih ada", `last_login_at` berarti
+ * "kapan login". Keduanya tidak menjawab: siapa yang SEDANG membuka aplikasi
+ * sekarang? Browser mengirim denyut tiap ±30 dtk selama tab hidup (dan
+ * menghapusnya saat tab ditutup). Denyut yang lebih tua dari DENYUT_HIDUP_MS
+ * dianggap tidak membuka lagi (mis. laptop tertidur / jaringan putus). */
+
+/** Batas denyut masih dianggap "sedang membuka" (ms). */
+export const DENYUT_HIDUP_MS = 90 * 1000;
+
+/**
+ * Catat denyut tab untuk sesi pemanggil.
+ * @param {string} token  token sesi asli (dari header/cookie)
+ * @param {string} layar  'terlihat' | 'tersembunyi' | '' (kosong = tab ditutup)
+ */
+export async function catatDenyut(token, layar) {
+  const l = layar === "terlihat" || layar === "tersembunyi" ? layar : "";
+  await q(
+    "UPDATE sessions SET denyut_at = $1, denyut_layar = $2 WHERE token = $3",
+    [l ? nowIso() : "", l, hashToken(String(token || ""))]
+  ).catch(() => {});
+}
+
+/** Turunkan status kehadiran dari kolom denyut sebuah baris sesi. */
+export function statusDenyut(r) {
+  const t = Date.parse(r?.denyut_at || "") || 0;
+  const hidup = t > 0 && Date.now() - t < DENYUT_HIDUP_MS;
+  return {
+    membuka: hidup,                                  // tab aplikasi sedang terbuka
+    layar: hidup ? (r.denyut_layar || "terlihat") : "", // 'terlihat' | 'tersembunyi'
+    denyut: r?.denyut_at || "",
+  };
 }
 
 /**
@@ -549,11 +585,13 @@ const barisSesiPanel = (r) => ({
   penuh: !!r.ip_penuh,
   dibuat: r.created_at,
   terakhir: r.last_used_at || r.created_at,
+  ...statusDenyut(r), // membuka / layar / denyut
 });
 
 const SQL_SESI_PANEL =
   `SELECT LEFT(s.token, ${ID_PANJANG}) AS id, s.user_id, s.created_at,
           s.last_used_at, s.perangkat, s.ip_samar, s.ip_penuh,
+          s.denyut_at, s.denyut_layar,
           u.username, COALESCE(u.role, 'tim') AS role
      FROM sessions s
      JOIN users u ON u.id = s.user_id`;

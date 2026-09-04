@@ -421,6 +421,33 @@ router.get("/sesi", authRequired, async (req, res, next) => {
 
 /**
  * @openapi
+ * /api/auth/denyut:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Denyut tab (dikirim browser tiap ±30 dtk) — menandai sesi ini SEDANG membuka aplikasi
+ *     description: >
+ *       `layar` = terlihat | tersembunyi | "" (kosong = tab ditutup, dikirim
+ *       lewat sendBeacon). Hanya waktu & status layar yang disimpan; ikut
+ *       terhapus bersama sesinya. Dibaca panel admin & halaman Profil.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: layar, required: false, schema: { type: string, enum: [terlihat, tersembunyi, ""] } }
+ *     responses:
+ *       204: { description: Dicatat }
+ */
+router.post("/denyut", authRequired, async (req, res, next) => {
+  try {
+    // sendBeacon tidak bisa mengirim JSON+header → nilai diterima juga lewat query
+    const layar = String(req.body?.layar ?? req.query.layar ?? "terlihat");
+    await store.catatDenyut(req.token, layar);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
  * /api/auth/sesi/{id}:
  *   delete:
  *     tags: [Auth]

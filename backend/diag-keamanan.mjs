@@ -117,6 +117,34 @@ try {
   // penghitung per-IP ikut naik akibat uji ini → nolkan agar tidak mengganggu uji lain
   await q("DELETE FROM login_fails WHERE kunci LIKE 'auth:login|%'");
 
+  console.log("\n== Denyut kehadiran (sedang membuka) ==");
+  const idSesi = store.idSesiDariToken(tok);
+  r = await jfetch("/api/auth/denyut?layar=terlihat", { method: "POST", headers: H(tok) });
+  cek("POST /denyut → 204", r.status === 204, String(r.status));
+  let sesiSaya = await jfetch("/api/auth/sesi", { headers: H(tok) });
+  let sesiIni = (sesiSaya.body || []).find((s) => s.id === idSesi);
+  cek("/auth/sesi: perangkat ini membuka=true, layar=terlihat",
+    sesiIni?.membuka === true && sesiIni?.layar === "terlihat", JSON.stringify(sesiIni));
+  let sesiPanel = await store.listSesiAktifUser(uid);
+  cek("panel melihat sesi ini 'membuka'", sesiPanel.some((s) => s.id === idSesi && s.membuka));
+
+  r = await jfetch("/api/auth/denyut?layar=tersembunyi", { method: "POST", headers: H(tok) });
+  sesiSaya = await jfetch("/api/auth/sesi", { headers: H(tok) });
+  sesiIni = (sesiSaya.body || []).find((s) => s.id === idSesi);
+  cek("tab tersembunyi → layar=tersembunyi, tetap membuka",
+    sesiIni?.membuka === true && sesiIni?.layar === "tersembunyi", JSON.stringify(sesiIni));
+
+  // Beacon "tab ditutup": tanpa header Authorization, autentikasi lewat cookie sesi
+  r = await jfetch("/api/auth/denyut?layar=", {
+    method: "POST", headers: { Cookie: `logbook_sesi=${tok}` }, body: "",
+  });
+  cek("beacon tutup (cookie saja) → 204", r.status === 204, String(r.status));
+  sesiPanel = await store.listSesiAktifUser(uid);
+  cek("setelah beacon: sesi tetap ada tapi membuka=false",
+    sesiPanel.some((s) => s.id === idSesi && s.membuka === false), JSON.stringify(sesiPanel));
+  r = await jfetch("/api/auth/denyut?layar=terlihat", { method: "POST" });
+  cek("denyut tanpa login → 401", r.status === 401, String(r.status));
+
   console.log("\n== Panel: toggle pendaftaran + audit ==");
   const meta = await q("SELECT nilai FROM meta WHERE kunci = 'admin'");
   const PANEL = (meta[0] ? JSON.parse(meta[0].nilai).path : "/pusat-kendali") || "/pusat-kendali";

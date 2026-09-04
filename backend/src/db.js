@@ -62,6 +62,13 @@ const SKEMA = [
   `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ip_penuh  TEXT NOT NULL DEFAULT ''`,
   // Pembersihan sesi menganggur menyaring pada kolom ini.
   `CREATE INDEX IF NOT EXISTS sessions_last_used_idx ON sessions (last_used_at)`,
+  // DENYUT (heartbeat) — kapan tab aplikasi TERAKHIR benar-benar terbuka di
+  // perangkat ini, dikirim browser tiap ±30 dtk selama halaman hidup, dan
+  // dikosongkan saat tab ditutup. Berbeda dari last_used_at (sesi "ada")
+  // maupun last_login_at (kapan login): ini menjawab "siapa yang SEDANG
+  // membuka aplikasi sekarang". denyut_layar = 'terlihat' | 'tersembunyi'.
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS denyut_at    TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS denyut_layar TEXT NOT NULL DEFAULT ''`,
   // Penghitung brute-force login APLIKASI (bukan panel) — di database supaya
   // lockout tetap berlaku walau Vercel menjalankan banyak instance serverless.
   `CREATE TABLE IF NOT EXISTS login_fails (

@@ -86,7 +86,7 @@ const sandbox = {
 let api;
 try {
   const nama = Object.keys(sandbox);
-  const fn = new Function(...nama, kode + "\n;return { B: B, HAL: HAL, urlHal: urlHal, keHalaman: keHalaman, render: render, renderSesi: renderSesi, kartuAkunSesi: kartuAkunSesi, sesiPerAkun: sesiPerAkun, akunOnline: akunOnline, setMode: function(m){ MODE_SESI = m; }, bentang: function(id){ BUKA_SESI[id] = true; }, setState: function(u, s){ USERS = u; SESI = s; PERTAMA = false; } };");
+  const fn = new Function(...nama, kode + "\n;return { B: B, HAL: HAL, urlHal: urlHal, keHalaman: keHalaman, render: render, renderSesi: renderSesi, kartuAkunSesi: kartuAkunSesi, barisPerangkat: barisPerangkat, sesiPerAkun: sesiPerAkun, akunOnline: akunOnline, setMode: function(m){ MODE_SESI = m; }, bentang: function(id){ BUKA_SESI[id] = true; }, setState: function(u, s){ USERS = u; SESI = s; PERTAMA = false; } };");
 
   api = fn(...nama.map((n) => sandbox[n]));
   cek("skrip panel berjalan tanpa error", true);
@@ -112,7 +112,8 @@ const users = [
 ];
 const sesi = [
   { id: "aa11", user_id: "t1", username: "Tim Alfa", role: "tim", perangkat: "Brave · Linux",
-    ip: "203.0.113.7", penuh: true, dibuat: "2026-08-20T02:00:00.000Z", terakhir: new Date().toISOString() },
+    ip: "203.0.113.7", penuh: true, dibuat: "2026-08-20T02:00:00.000Z", terakhir: new Date().toISOString(),
+    membuka: true, layar: "terlihat" },
 ];
 api.setState(users, sesi);
 
@@ -122,9 +123,24 @@ cek("akunOnline hanya berisi yang punya sesi",
   api.akunOnline().length === 1 && api.akunOnline()[0] === "t1", JSON.stringify(api.akunOnline()));
 
 const kartuOnline = api.kartuAkunSesi(users[0], sesi);
-cek("kartu akun online: badge perangkat", kartuOnline.includes('class="st on"') && kartuOnline.includes("1 perangkat"));
+cek("kartu akun MEMBUKA: badge online + jumlah perangkat",
+  kartuOnline.includes('class="st on"') && kartuOnline.includes("1 perangkat") &&
+  kartuOnline.includes("sedang membuka aplikasi"));
 cek("kartu akun online: nama pendamping tampil", kartuOnline.includes("pendamping: Bu Rina"));
 cek("kartu akun online: tombol cabut semua ada", kartuOnline.includes('data-act="sesi"'));
+
+// Login tapi tab aplikasi TIDAK terbuka → bukan "online", melainkan "login"
+const sesiDiam = [{ ...sesi[0], membuka: false, layar: "" }];
+const kartuDiam = api.kartuAkunSesi(users[0], sesiDiam);
+cek("kartu akun LOGIN SAJA: badge redup, bukan online",
+  kartuDiam.includes('class="st dim"') && !kartuDiam.includes('class="st on"') &&
+  kartuDiam.includes("login, tidak membuka"));
+cek("baris perangkat: lencana 'tidak membuka'",
+  api.barisPerangkat(sesiDiam[0]).includes("tidak membuka"));
+cek("baris perangkat: lencana 'tab di latar' saat tersembunyi",
+  api.barisPerangkat({ ...sesi[0], layar: "tersembunyi" }).includes("tab di latar"));
+cek("baris perangkat: lencana 'sedang membuka' saat terlihat",
+  api.barisPerangkat(sesi[0]).includes("sedang membuka"));
 
 const kartuOffline = api.kartuAkunSesi(users[1], []);
 cek("kartu akun offline: berlabel offline", kartuOffline.includes('class="st off"') && kartuOffline.includes("offline"));
