@@ -260,7 +260,12 @@ besar, di dalamnya admin dapat:
   username, setel ulang password, keluarkan dari perangkat yang sedang login,
   serta menghapus akun.
 - Memantau **perangkat & sesi** — berapa dan siapa saja yang sedang login,
-  ditinjau secara keseluruhan maupun per akun.
+  ditinjau secara keseluruhan maupun per akun. Tiap perangkat diberi status
+  kehadiran nyata: **sedang membuka** (tab aplikasi terbuka, denyut < 90
+  detik), **tab di latar** (terbuka tapi tersembunyi), atau **tidak membuka**
+  (masih login, aplikasi tidak sedang dibuka). Kartu **"Sedang membuka"**
+  menghitung akun yang benar-benar aktif saat ini — bukan sekadar login
+  terakhir.
 - Mengatur **kode pendaftaran** fasilitator dan dosen, serta **penugasan tim**
   untuk menghubungkan pembimbing dengan tim yang didampingi.
 - **Membuka / menutup pendaftaran akun Tim** — tutup begitu semua tim
@@ -438,6 +443,11 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/auth/me` | Profil akun yang sedang masuk |
 | PUT | `/api/auth/username` | Ganti username (konfirmasi password) |
 | PUT | `/api/auth/password` | Ganti password (sesi lain dikeluarkan) |
+| GET | `/api/auth/aktivitas` | Riwayat aktivitas akun sendiri |
+| GET | `/api/auth/sesi` | Daftar perangkat yang login (+ `membuka`/`layar` = sedang membuka aplikasi) |
+| DELETE | `/api/auth/sesi/{id}` | Keluarkan satu perangkat |
+| POST | `/api/auth/sesi/lainnya` | Keluarkan semua perangkat lain |
+| POST | `/api/auth/denyut` | Denyut tab (tiap ±30 dtk; `?layar=terlihat\|tersembunyi\|` kosong = tab ditutup) |
 | POST | `/api/auth/logout` | Akhiri sesi |
 | GET / POST | `/api/kegiatan` | Daftar / tambah kegiatan (+foto) |
 | PUT / DELETE | `/api/kegiatan/{id}` | Ubah / hapus kegiatan |
@@ -570,7 +580,7 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:presentasi-langsung --workspace backend` | Jalur unggah **langsung ke ImageKit**: penerbitan izin, verifikasi metadata, berkas satu bagian & multi-bagian, redirect 302 ke CDN, dan penolakan izin palsu (butuh internet + env `IMAGEKIT_*`) |
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
 | `npm run diag:impor-langsung --workspace backend` | Jalur **impor `.docx` langsung ke ImageKit**: penerbitan izin, verifikasi metadata, impor berjalan, berkas sementara terhapus (sukses maupun gagal), penolakan izin palsu, pagar peran & login (butuh internet + env `IMAGEKIT_*`) |
-| `npm run diag:keamanan --workspace backend` | Perbaikan keamanan hasil audit: buka/tutup pendaftaran tim (+ endpoint publik & audit panel), whitelist kunci pengaturan, penolakan origin CORS palsu, unggahan bukan gambar → 400 ramah, pembatas laju per-username, cookie sesi panel |
+| `npm run diag:keamanan --workspace backend` | Perbaikan keamanan hasil audit: buka/tutup pendaftaran tim (+ endpoint publik & audit panel), whitelist kunci pengaturan, penolakan origin CORS palsu, unggahan bukan gambar → 400 ramah, pembatas laju per-username, cookie sesi panel, serta **denyut kehadiran** (`/denyut` → `membuka`, beacon tutup → tidak membuka) |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
 | `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, serta **nota tersemat** (thumbnail + lampiran bernomor, relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |
@@ -631,9 +641,15 @@ ruangnya benar-benar kembali ke kuota.
 - Halaman **Profil → Perangkat & sesi aktif** memperlihatkan setiap perangkat yang
   sedang masuk ke akun (mis. “Brave · Linux”, terakhir aktif kapan) dan dapat
   mengeluarkannya satu per satu atau sekaligus — berguna saat lupa keluar di
-  komputer pinjaman. Data yang disimpan sengaja seminim mungkin: User-Agent
+  komputer pinjaman. Perangkat lain yang **saat ini benar-benar membuka
+  aplikasi** ditandai lencana **Online** (perangkat yang sedang kamu pakai cukup
+  ditandai “perangkat ini”). Data yang disimpan sengaja seminim mungkin: User-Agent
   **tidak** disimpan utuh, dan keterangan jaringan yang ditampilkan kepada pemilik
   akun sudah disamarkan.
+- Status **Online / sedang membuka** berasal dari *denyut* yang dikirim tab
+  aplikasi tiap ±30 detik selama terbuka (dan dihapus saat tab ditutup). Yang
+  disimpan hanya waktu denyut dan apakah tab terlihat/tersembunyi — tanpa
+  data lain — dan ikut terhapus bersama sesinya.
 - Nama peramban dibaca dari *Client Hints* (`Sec-CH-UA`), sehingga peramban yang
   sengaja menyamar sebagai Chrome di User-Agent — **Brave** — tetap dikenali
   dengan nama aslinya.

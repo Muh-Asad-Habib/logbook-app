@@ -387,6 +387,43 @@ export default function Shell({ children }) {
     }).catch(() => {});
   }, [isLogin, path]);
 
+  /* ---------- Denyut kehadiran ----------
+   * Memberi tahu server bahwa tab aplikasi ini SEDANG terbuka (tiap 30 dtk +
+   * saat tab berpindah terlihat/tersembunyi). Saat tab ditutup, kirim
+   * sendBeacon "berhenti" supaya status langsung offline tanpa menunggu 90 dtk.
+   * Yang dikirim hanya status layar — tanpa data lain. Dipakai Pusat Kendali
+   * ("sedang membuka") & halaman Profil ("Online" pada perangkat lain). */
+  useEffect(() => {
+    if (!siap || isLogin || typeof window === "undefined") return;
+    const kirim = (layar) => {
+      const t = getToken();
+      if (!t) return;
+      const url = `/api/auth/denyut?layar=${encodeURIComponent(layar)}`;
+      if (layar === "" && typeof navigator.sendBeacon === "function") {
+        // Tab ditutup: beacon tetap terkirim walau halaman sudah dibongkar.
+        // Autentikasi lewat cookie HttpOnly logbook_sesi (SameSite=Strict).
+        navigator.sendBeacon(url, new Blob([], { type: "text/plain" }));
+        return;
+      }
+      fetch(url, {
+        method: "POST", credentials: "same-origin", keepalive: true,
+        headers: { Authorization: `Bearer ${t}` },
+      }).catch(() => {});
+    };
+    const layar = () => (document.visibilityState === "hidden" ? "tersembunyi" : "terlihat");
+    kirim(layar());
+    const id = setInterval(() => kirim(layar()), 30_000);
+    const vis = () => kirim(layar());
+    const tutup = () => kirim("");
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("pagehide", tutup);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("pagehide", tutup);
+    };
+  }, [siap, isLogin]);
+
   useEffect(() => {
     if (!menuBuka && !menuMob) return;
     const tutup = (e) => {

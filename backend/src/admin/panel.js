@@ -253,6 +253,11 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .st.on{color:#4ade80;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.34)}
   .st.on i{animation:blink 1.9s infinite}
   .st.off{color:#8891bb;background:rgba(136,145,187,.08);border:1px solid rgba(136,145,187,.24)}
+  /* tab aplikasi terbuka tapi di latar belakang (tersembunyi) */
+  .st.idle{color:#fbbf24;background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.34)}
+  /* sesi login ada, tetapi tab aplikasi tidak sedang dibuka */
+  .st.dim{color:#a5adcf;background:rgba(136,145,187,.06);border:1px dashed rgba(136,145,187,.30)}
+  .asx.membuka{border-color:rgba(52,211,153,.55);box-shadow:0 0 0 1px rgba(52,211,153,.18) inset}
 
   /* ---------- skeleton saat memuat pertama kali ---------- */
   @keyframes shimmer{from{background-position:-420px 0}to{background-position:420px 0}}
@@ -1020,7 +1025,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
             <div class="tbl">
               <table>
                 <thead><tr>
-                  <th>Akun</th><th>Perangkat</th><th>Alamat IP</th>
+                  <th>Akun</th><th>Status</th><th>Perangkat</th><th>Alamat IP</th>
                   <th>Terakhir aktif</th><th>Mulai login</th>
                   <th style="text-align:right">Aksi</th>
                 </tr></thead>
@@ -1890,6 +1895,26 @@ function akunOnline(){
   return Object.keys(peta);
 }
 
+/* ---------- Kehadiran nyata (denyut tab) ----------
+ * Server menandai tiap sesi dengan "membuka" (tab aplikasi terbuka, denyut
+ * < 90 dtk) dan "layar" ('terlihat' | 'tersembunyi'). Ini beda dengan
+ * "login" (sesi ada) — seseorang bisa login di 3 perangkat tapi hanya SATU
+ * yang benar-benar sedang dibuka. */
+
+/** Lencana kehadiran satu sesi. */
+function lencanaSesi(s){
+  if (s.membuka && s.layar === "tersembunyi")
+    return '<span class="st idle" title="Aplikasi terbuka di tab latar belakang"><i></i>tab di latar</span>';
+  if (s.membuka)
+    return '<span class="st on" title="Tab aplikasi sedang terbuka di perangkat ini"><i></i>sedang membuka</span>';
+  return '<span class="st dim" title="Masih login, tetapi aplikasi tidak sedang dibuka"><i></i>tidak membuka</span>';
+}
+/** Tingkat kehadiran sebuah akun dari daftar sesinya: 2 = membuka, 1 = login saja, 0 = offline. */
+function tingkatAkun(list){
+  if (!list || !list.length) return 0;
+  return list.some(function(s){ return s.membuka; }) ? 2 : 1;
+}
+
 function renderSesi(){
   renderStatSesi();
   renderFilterPeran();
@@ -1906,24 +1931,29 @@ function renderSesi(){
 function renderStatSesi(){
   var peta = sesiPerAkun();
   var online = { tim: 0, fasilitator: 0, dosen: 0 };
-  var total = 0;
+  var total = 0, membuka = 0;
   USERS.forEach(function(u){
     if (!(peta[u.id] && peta[u.id].length)) return;
     var role = u.role || "tim";
     if (online[role] == null) role = "tim";
     online[role]++; total++;
+    if (tingkatAkun(peta[u.id]) === 2) membuka++;
   });
+  var perangkatMembuka = SESI.filter(function(s){ return s.membuka; }).length;
   var html =
+    stat("gauge","Sedang membuka", membuka, "s1") +
     stat("device","Perangkat login", SESI.length, "s4") +
-    stat("users","Akun online", total, "s1") +
-    stat("user","Tim online", online.tim, "s2") +
-    stat("user","Fasilitator online", online.fasilitator, "s5") +
-    stat("user","Dosen online", online.dosen, "s3") +
+    stat("users","Akun login", total, "s2") +
+    stat("user","Tim login", online.tim, "s2") +
+    stat("user","Fasilitator login", online.fasilitator, "s5") +
+    stat("user","Dosen login", online.dosen, "s3") +
     stat("power","Akun offline", Math.max(0, USERS.length - total), "s6");
   if (setHTML($("#stat-sesi"), html, "stat-sesi")) {
     document.querySelectorAll("#stat-sesi b[data-n]").forEach(function(b){
       hitungNaik(b, Number(b.dataset.n));
     });
+    var k = $("#stat-sesi .stat"); // kartu pertama = "Sedang membuka"
+    if (k) k.title = perangkatMembuka + " tab aplikasi sedang terbuka (denyut < 90 detik)";
   }
 }
 
@@ -1948,9 +1978,14 @@ function renderFilterPeran(){
 function renderTabelSesi(){
   var el = $("#t-sesi");
   if (!el) return;
-  var rows = sesiTersaring();
+  var rows = sesiTersaring().slice().sort(function(a, b){
+    // sedang membuka (layar terlihat) → tab di latar → login saja; sisanya urutan server
+    var ra = a.membuka ? (a.layar === "tersembunyi" ? 1 : 2) : 0;
+    var rb = b.membuka ? (b.layar === "tersembunyi" ? 1 : 2) : 0;
+    return rb - ra;
+  });
   setHTML(el, rows.map(barisSesi).join("") ||
-    '<tr><td colspan="6"><div class="kosong"><div class="big">🖥️</div>' +
+    '<tr><td colspan="7"><div class="kosong"><div class="big">🖥️</div>' +
     (cariSesi() || PERAN_SESI ? "Tidak ada sesi yang cocok dengan saringan ini."
                               : "Belum ada perangkat yang sedang login.") +
     "</div></td></tr>", "t-sesi");
@@ -1969,10 +2004,11 @@ function renderAkunSesi(){
     }).join(" ");
     return teks.toLowerCase().indexOf(cari) >= 0;
   });
-  // Urutan: sedang login dulu, lalu yang paling baru login.
+  // Urutan: sedang MEMBUKA dulu, lalu yang login saja, lalu yang paling baru login.
   rows.sort(function(a, b){
+    var ta = tingkatAkun(peta[a.id]), tb = tingkatAkun(peta[b.id]);
+    if (ta !== tb) return tb - ta;
     var na = (peta[a.id] || []).length, nb = (peta[b.id] || []).length;
-    if (!!na !== !!nb) return nb ? 1 : -1;
     if (na !== nb) return nb - na;
     return String(b.loginTerakhir || "").localeCompare(String(a.loginTerakhir || ""));
   });
@@ -1983,18 +2019,24 @@ function renderAkunSesi(){
     "akun-sesi");
 }
 
-/** Satu kartu akun: status online, login terakhir, pendamping, perangkatnya. */
+/** Satu kartu akun: status kehadiran, login terakhir, pendamping, perangkatnya. */
 function kartuAkunSesi(u, list){
   var role = u.role || "tim";
   var online = list.length > 0;
+  var tingkat = tingkatAkun(list);            // 2 membuka · 1 login saja · 0 offline
+  var nMembuka = list.filter(function(s){ return s.membuka; }).length;
   var buka = !!BUKA_SESI[u.id];
   var ini = (u.username || "?").charAt(0).toUpperCase();
   var kelas = role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b";
 
   var meta = [];
-  meta.push(online
-    ? "aktif " + sejak((list[0] || {}).terakhir)
-    : (u.loginTerakhir ? "login terakhir " + sejak(u.loginTerakhir) : "belum pernah login"));
+  if (tingkat === 2) {
+    meta.push("sedang membuka aplikasi" + (nMembuka > 1 ? " di " + nMembuka + " perangkat" : ""));
+  } else if (online) {
+    meta.push("login, tidak membuka · aktif " + sejak((list[0] || {}).terakhir));
+  } else {
+    meta.push(u.loginTerakhir ? "login terakhir " + sejak(u.loginTerakhir) : "belum pernah login");
+  }
   if (isPendamping(role)) {
     meta.push(u.n_tim_diampu ? "mengampu " + u.n_tim_diampu + " tim" : "belum di-assign tim");
   } else {
@@ -2014,7 +2056,13 @@ function kartuAkunSesi(u, list){
       "</div>";
   }
 
-  return '<div class="asx' + (online ? " aktif" : "") + (buka ? " buka" : "") + '">' +
+  var statusKepala = tingkat === 2
+    ? '<span class="st on"><i></i>online · ' + list.length + " perangkat</span>"
+    : online
+      ? '<span class="st dim" title="Login di ' + list.length + ' perangkat, aplikasi tidak sedang dibuka"><i></i>login · ' + list.length + " perangkat</span>"
+      : '<span class="st off"><i></i>offline</span>';
+
+  return '<div class="asx' + (online ? " aktif" : "") + (tingkat === 2 ? " membuka" : "") + (buka ? " buka" : "") + '">' +
     '<div class="asx-h" data-act="lipat" data-id="' + u.id + '">' +
       '<span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + "</span>" +
       '<div class="asx-nm"><b>' + esc(u.username) +
@@ -2025,8 +2073,7 @@ function kartuAkunSesi(u, list){
         return (i ? '<i class="dot"></i>' : "") + "<span>" + esc(m) + "</span>";
       }).join("") + "</div></div>" +
       '<div class="asx-act">' +
-        '<span class="st ' + (online ? "on" : "off") + '"><i></i>' +
-          (online ? list.length + " perangkat" : "offline") + "</span>" +
+        statusKepala +
         '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + " Data</button>" +
         (isPendamping(role)
           ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '">🔗</button>'
@@ -2044,7 +2091,8 @@ function barisPerangkat(s){
   return '<div class="dev">' +
     '<span class="dev-ic">' + ikonSesi(s.perangkat) + "</span>" +
     '<div class="dev-nm"><b>' +
-      (s.perangkat ? esc(s.perangkat) : '<span class="mut">Perangkat tidak dikenal</span>') + "</b>" +
+      (s.perangkat ? esc(s.perangkat) : '<span class="mut">Perangkat tidak dikenal</span>') + "</b> " +
+      lencanaSesi(s) +
       catatanPerangkat(s.perangkat) + "</div>" +
     '<span class="dev-ip">' + (s.ip ? esc(s.ip) : "IP tidak terekam") + "</span>" +
     '<div class="dev-tm">' + esc(sejak(s.terakhir)) +
@@ -2063,6 +2111,7 @@ function barisSesi(s){
       '<span class="badge ' + (role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b") + '">' +
       labelPeran(role) + "</span>" +
     "</div></div></td>" +
+    '<td data-l="Status">' + lencanaSesi(s) + "</td>" +
     '<td data-l="Perangkat">' + ikonSesi(s.perangkat) + " " +
       (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
       catatanPerangkat(s.perangkat) + "</td>" +

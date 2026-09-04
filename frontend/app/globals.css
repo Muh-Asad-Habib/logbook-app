@@ -1385,6 +1385,12 @@ td.num small { font-weight: 600; }
   color: var(--muted); font-size: 0.72rem; font-weight: 600;
 }
 .sesi-item .btn { flex: 0 0 auto; }
+/* Lencana "Online" — titik hijau berdenyut menandai tab aplikasi sedang terbuka */
+.sesi-online { display: inline-flex; align-items: center; gap: 5px; }
+.sesi-online i { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: pulseOnline 1.8s ease-in-out infinite; }
+[data-theme="dark"] .sesi-online i { background: #4ade80; }
+@keyframes pulseOnline { 0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); } 50% { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); } }
+@media (prefers-reduced-motion: reduce) { .sesi-online i { animation: none; } }
 
 @media (max-width: 520px) {
   .sesi-item { flex-wrap: wrap; }

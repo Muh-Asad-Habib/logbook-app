@@ -116,14 +116,20 @@ export default function SesiAktif() {
     <div className="card mt">
       <h3><MonitorSmartphone className="lucide" /> Perangkat &amp; sesi aktif</h3>
       <p className="sub">
-        Tempat akunmu sedang dalam keadaan login. Tidak mengenali salah satunya?
-        Keluarkan perangkat itu, lalu segera ganti password.
+        Tempat akunmu sedang dalam keadaan login. Perangkat lain yang saat ini
+        benar-benar membuka aplikasi ditandai <b>Online</b>. Tidak mengenali
+        salah satunya? Keluarkan perangkat itu, lalu segera ganti password.
       </p>
 
       {list === null && <div className="skel mts" style={{ height: 72 }} />}
 
       {(list || []).map((s) => {
         const Ic = ikonUntuk(s.perangkat);
+        // Lencana kehadiran — sengaja minimalis: perangkat INI cukup "perangkat ini"
+        // (sudah pasti online); perangkat lain diberi "Online" hanya bila tab
+        // aplikasinya benar-benar sedang terbuka (denyut < 90 dtk). Yang login
+        // tapi tidak membuka: tanpa lencana — cukup "aktif … lalu" di bawahnya.
+        const online = !s.ini_perangkat && s.membuka;
         return (
           <div key={s.id} className="act-item sesi-item">
             <Ic className="lucide" />
@@ -131,6 +137,17 @@ export default function SesiAktif() {
               <b>{s.perangkat || "Perangkat tidak dikenal"}</b>
               {s.ini_perangkat && (
                 <span className="badge ok" style={{ marginLeft: 8 }}>perangkat ini</span>
+              )}
+              {online && (
+                <span
+                  className="badge ok sesi-online"
+                  style={{ marginLeft: 8 }}
+                  title={s.layar === "tersembunyi"
+                    ? "Aplikasi terbuka di tab latar belakang perangkat ini"
+                    : "Aplikasi sedang terbuka di perangkat ini"}
+                >
+                  <i aria-hidden="true" /> {s.layar === "tersembunyi" ? "Online · tab di latar" : "Online"}
+                </span>
               )}
               <span className="ket">
                 {s.ip ? `${s.ip} · ` : ""}aktif {sejak(s.terakhir)}
