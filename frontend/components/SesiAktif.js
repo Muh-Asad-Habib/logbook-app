@@ -146,7 +146,7 @@ export default function SesiAktif() {
                     ? "Aplikasi terbuka di tab latar belakang perangkat ini"
                     : "Aplikasi sedang terbuka di perangkat ini"}
                 >
-                  <i aria-hidden="true" /> {s.layar === "tersembunyi" ? "Online · tab di latar" : "Online"}
+                  {s.layar === "tersembunyi" ? "Online · tab di latar" : "Online"}
                 </span>
               )}
               <span className="ket">

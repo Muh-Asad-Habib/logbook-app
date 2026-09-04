@@ -257,7 +257,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .st.idle{color:#fbbf24;background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.34)}
   /* sesi login ada, tetapi tab aplikasi tidak sedang dibuka */
   .st.dim{color:#a5adcf;background:rgba(136,145,187,.06);border:1px dashed rgba(136,145,187,.30)}
+  /* lencana yang membawa angka/kata biasa (mis. "login · 3 perangkat") tidak perlu kapital */
+  .st.kecil{text-transform:none;letter-spacing:.01em;font-size:.66rem;padding:2px 9px}
   .asx.membuka{border-color:rgba(52,211,153,.55);box-shadow:0 0 0 1px rgba(52,211,153,.18) inset}
+  /* lencana status di baris perangkat & sel tabel: lebih kecil, di baris tersendiri */
+  .dev-st{display:block;margin-top:5px}
+  .dev-st .st,.st-cell .st{font-size:.6rem;padding:2px 8px;gap:5px;letter-spacing:.04em}
+  .st-cell{white-space:nowrap}
 
   /* ---------- skeleton saat memuat pertama kali ---------- */
   @keyframes shimmer{from{background-position:-420px 0}to{background-position:420px 0}}
@@ -381,6 +387,13 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .stat b{font-size:1.55rem;letter-spacing:-.03em;display:block;line-height:1.1;
     font-variant-numeric:tabular-nums}
   .stat .lbl{color:var(--mut);font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+  /* rincian kecil di bawah label (mis. "👥 2 · 🎓 1 · 👨‍🏫 1") */
+  .stat .sub{display:block;color:var(--mut);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* kartu "Sedang membuka": titik hijau berdenyut di sudut */
+  .stat.hidup .ic{position:relative}
+  .stat.hidup .ic::after{content:"";position:absolute;right:-3px;top:-3px;width:10px;height:10px;border-radius:50%;
+    background:#4ade80;border:2px solid var(--panel);animation:blink 1.9s infinite}
   .s1{--a:#6d7cff}.s2{--a:#22d3ee}.s3{--a:#fbbf24}.s4{--a:#34d399}.s5{--a:#a78bfa}.s6{--a:#fb7185}
 
   /* ---------- tabel ---------- */
@@ -1710,9 +1723,10 @@ function barisAudit(r){
     (r.ip ? '<span class="ip">' + esc(r.ip) + "</span>" : "") + "</div>";
 }
 
-function stat(ic, lbl, v, cls){
-  return '<div class="stat ' + cls + '"><div class="ic">' + sv(ic) + '</div><div class="tx">' +
-    '<b data-n="' + Number(v || 0) + '">0</b><span class="lbl">' + lbl + '</span></div></div>';
+function stat(ic, lbl, v, cls, sub, extra){
+  return '<div class="stat ' + cls + (extra ? " " + extra : "") + '"><div class="ic">' + sv(ic) + '</div><div class="tx">' +
+    '<b data-n="' + Number(v || 0) + '">0</b><span class="lbl">' + lbl + '</span>' +
+    (sub ? '<span class="sub">' + sub + '</span>' : '') + '</div></div>';
 }
 function hitungNaik(el, akhir){
   var awal = performance.now(), durasi = 650;
@@ -1940,20 +1954,25 @@ function renderStatSesi(){
     if (tingkatAkun(peta[u.id]) === 2) membuka++;
   });
   var perangkatMembuka = SESI.filter(function(s){ return s.membuka; }).length;
+  var perangkatLatar = SESI.filter(function(s){ return s.membuka && s.layar === "tersembunyi"; }).length;
+  // 6 kartu → grid 3×2 rapi (rincian peran jadi sub-teks, bukan kartu terpisah)
   var html =
-    stat("gauge","Sedang membuka", membuka, "s1") +
-    stat("device","Perangkat login", SESI.length, "s4") +
-    stat("users","Akun login", total, "s2") +
-    stat("user","Tim login", online.tim, "s2") +
-    stat("user","Fasilitator login", online.fasilitator, "s5") +
-    stat("user","Dosen login", online.dosen, "s3") +
-    stat("power","Akun offline", Math.max(0, USERS.length - total), "s6");
+    stat("gauge","Sedang membuka", membuka, "s4",
+      perangkatMembuka + " tab terbuka" + (perangkatLatar ? " · " + perangkatLatar + " di latar" : ""),
+      membuka ? "hidup" : "") +
+    stat("users","Akun login", total, "s1",
+      "👥 " + online.tim + " · 🎓 " + online.fasilitator + " · 👨‍🏫 " + online.dosen) +
+    stat("device","Perangkat login", SESI.length, "s2",
+      Math.max(0, SESI.length - perangkatMembuka) + " tidak sedang membuka") +
+    stat("user","Tim login", online.tim, "s5") +
+    stat("user","Pendamping login", online.fasilitator + online.dosen, "s3",
+      "🎓 " + online.fasilitator + " · 👨‍🏫 " + online.dosen) +
+    stat("power","Akun offline", Math.max(0, USERS.length - total), "s6",
+      "dari " + USERS.length + " akun");
   if (setHTML($("#stat-sesi"), html, "stat-sesi")) {
     document.querySelectorAll("#stat-sesi b[data-n]").forEach(function(b){
       hitungNaik(b, Number(b.dataset.n));
     });
-    var k = $("#stat-sesi .stat"); // kartu pertama = "Sedang membuka"
-    if (k) k.title = perangkatMembuka + " tab aplikasi sedang terbuka (denyut < 90 detik)";
   }
 }
 
@@ -2057,9 +2076,9 @@ function kartuAkunSesi(u, list){
   }
 
   var statusKepala = tingkat === 2
-    ? '<span class="st on"><i></i>online · ' + list.length + " perangkat</span>"
+    ? '<span class="st on kecil"><i></i>Online · ' + list.length + " perangkat</span>"
     : online
-      ? '<span class="st dim" title="Login di ' + list.length + ' perangkat, aplikasi tidak sedang dibuka"><i></i>login · ' + list.length + " perangkat</span>"
+      ? '<span class="st dim kecil" title="Login di ' + list.length + ' perangkat, aplikasi tidak sedang dibuka"><i></i>Login · ' + list.length + " perangkat</span>"
       : '<span class="st off"><i></i>offline</span>';
 
   return '<div class="asx' + (online ? " aktif" : "") + (tingkat === 2 ? " membuka" : "") + (buka ? " buka" : "") + '">' +
@@ -2091,9 +2110,9 @@ function barisPerangkat(s){
   return '<div class="dev">' +
     '<span class="dev-ic">' + ikonSesi(s.perangkat) + "</span>" +
     '<div class="dev-nm"><b>' +
-      (s.perangkat ? esc(s.perangkat) : '<span class="mut">Perangkat tidak dikenal</span>') + "</b> " +
-      lencanaSesi(s) +
-      catatanPerangkat(s.perangkat) + "</div>" +
+      (s.perangkat ? esc(s.perangkat) : '<span class="mut">Perangkat tidak dikenal</span>') + "</b>" +
+      catatanPerangkat(s.perangkat) +
+      '<span class="dev-st">' + lencanaSesi(s) + "</span></div>" +
     '<span class="dev-ip">' + (s.ip ? esc(s.ip) : "IP tidak terekam") + "</span>" +
     '<div class="dev-tm">' + esc(sejak(s.terakhir)) +
       '<div class="mut">mulai ' + esc(tgl(s.dibuat)) + "</div></div>" +
@@ -2111,7 +2130,7 @@ function barisSesi(s){
       '<span class="badge ' + (role === "dosen" ? "c" : role === "fasilitator" ? "y" : "b") + '">' +
       labelPeran(role) + "</span>" +
     "</div></div></td>" +
-    '<td data-l="Status">' + lencanaSesi(s) + "</td>" +
+    '<td data-l="Status" class="st-cell">' + lencanaSesi(s) + "</td>" +
     '<td data-l="Perangkat">' + ikonSesi(s.perangkat) + " " +
       (s.perangkat ? "<b>" + esc(s.perangkat) + "</b>" : '<span class="mut">Perangkat tidak dikenal</span>') +
       catatanPerangkat(s.perangkat) + "</td>" +
