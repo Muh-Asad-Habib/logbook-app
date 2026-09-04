@@ -68,10 +68,17 @@ try {
   const baris = (r.body?.users || []).find((x) => x.id === uidPptx);
   cek("daftar akun memuat punya_presentasi", !!baris && baris.punya_presentasi === true, JSON.stringify(baris || {}));
 
-  const berkas = await fetch(`${BASE}${PANEL}/data/pengguna/${uidPptx}/presentasi-file?t=${TOKEN}`, {
-    headers: { "User-Agent": UA } });
+  // Tautan berkas (<a href>/<img>) tidak bisa mengirim header Authorization →
+  // sesi dikenali lewat cookie HttpOnly `logbook_panel` (token di URL ?t=
+  // sudah DIHAPUS karena bocor ke riwayat/log).
+  const berkas = await fetch(`${BASE}${PANEL}/data/pengguna/${uidPptx}/presentasi-file`, {
+    headers: { "User-Agent": UA, Cookie: `logbook_panel=${TOKEN}` } });
   const buf = Buffer.from(await berkas.arrayBuffer());
-  cek("unduh .pptx lewat panel (?t=)", berkas.ok && buf[0] === 0x50 && buf[1] === 0x4b, `${berkas.status} ${buf.length} B`);
+  cek("unduh .pptx lewat panel (cookie sesi)", berkas.ok && buf[0] === 0x50 && buf[1] === 0x4b, `${berkas.status} ${buf.length} B`);
+
+  const tolak = await fetch(`${BASE}${PANEL}/data/pengguna/${uidPptx}/presentasi-file?t=${TOKEN}`, {
+    headers: { "User-Agent": UA } });
+  cek("token di query ?t= TIDAK lagi diterima → 401", tolak.status === 401, String(tolak.status));
 
   const det = await api(`/data/pengguna/${uidPptx}?senyap=1`);
   cek("detail akun memuat presentasi.file & canva",

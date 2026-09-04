@@ -18,8 +18,11 @@ import crypto from "node:crypto";
 import { q, objek } from "../db.js";
 import { hashPasswordStrong, verifyPasswordStrong, newToken } from "../passwords.js";
 import { siarkan } from "../bus.js";
+import { bacaCookie, COOKIE_PANEL } from "../cookies.js";
 
 const SESSION_TTL_MS = 30 * 60 * 1000;   // 30 menit (diperpanjang tiap aktivitas)
+/** Umur sesi panel dalam detik — dipakai untuk Max-Age cookie panel. */
+export const SESSION_TTL_DETIK = SESSION_TTL_MS / 1000;
 const MAX_FAILS_PER_IP = 5;              // 5 kegagalan →
 const LOCK_MS = 15 * 60 * 1000;          // kunci 15 menit
 const MAX_FAILS_GLOBAL = 25;             // rem darurat lintas-IP
@@ -204,11 +207,13 @@ export async function login(req, username, password) {
 }
 
 /** Validasi token sesi panel (sliding TTL + terikat User-Agent).
- *  Token dibaca dari header Authorization, atau query ?t= (untuk <img> foto). */
+ *  Token dibaca dari header Authorization ATAU cookie HttpOnly `logbook_panel`
+ *  (untuk <img>, EventSource, dan tautan berkas). Query `?t=` TIDAK lagi
+ *  diterima — token di URL bocor ke riwayat browser & log. */
 export async function checkSession(req) {
   const h = String(req.headers.authorization || "");
   const bearer = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
-  const token = bearer || String(req.query?.t || "");
+  const token = bearer || bacaCookie(req, COOKIE_PANEL);
   if (!token) return null;
   const rows = await q("SELECT * FROM admin_sessions WHERE token = $1", [token]);
   const s = rows[0];

@@ -6,15 +6,181 @@ import {
   cekPotongan, simpanPotongan, rakitPotongan, bersihkanPotongan,
   ID_RE, validTotal,
 } from "../potongan.js";
+import {
+  pakaiCloud, PART_MAX, izinUnggahIK, infoUnggahIK, metaFileIK, catatFileIK,
+  namaBagian, buatStem, tandaInternal, removeFiles, getFileBufferRetry,
+} from "../files.js";
+
+/** Jalur lama (byte lewat server) — disamakan dengan laporan (40 MB). */
+const MAKS_UKURAN_SERVER = 40 * 1024 * 1024;
+/** Jalur langsung ke ImageKit — byte tidak lewat Vercel. */
+const MAKS_UKURAN = 300 * 1024 * 1024;
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 60 * 1024 * 1024, files: 1 },
+  limits: { fileSize: MAKS_UKURAN_SERVER, files: 1 },
 });
 
 const router = Router();
 router.use(authRequired); // hasil impor masuk ke akun user yang login
 router.use(hanyaTim); // fasilitator tidak boleh mengubah data tim
+
+/* ============ IMPOR LANGSUNG BROWSER → IMAGEKIT (hemat trafik) ============
+ * Batas body Vercel ±4,5 MB membuat .docx berfoto tak bisa dikirim utuh.
+ * Jalur lama memotongnya jadi base64 2 MB per request — tetap lewat server.
+ * Sekarang: browser meminta IZIN (beberapa ratus byte), mengunggah bagian-
+ * bagiannya LANGSUNG ke ImageKit, lalu server memverifikasi metadata tiap
+ * bagian, menariknya dari CDN, menjalankan impor, dan MENGHAPUS berkas
+ * sementaranya. Pola sama dengan laporan/presentasi (teruji diag-*-langsung). */
+
+const STEM_RE = /^[A-Za-z0-9._-]{6,120}$/;
+const bersihkanNama = (s) =>
+  String(s || "logbook.docx").replace(/[\\/:*?"<>|]/g, "_").trim().slice(0, 120);
+
+/**
+ * @openapi
+ * /api/import/izin-unggah:
+ *   post:
+ *     tags: [Import]
+ *     summary: Terbitkan izin unggah .docx impor langsung ke ImageKit (byte tidak lewat server)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ukuran]
+ *             properties:
+ *               nama: { type: string }
+ *               ukuran: { type: integer }
+ *     responses:
+ *       200: { description: "{ mode: 'langsung'|'server', … }" }
+ *       400: { description: Ukuran tidak valid }
+ */
+router.post("/izin-unggah", async (req, res, next) => {
+  try {
+    const ukuran = Number(req.body?.ukuran);
+    if (!Number.isFinite(ukuran) || ukuran <= 0) {
+      return res.status(400).json({ error: "Ukuran berkas tidak valid" });
+    }
+    if (ukuran > MAKS_UKURAN) {
+      return res.status(400).json({ error: "Berkas terlalu besar (maks. 300 MB)" });
+    }
+    if (!pakaiCloud()) return res.json({ mode: "server", maksServer: MAKS_UKURAN_SERVER });
+
+    const jumlah = Math.max(1, Math.ceil(ukuran / PART_MAX));
+    const stem = buatStem("imp");
+    const izin = Array.from({ length: jumlah }, () => izinUnggahIK());
+    const bagian = Array.from({ length: jumlah }, (_, i) => namaBagian(stem, i, jumlah, ".docx"));
+    res.json({
+      mode: "langsung",
+      ...infoUnggahIK(),
+      stem,
+      jumlah,
+      bagian,
+      izin,
+      nama: bersihkanNama(req.body?.nama),
+      tanda: tandaInternal(`impor|${req.userId}|${stem}|${jumlah}`),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/import/docx/langsung:
+ *   post:
+ *     tags: [Import]
+ *     summary: Verifikasi bagian yang diunggah browser ke ImageKit, jalankan impor, lalu hapus berkas sementara
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [stem, jumlah, tanda, bagian]
+ *             properties:
+ *               stem: { type: string }
+ *               jumlah: { type: integer }
+ *               tanda: { type: string }
+ *               bagian:
+ *                 type: array
+ *                 items: { type: object, properties: { key: { type: string }, fileId: { type: string } } }
+ *     responses:
+ *       200: { description: Ringkasan hasil impor (sama dengan /api/import/docx) }
+ *       400: { description: Verifikasi gagal / berkas tidak valid }
+ */
+router.post("/docx/langsung", async (req, res, next) => {
+  const terdaftar = [];
+  try {
+    if (!pakaiCloud()) return res.status(400).json({ error: "Mode cloud tidak aktif" });
+    const stem = String(req.body?.stem || "");
+    const jumlah = Number(req.body?.jumlah);
+    const daftar = Array.isArray(req.body?.bagian) ? req.body.bagian : [];
+    const tanda = String(req.body?.tanda || "");
+
+    if (!STEM_RE.test(stem) || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 15) {
+      return res.status(400).json({ error: "Parameter unggahan tidak valid" });
+    }
+    if (tanda !== tandaInternal(`impor|${req.userId}|${stem}|${jumlah}`)) {
+      return res.status(400).json({ error: "Izin unggah tidak sah — ulangi unggahan" });
+    }
+    if (daftar.length !== jumlah) {
+      return res.status(400).json({ error: `Bagian tidak lengkap (${daftar.length}/${jumlah})` });
+    }
+
+    // Verifikasi ke ImageKit: nama & ukuran tiap bagian, fileId milik akun kita.
+    const kunci = [];
+    let total = 0;
+    for (let i = 0; i < jumlah; i++) {
+      const seharusnya = namaBagian(stem, i, jumlah, ".docx");
+      const b = daftar.find((x) => String(x?.key) === seharusnya);
+      if (!b?.fileId) return res.status(400).json({ error: `Bagian #${i} tidak ditemukan` });
+      const meta = await metaFileIK(String(b.fileId));
+      if (!meta || meta.name !== seharusnya) {
+        return res.status(400).json({ error: `Bagian #${i} gagal diverifikasi` });
+      }
+      const size = Number(meta.size) || 0;
+      if (size <= 0 || size > PART_MAX + 1024) {
+        return res.status(400).json({ error: `Ukuran bagian #${i} tidak wajar` });
+      }
+      total += size;
+      await catatFileIK(seharusnya, meta.fileId, meta.url || "");
+      terdaftar.push(seharusnya);
+      kunci.push(seharusnya);
+    }
+    if (total <= 0 || total > MAKS_UKURAN) {
+      return res.status(400).json({ error: "Ukuran total berkas tidak wajar" });
+    }
+
+    // Tarik tiap bagian dari CDN (dengan retry — propagasi CDN bisa 1–5 dtk), rakit.
+    const potongan = [];
+    for (const k of kunci) {
+      const buf = await getFileBufferRetry(k);
+      if (!buf) return res.status(400).json({ error: "Berkas belum tersedia di penyimpanan — coba lagi" });
+      potongan.push(buf);
+    }
+    const buffer = Buffer.concat(potongan);
+    if (!(buffer[0] === 0x50 && buffer[1] === 0x4b)) {
+      return res.status(400).json({ error: "Berkas bukan dokumen Word (.docx) yang valid" });
+    }
+
+    let hasil;
+    try {
+      hasil = await importDocx(buffer, req.userId);
+    } catch (e) {
+      e.status = 400;
+      throw e;
+    }
+    res.json(hasil);
+  } catch (err) {
+    next(err);
+  } finally {
+    // Berkas impor hanya sementara — selalu dibersihkan, sukses maupun gagal.
+    if (terdaftar.length) removeFiles(terdaftar).catch(() => {});
+  }
+});
 
 /**
  * @openapi

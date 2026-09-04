@@ -19,6 +19,19 @@ const KUNCI_TERKUNCI = new Set(["kode_tim"]);
 const KUNCI_DIABAIKAN = new Set(["dana_awal"]);
 
 /**
+ * Kunci yang BOLEH dibaca/ditulis lewat endpoint ini (whitelist).
+ * Sebelumnya kunci & nilai bebas tanpa batas panjang — satu akun bisa
+ * menumpuk baris/megabyte sembarang di tabel `pengaturan` (kuota Neon 0,5 GB).
+ * Tambahkan kunci baru di sini bila frontend memerlukannya.
+ */
+const KUNCI_BOLEH = new Set(["dana_belmawa", "dana_pt", "dana_awal"]);
+const NILAI_MAKS = 200;
+
+function kunciSah(kunci) {
+  return /^[a-z][a-z0-9_]{0,40}$/.test(kunci) && KUNCI_BOLEH.has(kunci);
+}
+
+/**
  * @openapi
  * /api/pengaturan/{kunci}:
  *   get:
@@ -53,6 +66,9 @@ const KUNCI_DIABAIKAN = new Set(["dana_awal"]);
  */
 router.get("/:kunci", async (req, res, next) => {
   try {
+    if (!kunciSah(req.params.kunci)) {
+      return res.status(400).json({ error: "Kunci pengaturan tidak dikenal" });
+    }
     // dana_awal = turunan (Belmawa + PT) — dijawab dari hasil hitung server
     if (req.params.kunci === "dana_awal") {
       const dana = await store.hitungDana(req.userId);
@@ -69,6 +85,9 @@ router.put("/:kunci", async (req, res, next) => {
     if (KUNCI_TERKUNCI.has(req.params.kunci)) {
       return res.status(403).json({ error: "Kunci ini dikelola lewat /api/tim/kode" });
     }
+    if (!kunciSah(req.params.kunci)) {
+      return res.status(400).json({ error: "Kunci pengaturan tidak dikenal" });
+    }
     // Nilai turunan: terima permintaannya (klien lama tidak error) tapi
     // jawab dengan angka hasil hitung server, bukan menuliskannya.
     if (KUNCI_DIABAIKAN.has(req.params.kunci)) {
@@ -76,6 +95,9 @@ router.put("/:kunci", async (req, res, next) => {
       return res.json({ kunci: req.params.kunci, nilai: String(dana.total), turunan: true });
     }
     const nilai = String(req.body?.nilai ?? "");
+    if (nilai.length > NILAI_MAKS) {
+      return res.status(400).json({ error: `Nilai terlalu panjang (maks. ${NILAI_MAKS} karakter)` });
+    }
     await store.setSetting(req.userId, req.params.kunci, nilai);
     res.json({ kunci: req.params.kunci, nilai });
   } catch (err) {

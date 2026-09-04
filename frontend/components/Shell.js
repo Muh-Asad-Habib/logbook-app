@@ -139,26 +139,16 @@ function TopChips() {
   );
 }
 
-/* ---------- Badge jumlah komentar belum dibaca (aksesibel) ---------- */
-function BadgeNotif({ n, varian }) {
+/* ---------- Badge jumlah komentar belum dibaca (aksesibel) ----------
+ * Gaya di globals.css (.badge-notif) supaya ikut variabel tema, bukan inline. */
+function BadgeNotif({ n, varian, label = "komentar belum dibaca" }) {
   if (!n) return null;
-  const gaya = varian === "nav"
-    ? {
-        position: "absolute", top: 2, right: "18%",
-        background: "var(--bad, #ef4444)", color: "#fff", borderRadius: 99,
-        fontSize: ".62rem", fontWeight: 800, padding: "0 5px", lineHeight: 1.6,
-      }
-    : {
-        marginLeft: "auto", background: "var(--bad, #ef4444)", color: "#fff",
-        borderRadius: 99, fontSize: ".66rem", fontWeight: 800,
-        padding: "1px 7px", lineHeight: 1.5,
-      };
   return (
     <span
-      style={gaya}
+      className={`badge-notif${varian === "nav" ? " nav" : ""}`}
       role="status"
-      aria-label={`${n} komentar belum dibaca`}
-      title={`${n} komentar belum dibaca`}
+      aria-label={`${n} ${label}`}
+      title={`${n} ${label}`}
     >
       {n}
     </span>
@@ -242,6 +232,10 @@ function TimSwitcher({ role }) {
   if (tim.length === 0) return null;
   const sama = (t) => String(t.id) === String(aktif);
   const namaAktif = (tim.find(sama) || tim[0]).username;
+  // Entri baru (kegiatan/keuangan/laporan/presentasi) sejak kunjungan terakhir
+  // — disediakan server di /api/fasilitator/tim (field `baru`).
+  const baruDi = (t) => Number(t?.baru?.total || 0);
+  const totalBaruLain = tim.filter((t) => !sama(t)).reduce((s, t) => s + baruDi(t), 0);
 
   const pilih = (t) => {
     setAktif(String(t.id));
@@ -265,6 +259,7 @@ function TimSwitcher({ role }) {
         {tim.length > 1 && (
           <span className="muted" style={{ fontSize: ".68rem" }}>+{tim.length - 1}</span>
         )}
+        <BadgeNotif n={totalBaruLain} label="entri baru di tim lain" />
         <ChevronDown className="lucide" style={{ width: 14, height: 14, opacity: 0.65 }} />
       </button>
       <span className="chip chip-role" title="Peran akun">{info.emoji} {info.nama}</span>
@@ -283,10 +278,14 @@ function TimSwitcher({ role }) {
               <Users className="lucide" />
               <span>
                 {t.username}
-                {sama(t) && <small>sedang dilihat</small>}
+                {sama(t)
+                  ? <small>sedang dilihat</small>
+                  : baruDi(t) > 0 && <small>{baruDi(t)} entri baru</small>}
               </span>
-              {sama(t) && (
+              {sama(t) ? (
                 <Check className="lucide" style={{ marginLeft: "auto", width: 16, height: 16 }} />
+              ) : (
+                <BadgeNotif n={baruDi(t)} label="entri baru" />
               )}
             </button>
           ))}
@@ -357,6 +356,15 @@ export default function Shell({ children }) {
   // Ingat pilihan sidebar diperkecil (dibaca sebelum kerangka dirender)
   useEffect(() => {
     setSbMini(localStorage.getItem("logbook_sidebar") === "mini");
+  }, []);
+
+  // PWA: daftarkan service worker (kerangka + aset statis bisa dibuka offline;
+  // /api/* tidak pernah di-cache). Hanya di produksi & bila didukung browser —
+  // saat `next dev` SW justru mengganggu HMR.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV !== "production") return;
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
   }, []);
 
   const toggleSidebar = () => {

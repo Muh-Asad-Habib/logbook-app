@@ -100,8 +100,10 @@ export default function EksporPage() {
     setHasilImpor(null);
     setErr("");
     try {
-      // File besar otomatis diunggah terpotong (lolos limit ±4,5 MB Vercel)
-      const j = await api.importDocx(file, setProgres);
+      // Berkas diunggah LANGSUNG ke penyimpanan (ImageKit), bukan lewat server —
+      // bebas dari batas body ±4,5 MB Vercel. Setelah unggah 100%, server
+      // menarik & membaca dokumennya (tahap "Membaca dokumen…").
+      const j = await api.importDocx(file, (p) => setProgres(p));
       setHasilImpor(j);
       toast.ok(`Impor selesai: ${j.keg_baru + j.keu_baru} entri baru`);
       refreshData();
@@ -199,7 +201,11 @@ export default function EksporPage() {
           />
           <button className="btn primary" onClick={impor} disabled={busyImpor}>
             {busyImpor
-              ? (progres > 0 ? `Mengunggah… ${progres}%` : "Mengimpor…")
+              ? (progres > 0 && progres < 100
+                  ? `Mengunggah… ${progres}%`
+                  : progres >= 100
+                    ? "Membaca dokumen & memindahkan foto…"
+                    : "Mengimpor…")
               : <><Upload className="lucide" /> Impor</>}
           </button>
         </div>

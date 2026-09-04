@@ -1153,6 +1153,51 @@ export async function listTimUntukFasilitator(fasilitatorId) {
   return rows.map((r) => ({ id: r.id, username: r.username, sejak: r.sejak }));
 }
 
+/**
+ * Sama seperti listTimUntukFasilitator, ditambah hitungan ENTRI BARU sejak
+ * pendamping terakhir membuka dashboard tim tsb (kolom terakhir_lihat; bila
+ * kosong dihitung sejak assignment dibuat). Satu query untuk semua tim —
+ * dipakai lencana di pemilih tim & dashboard pendamping.
+ */
+export async function listTimUntukFasilitatorDenganBaru(fasilitatorId) {
+  const rows = await q(
+    `SELECT u.id, u.username, ft.created_at AS sejak,
+            COALESCE(NULLIF(ft.terakhir_lihat, ''), ft.created_at) AS batas,
+            (SELECT COUNT(*) FROM kegiatan k
+              WHERE k.user_id = u.id
+                AND k.created_at > COALESCE(NULLIF(ft.terakhir_lihat, ''), ft.created_at)) AS n_keg,
+            (SELECT COUNT(*) FROM keuangan b
+              WHERE b.user_id = u.id
+                AND b.created_at > COALESCE(NULLIF(ft.terakhir_lihat, ''), ft.created_at)) AS n_keu,
+            (SELECT COUNT(*) FROM laporan_docx l
+              WHERE l.user_id = u.id
+                AND l.updated_at > COALESCE(NULLIF(ft.terakhir_lihat, ''), ft.created_at)) AS n_lap,
+            (SELECT COUNT(*) FROM presentasi p
+              WHERE p.user_id = u.id AND (p.file_key <> '' OR p.canva_url <> '')
+                AND p.updated_at > COALESCE(NULLIF(ft.terakhir_lihat, ''), ft.created_at)) AS n_pre
+       FROM fasilitator_tim ft JOIN users u ON u.id = ft.tim_user_id
+      WHERE ft.fasilitator_id = $1
+      ORDER BY u.username`,
+    [fasilitatorId]
+  );
+  return rows.map((r) => {
+    const baru = {
+      kegiatan: angka(r.n_keg), keuangan: angka(r.n_keu),
+      laporan: angka(r.n_lap), presentasi: angka(r.n_pre),
+    };
+    baru.total = baru.kegiatan + baru.keuangan + baru.laporan + baru.presentasi;
+    return { id: r.id, username: r.username, sejak: r.sejak, terakhir_lihat: r.batas, baru };
+  });
+}
+
+/** Catat bahwa pendamping baru saja melihat dashboard tim ini (reset lencana "baru"). */
+export async function sentuhTerakhirLihat(fasilitatorId, timUserId) {
+  await q(
+    "UPDATE fasilitator_tim SET terakhir_lihat = $3 WHERE fasilitator_id = $1 AND tim_user_id = $2",
+    [String(fasilitatorId), String(timUserId), nowIso()]
+  ).catch(() => {});
+}
+
 /** Daftar pendamping (fasilitator & dosen) yang mengampu sebuah tim. */
 export async function listFasilitatorUntukTim(timUserId) {
   const rows = await q(

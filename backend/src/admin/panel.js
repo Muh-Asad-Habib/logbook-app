@@ -298,6 +298,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .tag{font:700 .62rem var(--mono);color:var(--mut);background:#0c1124;
     border:1px solid var(--line);padding:2.5px 10px;border-radius:99px;letter-spacing:.04em;
     white-space:nowrap}
+  .tag.g{color:#86efac;border-color:rgba(134,239,172,.35)}
+  .tag.r{color:#fca5a5;border-color:rgba(252,165,165,.35)}
   .mut{color:var(--mut);font-size:.78rem}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .spread{justify-content:space-between}
@@ -1103,6 +1105,16 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           </div>
           <div>
             <div class="card">
+              <h2>👥 Pendaftaran akun Tim <span class="tag" id="daftar-status">—</span></h2>
+              <p class="mut" style="margin-top:8px" id="daftar-ket">Memuat status…</p>
+              <p class="mut" style="margin-top:6px">Tutup bila semua tim sudah terdaftar supaya tidak ada akun
+              liar. Pendaftaran fasilitator &amp; dosen tidak terpengaruh (tetap memakai kode di samping).
+              Perubahan berlaku seketika dan tercatat di jejak audit.</p>
+              <button class="btn" id="btn-daftar" type="button" style="margin-top:14px" data-buka="1">
+                <svg class="i"><use href="#i-lock"/></svg> Tutup pendaftaran tim
+              </button>
+            </div>
+            <div class="card">
               <h2><svg class="i"><use href="#i-lock"/></svg> Akun admin</h2>
               <p class="mut" style="margin-top:8px">Ganti kredensial panel ini. Nilai baru disimpan sebagai
               hash scrypt — tidak bisa dilihat lagi setelah disimpan, hanya bisa diganti.</p>
@@ -1249,6 +1261,24 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <div class="row" style="justify-content:flex-end;margin-top:16px">
         <button value="batal" class="btn">Batal</button>
         <button value="ok" class="btn p">Buat akun</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Dialog konfirmasi umum — pengganti confirm()/prompt() browser -->
+<dialog id="d-konfirmasi" class="mini">
+  <div class="dlg-h"><h3 id="d-konf-judul">Konfirmasi</h3></div>
+  <div class="dlg-b">
+    <p class="mut" id="d-konf-isi"></p>
+    <form method="dialog" id="f-konfirmasi">
+      <label id="d-konf-ketik-wrap" class="hide"><span id="d-konf-ketik-lbl">Ketik untuk melanjutkan</span>
+        <span class="in-wrap"><svg class="i"><use href="#i-key"/></svg>
+        <input id="d-konf-ketik" autocomplete="off"></span>
+      </label>
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button value="batal" class="btn" type="submit">Batal</button>
+        <button value="ok" class="btn p" type="submit" id="d-konf-ok">Lanjutkan</button>
       </div>
     </form>
   </div>
@@ -1411,7 +1441,9 @@ function call(p, opt){
     });
   });
 }
-function fotoUrl(k){ return B + "/berkas/" + encodeURIComponent(k) + "?t=" + encodeURIComponent(TOK); }
+/* Sesi untuk <img>/tautan berkas/EventSource dikenali server lewat cookie
+ * HttpOnly yang dipasang saat login — token TIDAK lagi ditempel di URL. */
+function fotoUrl(k){ return B + "/berkas/" + encodeURIComponent(k); }
 
 function lihatLogin(){
   TOK = ""; sessionStorage.removeItem("mx");
@@ -1481,7 +1513,7 @@ function mulaiLive(){
   if (ES) { ES.close(); ES = null; }
   if (!TOK) return;
   if (!window.EventSource) { mulaiPolling(); return; }
-  ES = new EventSource(B + "/events?t=" + encodeURIComponent(TOK));
+  ES = new EventSource(B + "/events");
   ES.onopen = function(){ setLive(true); };
   ES.onerror = function(){
     setLive(false);
@@ -1519,6 +1551,7 @@ function segarkanDetail(){
  * oleh siaran langsung SSE / polling — jadi halaman mana pun yang sedang
  * dibuka selalu memperlihatkan keadaan terkini tanpa perlu di-refresh. */
 var KODE = { fas: { ada: false }, dosen: { ada: false } };
+var DAFTAR_TIM = { buka: true, updatedAt: "" }; // status pendaftaran akun tim
 
 function muat(){
   var rb = $("#btn-muat"); if (rb) rb.classList.add("memuat");
@@ -1528,7 +1561,8 @@ function muat(){
     call("/data/audit?n=" + AUDIT_N + (AUDIT_F ? "&aksi=" + encodeURIComponent(AUDIT_F) : "")),
     call("/data/kode-fasilitator").catch(function(){ return { ada:false, updatedAt:"" }; }),
     call("/data/kode-dosen").catch(function(){ return { ada:false, updatedAt:"" }; }),
-    call("/data/sesi").catch(function(){ return { rows: [] }; })
+    call("/data/sesi").catch(function(){ return { rows: [] }; }),
+    call("/data/pendaftaran-tim").catch(function(){ return { buka: true, updatedAt: "" }; })
   ])
     .then(function(rs){
       RINGKAS = rs[0];
@@ -1536,6 +1570,7 @@ function muat(){
       AUDIT   = rs[2].rows || [];
       KODE    = { fas: rs[3], dosen: rs[4] };
       SESI    = rs[5].rows || [];
+      DAFTAR_TIM = rs[6] || { buka: true, updatedAt: "" };
       PERTAMA = false;
       render();
       var up = $("#upd");
@@ -1620,6 +1655,26 @@ function renderKode(){
   }
   status($("#kode-status"), KODE.fas);
   status($("#kode-status-dosen"), KODE.dosen);
+
+  // Kartu pendaftaran akun tim (buka/tutup)
+  var buka = DAFTAR_TIM.buka !== false;
+  var tag = $("#daftar-status");
+  if (tag) {
+    tag.textContent = (buka ? "terbuka" : "ditutup") +
+      (DAFTAR_TIM.updatedAt ? " · " + tgl(DAFTAR_TIM.updatedAt) : "");
+    tag.className = "tag " + (buka ? "g" : "r");
+  }
+  var ket = $("#daftar-ket");
+  if (ket) ket.textContent = buka
+    ? "Siapa pun yang membuka halaman Daftar dapat membuat akun tim baru."
+    : "Halaman Daftar menolak akun tim baru. Buat akun lewat tombol “Akun baru” di halaman Akun pengguna.";
+  var tombol = $("#btn-daftar");
+  if (tombol) {
+    tombol.className = "btn " + (buka ? "" : "p");
+    tombol.innerHTML = sv(buka ? "lock" : "unlock") +
+      (buka ? " Tutup pendaftaran tim" : " Buka pendaftaran tim");
+    tombol.dataset.buka = buka ? "1" : "0";
+  }
 }
 
 /* ---------- jejak audit ---------- */
@@ -2118,7 +2173,7 @@ function ukur(b){
 function tabelLaporan(d){
   var l = d.laporan || { ada: false };
   if (!l.ada) return '<div class="kosong"><div class="big">📄</div>Tim ini belum mengunggah laporan kemajuan.</div>';
-  var url = B + "/data/pengguna/" + d.user.id + "/laporan-file?t=" + encodeURIComponent(TOK);
+  var url = B + "/data/pengguna/" + d.user.id + "/laporan-file";
   return '<div class="card" style="margin-top:14px">' +
     '<div class="row spread">' +
       '<div><b style="font-size:.95rem">📄 ' + esc(l.nama) + '</b>' +
@@ -2126,7 +2181,7 @@ function tabelLaporan(d){
       ' · diunggah ' + esc(tglJam(l.updated_at)) + '</div></div>' +
       '<div class="row" style="gap:8px">' +
         '<a class="btn sm p" href="' + url + '" target="_blank" rel="noopener">' + sv("folder") + ' Buka</a>' +
-        '<a class="btn sm" href="' + url + '&unduh=1">' + sv("save") + ' Unduh</a>' +
+        '<a class="btn sm" href="' + url + '?unduh=1">' + sv("save") + ' Unduh</a>' +
       '</div>' +
     '</div></div>';
 }
@@ -2135,7 +2190,7 @@ function tabelPresentasi(d){
   if (!p.ada) return '<div class="kosong"><div class="big">📽️</div>Tim ini belum mengunggah presentasi (.pptx) maupun menautkan Canva.</div>';
   var out = "";
   if (p.file && p.file.ada) {
-    var url = B + "/data/pengguna/" + d.user.id + "/presentasi-file?t=" + encodeURIComponent(TOK);
+    var url = B + "/data/pengguna/" + d.user.id + "/presentasi-file";
     out += '<div class="card" style="margin-top:14px">' +
       '<div class="row spread">' +
         '<div><b style="font-size:.95rem">📽️ ' + esc(p.file.nama) + '</b>' +
@@ -2143,7 +2198,7 @@ function tabelPresentasi(d){
         ' · diunggah ' + esc(tglJam(p.file.updated_at)) + '</div></div>' +
         '<div class="row" style="gap:8px">' +
           '<a class="btn sm p" href="' + url + '" target="_blank" rel="noopener">' + sv("folder") + ' Buka</a>' +
-          '<a class="btn sm" href="' + url + '&unduh=1">' + sv("save") + ' Unduh</a>' +
+          '<a class="btn sm" href="' + url + '?unduh=1">' + sv("save") + ' Unduh</a>' +
         '</div>' +
       '</div></div>';
   }
@@ -2204,7 +2259,8 @@ var AKSI_INFO = {
   "tim.kode.reset":       ["key","y","Kode tim dicetak ulang"],
   "pendamping.gabung":    ["users","g","Pendamping bergabung lewat kode tim"],
   "pendamping.keluar":    ["users","r","Pendamping keluar dari tim"],
-  "pendamping.keluarkan": ["users","r","Tim mengeluarkan pendamping"]
+  "pendamping.keluarkan": ["users","r","Tim mengeluarkan pendamping"],
+  "pendaftaran.tim.ubah": ["key","y","Pendaftaran akun tim dibuka/ditutup"]
 };
 function tabelAktivitas(list){
   if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
@@ -2225,6 +2281,7 @@ function tabelAktivitas(list){
     if (r.catatan && String(r.aksi || "").indexOf("acc.") === 0) meta.push("“" + r.catatan + "”");
     if (r.balasan) meta.push("balasan");
     if (r.nama && String(r.aksi || "").indexOf("laporan.") === 0) meta.push(r.nama);
+    if (r.aksi === "pendaftaran.tim.ubah") meta.push(r.buka ? "dibuka" : "ditutup");
     out += '<div class="tl-item">' +
       '<div class="tl-dot ' + info[1] + '">' + sv(info[0]) + '</div>' +
       '<div class="tl-body"><b>' + esc(info[2]) + '</b>' +
@@ -2323,30 +2380,46 @@ function resetPassword(id){
 }
 function cabutSesi(id){
   var u = findU(id); if (!u) return;
-  if (!confirm("Keluarkan " + u.username + " dari semua perangkat?")) return;
-  call("/data/pengguna/" + id + "/keluarkan", { method: "POST" })
-    .then(function(j){ toast(j.dicabut + " sesi dicabut"); muat(); segarkanDetail(); })
-    .catch(function(e){ toast(e.message, true); });
+  konfirmasiDialog({
+    judul: "🚪 Keluarkan dari semua perangkat?",
+    isi: "Semua sesi akun " + u.username + " akan dicabut — pemiliknya harus login ulang di setiap perangkat.",
+    tombol: "Keluarkan semua", bahaya: true
+  }).then(function(ok){
+    if (!ok) return;
+    call("/data/pengguna/" + id + "/keluarkan", { method: "POST" })
+      .then(function(j){ toast(j.dicabut + " sesi dicabut"); muat(); segarkanDetail(); })
+      .catch(function(e){ toast(e.message, true); });
+  });
 }
 /** Cabut SATU perangkat — sesi lain milik akun itu tetap hidup. */
 function cabutSesiSatu(sid, nama){
   if (!sid) return;
-  if (!confirm("Keluarkan perangkat ini dari akun " + (nama || "") + "?\\n\\n" +
-    "Perangkat tersebut harus login ulang. Bila kamu tidak mengenalinya, " +
-    "setel ulang juga password akun itu setelah ini.")) return;
-  call("/data/sesi/" + encodeURIComponent(sid), { method: "DELETE" })
-    .then(function(){ toast("Perangkat dikeluarkan"); muat(); segarkanDetail(); })
-    .catch(function(e){ toast(e.message, true); });
+  konfirmasiDialog({
+    judul: "🚪 Keluarkan perangkat ini?",
+    isi: "Perangkat ini akan keluar dari akun " + (nama || "") + " dan harus login ulang. " +
+      "Bila kamu tidak mengenalinya, setel ulang juga password akun itu setelah ini.",
+    tombol: "Keluarkan perangkat", bahaya: true
+  }).then(function(ok){
+    if (!ok) return;
+    call("/data/sesi/" + encodeURIComponent(sid), { method: "DELETE" })
+      .then(function(){ toast("Perangkat dikeluarkan"); muat(); segarkanDetail(); })
+      .catch(function(e){ toast(e.message, true); });
+  });
 }
 function hapusUser(id){
   var u = findU(id); if (!u) return;
-  if (!confirm("HAPUS PERMANEN akun " + u.username + " beserta " + u.kegiatan +
-    " kegiatan, " + u.keuangan + " belanja, dan semua fotonya?")) return;
-  var ket = prompt("Ketik username persis (" + u.username + ") untuk konfirmasi:");
-  if (ket !== u.username) { toast("Konfirmasi tidak cocok — dibatalkan", true); return; }
-  call("/data/pengguna/" + id, { method: "DELETE" })
-    .then(function(){ toast("Akun " + u.username + " dihapus"); muat(); })
-    .catch(function(e){ toast(e.message, true); });
+  konfirmasiDialog({
+    judul: "🗑️ Hapus permanen akun " + u.username + "?",
+    isi: "Beserta " + u.kegiatan + " kegiatan, " + u.keuangan + " belanja, laporan, presentasi, " +
+      "komentar, dan semua fotonya. Tindakan ini TIDAK bisa dibatalkan.",
+    tombol: "Hapus permanen", bahaya: true,
+    ketik: u.username
+  }).then(function(ok){
+    if (!ok) return;
+    call("/data/pengguna/" + id, { method: "DELETE" })
+      .then(function(){ toast("Akun " + u.username + " dihapus"); muat(); })
+      .catch(function(e){ toast(e.message, true); });
+  });
 }
 function assignTim(id){
   var u = findU(id); if (!u) return;
@@ -2488,6 +2561,47 @@ function tutupSemuaDialog(){
   var buka = document.querySelectorAll("dialog[open]");
   for (var i = 0; i < buka.length; i++) tutupDialog(buka[i]);
   bersihkanDialog();
+}
+
+/**
+ * Dialog konfirmasi panel — pengganti confirm()/prompt() bawaan browser agar
+ * tampilannya selaras dengan dialog lain di panel & tidak bisa diblokir
+ * pengaturan "jangan tampilkan lagi" milik browser.
+ * @param {{judul:string, isi:string, tombol?:string, bahaya?:boolean,
+ *          ketik?:string}} o  "ketik" = teks yang wajib diketik persis
+ *          sebelum tombol aktif (mis. username akun yang akan dihapus).
+ * @returns {Promise<boolean>} true bila dikonfirmasi
+ */
+function konfirmasiDialog(o){
+  o = o || {};
+  var dlg = $("#d-konfirmasi");
+  if (!dlg) return Promise.resolve(window.confirm(o.isi || o.judul || "Lanjutkan?"));
+  $("#d-konf-judul").textContent = o.judul || "Konfirmasi";
+  $("#d-konf-isi").textContent = o.isi || "";
+  var ok = $("#d-konf-ok");
+  ok.textContent = o.tombol || "Lanjutkan";
+  ok.className = "btn " + (o.bahaya ? "d" : "p");
+  var wrap = $("#d-konf-ketik-wrap"), input = $("#d-konf-ketik");
+  var perluKetik = !!o.ketik;
+  wrap.classList.toggle("hide", !perluKetik);
+  input.value = "";
+  ok.disabled = perluKetik;
+  if (perluKetik) {
+    $("#d-konf-ketik-lbl").textContent = "Ketik “" + o.ketik + "” untuk melanjutkan";
+    input.oninput = function(){ ok.disabled = input.value.trim() !== o.ketik; };
+  } else {
+    input.oninput = null;
+  }
+  return new Promise(function(resolve){
+    function selesai(){
+      dlg.removeEventListener("close", selesai);
+      resolve(dlg.returnValue === "ok" && (!perluKetik || input.value.trim() === o.ketik));
+    }
+    dlg.returnValue = "";
+    dlg.addEventListener("close", selesai);
+    bukaDialog(dlg);
+    if (perluKetik) setTimeout(function(){ try { input.focus(); } catch(e){} }, 30);
+  });
 }
 // Dialog mini ditutup oleh <form method="dialog"> tanpa lewat tutupDialog —
 // bersihkan backdrop & kunci scroll lewat event close bawaan.
@@ -2642,7 +2756,26 @@ $("#f-kode-dosen").addEventListener("submit", function(e){
     }).catch(function(ex){ toast(ex.message, true); });
 });
 
-/* ---------- sidebar mini: kecilkan/perlebar (tersimpan per peramban) ---------- */
+/* Buka/tutup pendaftaran akun tim — konfirmasi lewat dialog panel (bukan confirm()). */
+$("#btn-daftar").addEventListener("click", function(){
+  var sedangBuka = this.dataset.buka !== "0";
+  var tombol = this;
+  konfirmasiDialog({
+    judul: sedangBuka ? "🔒 Tutup pendaftaran tim?" : "🔓 Buka pendaftaran tim?",
+    isi: sedangBuka
+      ? "Setelah ditutup, halaman Daftar menolak akun tim baru. Akun masih bisa dibuat dari panel ini."
+      : "Setelah dibuka, siapa pun yang mengetahui alamat aplikasi dapat membuat akun tim.",
+    tombol: sedangBuka ? "Tutup pendaftaran" : "Buka pendaftaran",
+    bahaya: sedangBuka
+  }).then(function(ok){
+    if (!ok) return;
+    tombol.disabled = true;
+    call("/data/pendaftaran-tim", { method: "PUT", body: JSON.stringify({ buka: !sedangBuka }) })
+      .then(function(r){ toast(r.catatan || "Tersimpan"); muat(); })
+      .catch(function(ex){ toast(ex.message, true); })
+      .finally(function(){ tombol.disabled = false; });
+  });
+});
 (function(){
   var btn = $("#btn-mini"), app = $("#v-app");
   if (!btn || !app) return;

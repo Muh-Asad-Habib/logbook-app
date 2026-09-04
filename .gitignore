@@ -20,6 +20,9 @@ diag.txt
 
 # referensi desain (gambar lokal, tidak dipakai aplikasi)
 Referensi Desain UI/
+/*.jpg
+/*.jpeg
+/*.png
 
 # dokumen pribadi/organisasi di root & artefak uji ekspor
 # (template yang dipakai aplikasi ada di backend/src/assets/ — tetap ikut)

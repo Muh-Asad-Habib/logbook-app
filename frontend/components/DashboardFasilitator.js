@@ -95,6 +95,17 @@ export default function DashboardFasilitator() {
   const lap = ringkas.laporan || { ada: false };
   const pres = ringkas.presentasi || { ada: false, file: { ada: false }, canva: { ada: false } };
   const badge = ringkas.komentar_belum_dibaca || { total: 0 };
+  // Entri baru sejak kunjungan terakhir (server sudah mereset stempelnya
+  // begitu ringkasan ini dikirim, jadi angka ini hanya tampil sekali).
+  const baru = ringkas.baru || null;
+  const rincianBaru = baru
+    ? [
+        baru.kegiatan && `${baru.kegiatan} kegiatan`,
+        baru.keuangan && `${baru.keuangan} belanja`,
+        baru.laporan && "laporan kemajuan diperbarui",
+        baru.presentasi && "presentasi diperbarui",
+      ].filter(Boolean)
+    : [];
 
   return (
     <>
@@ -102,8 +113,14 @@ export default function DashboardFasilitator() {
         Melihat logbook tim <b>{ringkas.tim?.username}</b> — kamu dapat melihat
         &amp; mengomentari{isDosen() ? " serta memberi ACC / meminta revisi" : ""}{" "}
         (data tim tidak bisa diubah).
-        {badge.total > 0 && <> · <b style={{ color: "#ef4444" }}>{badge.total} komentar belum dibaca</b></>}
+        {badge.total > 0 && <> · <b style={{ color: "var(--bad)" }}>{badge.total} komentar belum dibaca</b></>}
       </p>
+
+      {baru?.total > 0 && (
+        <div className="login-info mt" role="status">
+          🆕 Sejak kunjungan terakhirmu, tim ini menambahkan <b>{rincianBaru.join(", ")}</b>.
+        </div>
+      )}
 
       {/* ===== Kartu metrik tim ===== */}
       <div className="grid metrics mt stagger">

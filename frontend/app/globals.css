@@ -99,6 +99,32 @@ body {
 }
 .linklike:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; border-radius: 4px; }
 
+/* Fokus keyboard yang KONSISTEN untuk semua kontrol interaktif — sebelumnya
+ * hanya beberapa komponen (seg-btn, chip, rekap-head) yang punya gaya fokus,
+ * sehingga tombol ikon di Lightbox/dialog "menghilang" saat dinavigasi Tab.
+ * Komponen dengan gaya fokus khusus tetap menang karena selektornya lebih spesifik. */
+:where(button, a[href], [role="button"], input, select, textarea, summary):focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.42);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+[data-theme="dark"] :where(button, a[href], [role="button"], input, select, textarea, summary):focus-visible {
+  outline-color: rgba(129, 140, 248, 0.6);
+}
+
+/* Lencana notifikasi (komentar belum dibaca / entri baru) — ikut variabel tema.
+ * .nav = varian bottom-nav ponsel (melayang di pojok ikon). */
+.badge-notif {
+  margin-left: auto; background: var(--bad, #ef4444); color: #fff; border-radius: 99px;
+  font-size: 0.66rem; font-weight: 800; padding: 1px 7px; line-height: 1.5;
+  min-width: 1.4em; text-align: center; flex: 0 0 auto;
+}
+.badge-notif.nav {
+  position: absolute; top: 2px; right: 18%; margin-left: 0;
+  font-size: 0.62rem; padding: 0 5px; line-height: 1.6;
+}
+.chip > .badge-notif { margin-left: 2px; }
+
 svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 /* ================= Animasi ================= */
@@ -733,6 +759,10 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 [data-theme="dark"] .btn.danger { background: #4c1d1d; color: #fca5a5; }
 [data-theme="dark"] .btn.danger:hover { background: #5b2323; }
 .btn.sm { padding: 7px 13px; font-size: 0.78rem; border-radius: 10px; }
+/* Tombol polos tanpa latar — pelengkap tombol utama (mis. "Tampilkan semua") */
+.btn.ghost { background: transparent; border: 1px dashed var(--line, rgba(120,130,180,.35)); box-shadow: none; }
+/* Wadah tombol "Muat lagi" pada daftar panjang (paginasi ringan sisi klien) */
+.muat-lagi { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 18px 0 8px; }
 .btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
 
 .btn:focus-visible, .pill:focus-visible, .sb-menu a:focus-visible, .bottom-nav a:focus-visible, .chip:focus-visible {
@@ -1191,6 +1221,9 @@ td.num small { font-weight: 600; }
 .mts { margin-top: 8px; }
 .error-box { background: #fee2e2; color: #991b1b; border-radius: 13px; padding: 13px 16px; font-size: 0.85rem; border: 1px solid #fecaca; }
 [data-theme="dark"] .error-box { background: #4c1d1d; color: #fca5a5; border-color: #7f1d1d; }
+/* Kotak info (mis. pendaftaran tim ditutup) — nada netral, bukan error */
+.login-info { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 13px; padding: 11px 14px; font-size: 0.82rem; margin: 8px 0 2px; line-height: 1.5; font-weight: 500; }
+[data-theme="dark"] .login-info { background: #3b2a08; color: #fcd34d; border-color: #78500f; }
 .ok-note {
   background: #dcfce7; color: #166534; border: 1px solid #bbf7d0;
   border-radius: 13px; padding: 11px 14px; font-size: 0.82rem;

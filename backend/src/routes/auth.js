@@ -21,11 +21,62 @@ const loginLimiter = rateLimit({
   nama: NAMA_LIMIT_LOGIN,
   pesan: "Terlalu banyak percobaan login — tunggu sebentar",
 });
+// Lapis kedua: per USERNAME yang dicoba. Limiter per-IP saja tidak menahan
+// serangan terdistribusi (banyak IP → satu akun). Kunci memakai username
+// huruf kecil supaya "Tim Alpha" dan "tim alpha" dihitung sama.
+const NAMA_LIMIT_LOGIN_USER = "auth:login:user";
+const usernameDicoba = (req) => String(req.body?.username || "").trim().toLowerCase().slice(0, 80);
+const loginUserLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 10,
+  nama: NAMA_LIMIT_LOGIN_USER,
+  kunciDari: usernameDicoba,
+  pesan: "Terlalu banyak percobaan masuk ke akun ini — tunggu sebentar",
+});
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 jam
   max: 5,                   // diperketat dari 10 — meredam pemetaan username massal
   nama: "auth:register",
   pesan: "Terlalu banyak pendaftaran dari jaringanmu — coba lagi nanti",
+});
+// Ganti username/password memerlukan password saat ini — tanpa pembatas,
+// sesi yang dibajak bisa dipakai menebak password lama berulang kali.
+const NAMA_LIMIT_KREDENSIAL = "auth:ubah-kredensial";
+const kredensialLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  nama: NAMA_LIMIT_KREDENSIAL,
+  kunciDari: (req) => String(req.userId || ""),
+  pesan: "Terlalu banyak percobaan mengubah akun — tunggu sebentar",
+});
+
+/**
+ * Pendaftaran akun TIM dapat ditutup admin dari Pusat Kendali
+ * (meta `pendaftaranTimBuka` = "0"). Default (belum pernah diset) = terbuka.
+ * Pendaftaran fasilitator/dosen tidak terpengaruh — mereka sudah dipagari kode.
+ */
+export const META_PENDAFTARAN_TIM = "pendaftaranTimBuka";
+export async function pendaftaranTimTerbuka() {
+  const v = await store.getMeta(META_PENDAFTARAN_TIM);
+  return v !== "0";
+}
+
+/**
+ * @openapi
+ * /api/auth/pendaftaran:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Status pendaftaran (tanpa login) — dipakai halaman Daftar
+ *     responses:
+ *       200: { description: "{ tim: boolean }" }
+ */
+router.get("/pendaftaran", async (_req, res, next) => {
+  try {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ tim: await pendaftaranTimTerbuka() });
+  } catch (err) {
+    next(err);
+  }
 });
 
 
@@ -91,6 +142,11 @@ router.post("/register", registerLimiter, async (req, res, next) => {
     if (password.length < 8) {
       return res.status(400).json({ error: "Password minimal 8 karakter" });
     }
+    if (peran === "tim" && !(await pendaftaranTimTerbuka())) {
+      return res.status(403).json({
+        error: "Pendaftaran akun tim sedang ditutup — hubungi admin untuk dibuatkan akun",
+      });
+    }
     if (peran !== "tim") {
       const cfg = PENDAFTARAN[peran];
       const hash = await store.getMeta(cfg.metaKode);
@@ -148,7 +204,7 @@ router.post("/register", registerLimiter, async (req, res, next) => {
 const HASH_UMPAN =
   "s2:16384:8:1:" + "00".repeat(32) + ":" + "00".repeat(64);
 
-router.post("/login", loginLimiter, async (req, res, next) => {
+router.post("/login", loginLimiter, loginUserLimiter, async (req, res, next) => {
   try {
     const user = await store.findUserByUsername(req.body?.username);
     const password = String(req.body?.password || "");
@@ -162,6 +218,7 @@ router.post("/login", loginLimiter, async (req, res, next) => {
 
     const token = await store.createSession(user.id, jejakDari(req));
     resetLaju(req, NAMA_LIMIT_LOGIN); // login berhasil → penghitung dinolkan
+    resetLaju(req, NAMA_LIMIT_LOGIN_USER, usernameDicoba(req));
     catatAktivitas(user.id, "akun.masuk", {});
     pasangCookieSesi(req, res, token);
     res.json({ token, user: publicUser(user) });
@@ -241,7 +298,7 @@ router.post("/logout", authRequired, async (req, res, next) => {
  *       401: { description: Password salah }
  *       409: { description: Username sudah dipakai }
  */
-router.put("/username", authRequired, async (req, res, next) => {
+router.put("/username", authRequired, kredensialLimiter, async (req, res, next) => {
   try {
     const usernameBaru = String(req.body?.username || "").trim();
     const password = String(req.body?.password || "");
@@ -257,6 +314,7 @@ router.put("/username", authRequired, async (req, res, next) => {
       return res.status(409).json({ error: "Username sudah dipakai — silakan pilih yang lain" });
     }
     const updated = await store.updateUsername(user.id, usernameBaru);
+    resetLaju(req, NAMA_LIMIT_KREDENSIAL, user.id); // berhasil → penghitung dinolkan
     catatAktivitas(user.id, "akun.ganti_username", { dari: user.username, jadi: usernameBaru });
     res.json({ user: publicUser(updated) });
   } catch (err) {
@@ -286,7 +344,7 @@ router.put("/username", authRequired, async (req, res, next) => {
  *       400: { description: Input tidak valid }
  *       401: { description: Password lama salah }
  */
-router.put("/password", authRequired, async (req, res, next) => {
+router.put("/password", authRequired, kredensialLimiter, async (req, res, next) => {
   try {
     const lama = String(req.body?.password_lama || "");
     const baru = String(req.body?.password_baru || "");
@@ -298,6 +356,7 @@ router.put("/password", authRequired, async (req, res, next) => {
       return res.status(401).json({ error: "Password lama salah — perubahan dibatalkan" });
     }
     await store.updateUserPassword(user.id, baru);
+    resetLaju(req, NAMA_LIMIT_KREDENSIAL, user.id); // berhasil → penghitung dinolkan
     // Amankan akun: semua sesi lain dicabut, sesi ini tetap aktif
     const dicabut = await store.revokeUserSessions(user.id, req.token);
     lupakanSesiUser(user.id, req.token); // cache instance ini ikut dibersihkan

@@ -13,6 +13,7 @@ import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto"
 import { unduhFotoEntri } from "@/lib/unduh";
 import { KATEGORI_PKM } from "@/lib/pkm";
 import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
+import { useMuatBertahap, TombolMuatLagi } from "@/lib/muatBertahap";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
@@ -301,6 +302,17 @@ function KeuanganFasilitator() {
 
   const bulanTersedia = useMemo(() => daftarBulan(items), [items]);
 
+  // Daftar tersaring dihitung SEBELUM early-return agar urutan hook tetap.
+  const view = [...(items || [])]
+    .filter((e) =>
+      (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
+      (!bulan || e.tanggal.startsWith(bulan)) &&
+      cocokSumber(e, sumber) &&
+      cocokKategori(e, sumber, kat)
+    )
+    .reverse();
+  const halaman = useMuatBertahap(view); // paginasi ringan: render 100 entri dulu
+
   if (gagal === "belum-assign")
     return (
       <div className="empty mt">
@@ -311,17 +323,9 @@ function KeuanganFasilitator() {
   if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
   if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
 
-  const view = [...items]
-    .filter((e) =>
-      (!cari || e.item.toLowerCase().includes(cari.toLowerCase())) &&
-      (!bulan || e.tanggal.startsWith(bulan)) &&
-      cocokSumber(e, sumber) &&
-      cocokKategori(e, sumber, kat)
-    )
-    .reverse();
   const total = view.reduce((s, e) => s + e.total, 0);
 
-  // Sisipkan baris subtotal saat bulan berganti
+  // Sisipkan baris subtotal saat bulan berganti (subtotal dari seluruh hasil filter)
   const subtotal = {};
   for (const e of view) {
     const k = e.tanggal.slice(0, 7);
@@ -329,7 +333,7 @@ function KeuanganFasilitator() {
   }
   const rows = [];
   let bulanAktif = "";
-  for (const e of view) {
+  for (const e of halaman.tampil) {
     const k = e.tanggal.slice(0, 7);
     if (k !== bulanAktif) {
       rows.push({ jenis: "sub", kunci: k, total: subtotal[k] });
@@ -467,6 +471,7 @@ function KeuanganFasilitator() {
           ))}
         </div>
       )}
+      <TombolMuatLagi {...halaman} label="belanja" />
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
   );
@@ -526,9 +531,7 @@ function KeuanganTim() {
       index: idx,
     });
 
-  if (items === undefined && !loadErr) return <div className="skel mt" style={{ height: 220 }} />;
-
-  const err = loadErr && items === undefined ? `Gagal memuat: ${loadErr.message}` : "";
+  // Daftar tersaring dihitung SEBELUM early-return agar urutan hook tetap.
   const list = items || [];
   const view = list
     .filter((e) =>
@@ -538,6 +541,12 @@ function KeuanganTim() {
       cocokKategori(e, sumber, kat)
     )
     .reverse();
+  const halaman = useMuatBertahap(view); // paginasi ringan: render 100 entri dulu
+
+  if (items === undefined && !loadErr) return <div className="skel mt" style={{ height: 220 }} />;
+
+  const err = loadErr && items === undefined ? `Gagal memuat: ${loadErr.message}` : "";
+  // Total & subtotal dihitung dari SELURUH hasil filter (bukan hanya yang dirender)
   const total = view.reduce((s, e) => s + e.total, 0);
 
   // Sisipkan baris subtotal saat bulan berganti
@@ -548,7 +557,7 @@ function KeuanganTim() {
   }
   const rows = [];
   let bulanAktif = "";
-  for (const e of view) {
+  for (const e of halaman.tampil) {
     const k = e.tanggal.slice(0, 7);
     if (k !== bulanAktif) {
       rows.push({ jenis: "sub", kunci: k, total: subtotal[k] });
@@ -705,6 +714,7 @@ function KeuanganTim() {
           ))}
         </div>
       )}
+      <TombolMuatLagi {...halaman} label="belanja" />
 
       {edit && (
         <FormDialog
