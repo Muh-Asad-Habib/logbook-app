@@ -13,6 +13,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import * as store from "../storage.js";
 import { authRequired, hanyaPendamping } from "../auth.js";
+import { asalPublik } from "../config.js";
 import { bacaAktivitas, catatAktivitas } from "../aktivitas.js";
 import { rateLimit } from "../ratelimit.js";
 import { q } from "../db.js";
@@ -84,7 +85,9 @@ async function hitungStatistik(timId) {
  */
 router.get("/tim", async (req, res, next) => {
   try {
-    res.json(await store.listTimUntukFasilitator(req.user.id));
+    // + `baru`: hitungan entri yang masuk sejak pendamping terakhir membuka
+    // dashboard tim tsb (lencana di pemilih tim). Bentuk lama tetap ada.
+    res.json(await store.listTimUntukFasilitatorDenganBaru(req.user.id));
   } catch (err) {
     next(err);
   }
@@ -168,13 +171,18 @@ router.get("/tim/:timId/statistik", pastikanAkses, async (req, res, next) => {
 router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
   try {
     const { _kegiatan, ...statistik } = await hitungStatistik(req.tim.id);
-    const [aktivitas, laporan, presentasi, belumDibaca, persetujuan] = await Promise.all([
+    const [aktivitas, laporan, presentasi, belumDibaca, persetujuan, daftarTim] = await Promise.all([
       bacaAktivitas(req.tim.id, 10),
       store.infoLaporan(req.tim.id),
       store.infoPresentasi(req.tim.id),
       store.hitungBelumDibaca(req.user.id, req.user.role),
       store.ringkasPersetujuan(req.tim.id),
+      store.listTimUntukFasilitatorDenganBaru(req.user.id),
     ]);
+    // Hitungan "baru" dibaca SEBELUM stempel disentuh, supaya dashboard yang
+    // baru dibuka masih bisa menampilkan "ada N entri baru sejak kunjunganmu".
+    const baru = daftarTim.find((t) => t.id === req.tim.id)?.baru || null;
+    store.sentuhTerakhirLihat(req.user.id, req.tim.id); // reset lencana (tanpa menunggu)
     res.json({
       tim: req.tim,
       statistik,
@@ -184,6 +192,7 @@ router.get("/tim/:timId/ringkasan", pastikanAkses, async (req, res, next) => {
       presentasi,
       komentar_belum_dibaca: belumDibaca,
       persetujuan,
+      baru,
     });
   } catch (err) {
     next(err);
@@ -297,9 +306,7 @@ router.post("/tim/:timId/laporan-tautan", pastikanAkses, async (req, res, next) 
     await q("DELETE FROM laporan_links WHERE exp < $1", [Date.now()]);
     await q("INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'laporan')",
       [kunci, req.tim.id, exp]);
-    const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
-    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-    res.json({ url: `${proto}://${host}/api/laporan/publik/${kunci}`, exp });
+    res.json({ url: `${asalPublik(req)}/api/laporan/publik/${kunci}`, exp });
   } catch (err) {
     next(err);
   }
@@ -415,9 +422,7 @@ router.post("/tim/:timId/presentasi-tautan", pastikanAkses, async (req, res, nex
       "INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'presentasi')",
       [kunci, req.tim.id, exp]
     );
-    const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
-    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-    res.json({ url: `${proto}://${host}/api/presentasi/publik/${kunci}`, exp });
+    res.json({ url: `${asalPublik(req)}/api/presentasi/publik/${kunci}`, exp });
   } catch (err) {
     next(err);
   }

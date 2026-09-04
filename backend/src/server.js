@@ -2,6 +2,7 @@
 import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
+import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
 import swaggerUi from "swagger-ui-express";
@@ -108,11 +109,16 @@ app.use(
     origin(origin, cb) {
       if (!origin) return cb(null, true); // bukan permintaan lintas-origin
       if (ORIGIN_SAH.has(origin)) return cb(null, true);
-      // Pengembangan lokal: localhost / IP LAN / tunnel cloudflared
-      if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1]|192\.168\.|10\.)/.test(origin)) {
-        return cb(null, true);
+      // Pengembangan lokal SAJA (di Vercel cabang ini tidak pernah aktif):
+      // localhost / IP LAN / tunnel cloudflared. Pola di-anchor sampai akhir
+      // string (host lengkap + port opsional) — pola lama `192\.168\.` juga
+      // cocok dengan `https://192.168.evil.com`, jadi diperketat.
+      if (!config.diVercel) {
+        if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?$/.test(origin)) {
+          return cb(null, true);
+        }
+        if (/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)) return cb(null, true);
       }
-      if (/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(origin)) return cb(null, true);
       return cb(null, false); // ditolak diam-diam (tanpa header CORS)
     },
   })
@@ -218,8 +224,9 @@ if (fs.existsSync(config.frontendDir)) {
       // Chunk _next/static punya hash di nama file — aman di-cache selamanya
       if (filePath.includes(`${path.sep}_next${path.sep}static${path.sep}`)) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      } else if (filePath.endsWith(".html") || filePath.endsWith(".txt")) {
-        // HTML & payload navigasi: selalu validasi ulang (ETag → 304, tetap cepat)
+      } else if (filePath.endsWith(".html") || filePath.endsWith(".txt") || filePath.endsWith(`${path.sep}sw.js`)) {
+        // HTML & payload navigasi: selalu validasi ulang (ETag → 304, tetap cepat).
+        // sw.js ikut: service worker baru harus segera terdeteksi browser.
         res.setHeader("Cache-Control", "no-cache");
       } else {
         res.setHeader("Cache-Control", "public, max-age=3600");
@@ -247,10 +254,37 @@ if (fs.existsSync(config.frontendDir)) {
   );
 }
 
-// Error handler terpusat
+/**
+ * Error handler terpusat.
+ *
+ * - Error unggahan multer (berkas terlalu besar / terlalu banyak / jenis
+ *   ditolak fileFilter) sebelumnya jatuh ke 500 — kini 413/400 dengan pesan
+ *   yang bisa dibaca pengguna.
+ * - Untuk 5xx pesan asli (bisa berisi nama tabel/kolom Postgres, path
+ *   berkas, dsb.) TIDAK dikirim ke klien — cukup ke log server.
+ */
+const PESAN_MULTER = {
+  LIMIT_FILE_SIZE: [413, "Berkas terlalu besar — kecilkan ukurannya lalu coba lagi"],
+  LIMIT_FILE_COUNT: [400, "Terlalu banyak berkas dalam satu unggahan"],
+  LIMIT_UNEXPECTED_FILE: [400, "Nama field berkas tidak dikenali"],
+  LIMIT_PART_COUNT: [400, "Isi formulir terlalu banyak"],
+  LIMIT_FIELD_VALUE: [400, "Nilai formulir terlalu panjang"],
+};
 app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    const [kode, pesan] = PESAN_MULTER[err.code] || [400, "Unggahan tidak valid"];
+    return res.status(kode).json({ error: pesan });
+  }
+  // Penolakan fileFilter (bukan MulterError, tapi dilempar saat unggah)
+  if (/^Hanya berkas /.test(String(err?.message || ""))) {
+    return res.status(400).json({ error: err.message });
+  }
+  const status = Number(err?.status) || 500;
   console.error("[error]", err);
-  res.status(err.status || 500).json({ error: err.message || "internal server error" });
+  const pesan = status >= 500
+    ? "Terjadi gangguan di server — coba lagi sebentar"
+    : (err.message || "permintaan tidak valid");
+  res.status(status).json({ error: pesan });
 });
 
 // Di Vercel: aplikasi diekspor sebagai serverless function (lihat api/index.js) —

@@ -252,10 +252,15 @@ async function unggahBagianIK(dasar, izin, key, potong) {
 
 /**
  * Unggah berkas dokumen (.pptx/.docx) langsung ke ImageKit.
+ * @param {string} dasarPath   awalan endpoint, mis. "/api/laporan"
+ * @param {File} file
+ * @param {(persen:number)=>void} [onProgress]
+ * @param {string} [akhir="daftarkan"]  endpoint penutup yang menerima daftar bagian
+ *   (laporan/presentasi: "daftarkan"; impor: "docx/langsung")
  * @returns hasil pendaftaran, atau null bila server meminta jalur lama
  *   (mode lokal tanpa ImageKit).
  */
-async function unggahDokumenLangsung(dasarPath, file, onProgress) {
+async function unggahDokumenLangsung(dasarPath, file, onProgress, akhir = "daftarkan") {
   const izinRes = await aFetch(`${dasarPath}/izin-unggah`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -271,7 +276,9 @@ async function unggahDokumenLangsung(dasarPath, file, onProgress) {
     // sisakan 1 langkah untuk verifikasi server
     onProgress?.(Math.round(((i + 1) / (jumlah + 1)) * 100));
   }
-  return aFetch(`${dasarPath}/daftarkan`, {
+  // Semua byte sudah di CDN — tahap berikutnya (verifikasi/impor) di server.
+  onProgress?.(100);
+  return aFetch(`${dasarPath}/${akhir}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nama: file.name, stem, jumlah, tanda, bagian: terunggah }),
@@ -343,6 +350,9 @@ const ambilLaporanBlob = (pathBagian, pathFile, onProgress) =>
 
 export const api = {
   // ---- Auth ----
+  /** Status pendaftaran (tanpa login): { tim: boolean } — admin bisa menutup pendaftaran tim. */
+  statusPendaftaran: () =>
+    fetch(`${API_URL}/api/auth/pendaftaran`, { cache: "no-store" }).then(parse),
   register: (username, password, opts = {}) =>
     fetch(`${API_URL}/api/auth/register`, {
       method: "POST",
@@ -426,15 +436,30 @@ export const api = {
 
   // ---- Impor ----
   /**
-   * Impor .docx. File kecil dikirim sekali jalan; file besar otomatis
-   * dipotong ±2 MB per request (batas keras Vercel ±4,5 MB → dulu 413).
+   * Impor .docx. Jalur utama: berkas diunggah LANGSUNG ke ImageKit (byte tidak
+   * lewat Vercel — bebas dari batas body ±4,5 MB), lalu server menariknya dari
+   * CDN, mengimpor, dan menghapus berkas sementaranya. Jalur cadangan (mode
+   * lokal tanpa ImageKit): kirim utuh bila kecil, atau potongan base64 2 MB.
    * @param {File|null} file  berkas .docx (null → server pakai template bawaan)
    * @param {(persen:number)=>void} [onProgress]
    */
   importDocx: async (file, onProgress) => {
-    if (!file || file.size <= LANGSUNG_MAKS) {
+    if (!file) {
+      return aFetch("/api/import/docx", { method: "POST", body: new FormData() });
+    }
+    try {
+      const hasil = await unggahDokumenLangsung("/api/import", file, onProgress, "docx/langsung");
+      if (hasil) return hasil;
+    } catch (e) {
+      // Kegagalan verifikasi/impor di server adalah hasil akhir — jangan
+      // mengulang lewat jalur server (berkas besar pasti 413 di Vercel).
+      if (!/Unggah ke penyimpanan gagal|Failed to fetch|NetworkError/i.test(e?.message || "")) throw e;
+      if (file.size > LANGSUNG_MAKS) throw e;
+    }
+    // Mode lokal (tanpa ImageKit) atau unggahan CDN gagal untuk berkas kecil
+    if (file.size <= LANGSUNG_MAKS) {
       const fd = new FormData();
-      if (file) fd.append("file", file);
+      fd.append("file", file);
       return aFetch("/api/import/docx", { method: "POST", body: fd });
     }
     return uploadChunked("/api/import/docx", file, onProgress);

@@ -46,18 +46,28 @@ function bersihkanSesekali(now) {
  * @param {number} opts.max maksimal percobaan per jendela
  * @param {string} opts.pesan pesan error yang ramah
  * @param {string} opts.nama label unik penghitung (default: path endpoint)
+ * @param {(req: import("express").Request) => string} [opts.kunciDari]
+ *        pembeda penghitung selain IP — mis. username yang sedang dicoba,
+ *        supaya serangan dari BANYAK IP ke SATU akun tetap terbendung.
+ *        Bila mengembalikan string kosong, permintaan dilewatkan tanpa dihitung.
  */
 export function rateLimit({
   windowMs = 60_000,
   max = 10,
   pesan = "Terlalu banyak percobaan — coba lagi nanti",
   nama = "",
+  kunciDari = null,
 } = {}) {
   return async (req, res, next) => {
     try {
       const now = Date.now();
       const label = nama || `${req.method}:${req.baseUrl}${req.path}`;
-      const kunci = `${label}|${ambilIp(req)}`;
+      let pembeda = ambilIp(req);
+      if (typeof kunciDari === "function") {
+        pembeda = String(kunciDari(req) || "").slice(0, 120);
+        if (!pembeda) return next();
+      }
+      const kunci = `${label}|${pembeda}`;
 
       // Satu perjalanan ke database: naikkan penghitung, atau mulai jendela
       // baru bila jendela sebelumnya sudah lewat. Nilai `n` sesudah operasi
@@ -88,8 +98,10 @@ export function rateLimit({
   };
 }
 
-/** Nol-kan penghitung setelah percobaan yang BERHASIL (mis. login sukses). */
-export function resetLaju(req, nama) {
-  const kunci = `${nama}|${ambilIp(req)}`;
+/** Nol-kan penghitung setelah percobaan yang BERHASIL (mis. login sukses).
+ *  @param {string} [pembeda] kunci kustom (bila limiter memakai `kunciDari`);
+ *  default: IP pemanggil. */
+export function resetLaju(req, nama, pembeda = "") {
+  const kunci = `${nama}|${pembeda || ambilIp(req)}`;
   q("DELETE FROM login_fails WHERE kunci = $1", [kunci]).catch(() => {});
 }

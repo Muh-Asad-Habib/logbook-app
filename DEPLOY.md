@@ -255,11 +255,14 @@ Buka URL vercel.app-mu, lalu centang satu per satu:
 - [ ] `https://URL-kamu/docs` → **404** (benar: dokumentasi API sengaja ditutup di
       produksi agar daftar endpoint tidak bisa ditelusuri; buka lewat
       `http://localhost:4000/docs` saat menjalankan aplikasi di komputer sendiri)
-- [ ] panel admin: `https://URL-kamu/<path-panel-kamu>` — alamat & kredensialnya
-      dibuat acak saat aplikasi pertama jalan dan **dicetak sekali ke log**:
-      buka proyek di Vercel → tab **Logs** → cari baris `[keamanan]` (simpan pribadi)
+- [ ] panel admin: `https://URL-kamu/pusat-kendali` — kredensialnya dibuat acak
+      saat aplikasi pertama jalan dan **dicetak sekali ke log**: buka proyek di
+      Vercel → tab **Logs** → cari baris `[keamanan]` (simpan pribadi). Alamat
+      panel bisa diganti dengan `node tools/superuser.mjs --path /alamat-baru`
 - [ ] Kartu **🎓 Kode pendaftaran fasilitator** & **👨‍🏫 Kode pendaftaran dosen
       pendamping** di panel → setel kodenya
+- [ ] Kartu **👥 Pendaftaran akun Tim** di halaman Pengaturan panel — tutup
+      setelah semua tim terdaftar (akun baru tetap bisa dibuat dari panel)
 - [ ] Daftar akun pendamping memakai kode itu → hubungkan ke tim: **Profil tim →
       Kode tim** disalin & dikirim, lalu pendamping memasukkannya di Dashboard
       (atau tetapkan lewat tombol **🔗 Tim** di panel admin)
@@ -301,14 +304,21 @@ Aplikasi punya tiga peran: **👥 Tim** (default), **🎓 Fasilitator**, dan
 
 **Kredensial panel admin.** Dibuat acak otomatis saat aplikasi pertama jalan
 dan **dicetak sekali ke log**: buka proyek di Vercel → tab **Logs** → cari
-baris `[keamanan]`. Lupa password panel? Jalankan di laptop (butuh `.env`):
-`node tools/superuser.mjs -u namabaru -p sandibaru`.
+baris `[keamanan]`. Alamat panel bawaan `/pusat-kendali` (bisa diganti lewat
+`node tools/superuser.mjs --path /alamat-baru`). Lupa password panel? Jalankan
+di laptop (butuh `.env`): `node tools/superuser.mjs -u namabaru -p sandibaru`.
 
-**Batas ukuran upload ±4 MB per request** (batas platform Vercel).
-Foto HP biasanya lolos (dan tetap dikompres server jadi ±300 KB), tapi
-**impor .docx raksasa** (>4 MB, banyak foto) bisa ditolak — dokumen sebesar itu
-diimpor dari laptop dengan:
-`node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"`.
+**Batas ukuran upload ±4 MB per request** (batas platform Vercel) hanya
+berlaku untuk jalur yang melewati server — foto kegiatan/nota (dikompres
+klien ±300 KB) aman. Laporan `.docx`, presentasi `.pptx`, **dan impor logbook
+`.docx`** dikirim browser **langsung ke ImageKit** (maks. 300 MB), jadi tidak
+terkena batas ini. `tools/impor-logbook.mjs` tetap tersedia bila ingin
+mengimpor dari laptop tanpa browser.
+
+**Alamat tautan penampil Office.** Aplikasi memakai domain produksi Vercel
+secara otomatis. Bila memakai domain kustom, isi env `APP_ORIGIN`
+(mis. `https://logbook.kampus.ac.id`) di Vercel agar tautan yang diberikan ke
+penampil Microsoft mengarah ke domain tersebut.
 
 **"Tidur" singkat.** Bila tak ada pengunjung ±5 menit, database Neon ikut
 tidur; request pertama berikutnya butuh ±1–3 detik ekstra. Normal untuk

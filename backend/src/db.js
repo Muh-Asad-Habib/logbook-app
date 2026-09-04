@@ -207,6 +207,10 @@ const SKEMA = [
    )`,
   `CREATE INDEX IF NOT EXISTS fastim_fas_idx ON fasilitator_tim (fasilitator_id)`,
   `CREATE INDEX IF NOT EXISTS fastim_tim_idx ON fasilitator_tim (tim_user_id)`,
+  // Kapan pendamping ini TERAKHIR membuka dashboard tim tsb — dipakai untuk
+  // lencana "entri baru sejak kunjungan terakhir". Kosong = belum pernah dibuka
+  // (semua entri dihitung baru sejak assignment dibuat).
+  `ALTER TABLE fasilitator_tim ADD COLUMN IF NOT EXISTS terakhir_lihat TEXT NOT NULL DEFAULT ''`,
   // Komentar fasilitator ↔ tim pada entri kegiatan/keuangan/laporan.
   `CREATE TABLE IF NOT EXISTS komentar (
      id          TEXT PRIMARY KEY,

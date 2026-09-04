@@ -16,6 +16,7 @@ import { removeFiles, safePath, contentType, signedUrl, pakaiCloud } from "../fi
 import { PANEL_HTML } from "./panel.js";
 import { bus } from "../bus.js";
 import { bacaAktivitas } from "../aktivitas.js";
+import { pasangCookiePanel, hapusCookiePanel } from "../cookies.js";
 
 const router = Router();
 
@@ -53,6 +54,9 @@ router.post("/auth", async (req, res, next) => {
   try {
     const r = await adminStore.login(req, req.body?.u, req.body?.p);
     if (!r.ok) return res.status(401).json({ error: r.error });
+    // Cookie HttpOnly dibatasi ke path panel — dipakai <img>, EventSource,
+    // dan tautan berkas yang tidak bisa mengirim header Authorization.
+    pasangCookiePanel(req, res, r.token, adminStore.panelPath(), adminStore.SESSION_TTL_DETIK);
     res.json({ token: r.token });
   } catch (err) {
     next(err);
@@ -66,6 +70,8 @@ router.use(async (req, res, next) => {
     const token = await adminStore.checkSession(req);
     if (!token) return res.status(401).json({ error: "Harus login" });
     req.adminToken = token;
+    // Perpanjang umur cookie seiring sliding TTL sesi
+    pasangCookiePanel(req, res, token, adminStore.panelPath(), adminStore.SESSION_TTL_DETIK);
     next();
   } catch (err) {
     next(err);
@@ -75,6 +81,7 @@ router.use(async (req, res, next) => {
 router.post("/keluar", async (req, res, next) => {
   try {
     await adminStore.destroySession(req.adminToken);
+    hapusCookiePanel(req, res, adminStore.panelPath());
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -151,7 +158,8 @@ router.get("/data/pengguna/:id/aktivitas", async (req, res, next) => {
 });
 
 // Gambar (foto kegiatan / bukti belanja) — hanya untuk sesi panel yang sah.
-// Token lewat query ?t= karena <img> tidak bisa mengirim header Authorization.
+// <img> tidak bisa mengirim header Authorization → sesi dikenali lewat cookie
+// HttpOnly `logbook_panel` (lihat cookies.js); token tidak lagi ada di URL.
 router.get("/berkas/:key", (req, res) => {
   try {
     if (pakaiCloud()) {
@@ -398,6 +406,42 @@ router.get("/data/kode-dosen", async (_req, res, next) => {
 router.put("/data/kode-dosen", async (req, res, next) => {
   try {
     await simpanKode(req, res, "dosen");
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------- pendaftaran akun TIM: buka / tutup ----------
+ * Pendaftaran tim bawaan TERBUKA (siapa pun bisa membuat akun tim). Admin
+ * dapat menutupnya — mis. setelah semua tim terdaftar — supaya tidak ada
+ * akun liar. Akun tetap bisa dibuat admin lewat "Akun baru" di panel.
+ * Disimpan di meta `pendaftaranTimBuka` ("1"/"0"); dibaca routes/auth.js. */
+const META_PENDAFTARAN_TIM = "pendaftaranTimBuka";
+const META_PENDAFTARAN_TIM_TS = "pendaftaranTimUpdatedAt";
+
+router.get("/data/pendaftaran-tim", async (_req, res, next) => {
+  try {
+    const [v, ts] = await Promise.all([
+      store.getMeta(META_PENDAFTARAN_TIM), store.getMeta(META_PENDAFTARAN_TIM_TS),
+    ]);
+    res.json({ buka: v !== "0", updatedAt: ts || "" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put("/data/pendaftaran-tim", async (req, res, next) => {
+  try {
+    const buka = req.body?.buka !== false && req.body?.buka !== "0" && req.body?.buka !== 0;
+    await store.setMeta(META_PENDAFTARAN_TIM, buka ? "1" : "0");
+    await store.setMeta(META_PENDAFTARAN_TIM_TS, new Date().toISOString());
+    adminStore.audit(req, "pendaftaran.tim.ubah", { buka });
+    res.json({
+      ok: true, buka,
+      catatan: buka
+        ? "Pendaftaran akun tim dibuka — siapa pun bisa mendaftar dari halaman Daftar"
+        : "Pendaftaran akun tim ditutup — akun baru hanya bisa dibuat dari panel ini",
+    });
   } catch (err) {
     next(err);
   }

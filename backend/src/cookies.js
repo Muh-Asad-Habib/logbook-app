@@ -84,3 +84,43 @@ export function hapusCookieSesi(req, res) {
   tambahSetCookie(res, bagian.join("; "));
 }
 
+/* ---------- Cookie sesi PANEL ADMIN ----------
+ * Panel dulu menempelkan token sesinya di query string (?t=) untuk <img>,
+ * EventSource, dan tautan berkas — bocor ke riwayat browser & log persis
+ * seperti masalah lama di aplikasi utama. Sekarang token panel juga dipasang
+ * sebagai cookie HttpOnly yang DIBATASI ke path panel saja, sehingga tidak
+ * pernah ikut terkirim ke /api/* milik aplikasi utama. */
+
+/** Nama cookie sesi panel admin. */
+export const COOKIE_PANEL = "logbook_panel";
+
+/**
+ * Pasang cookie sesi panel.
+ * @param {string} pathPanel path panel saat ini, mis. "/pusat-kendali"
+ * @param {number} umurDetik  umur cookie (selaras TTL sesi panel)
+ */
+export function pasangCookiePanel(req, res, token, pathPanel, umurDetik) {
+  const bagian = [
+    `${COOKIE_PANEL}=${encodeURIComponent(String(token || ""))}`,
+    `Path=${pathPanel || "/"}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${Math.max(1, Math.floor(umurDetik || 1800))}`,
+  ];
+  if (amanHttps(req)) bagian.push("Secure");
+  tambahSetCookie(res, bagian.join("; "));
+}
+
+/** Hapus cookie sesi panel (logout panel). */
+export function hapusCookiePanel(req, res, pathPanel) {
+  const bagian = [
+    `${COOKIE_PANEL}=`,
+    `Path=${pathPanel || "/"}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    "Max-Age=0",
+  ];
+  if (amanHttps(req)) bagian.push("Secure");
+  tambahSetCookie(res, bagian.join("; "));
+}
+

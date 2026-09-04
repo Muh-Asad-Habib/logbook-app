@@ -18,11 +18,28 @@ export default function LoginPage() {
   const [lihatPass, setLihatPass] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  // Pendaftaran akun TIM bisa ditutup admin (Pusat Kendali). null = belum dicek.
+  const [daftarTimBuka, setDaftarTimBuka] = useState(null);
 
   // Sudah login? Langsung ke dashboard.
   useEffect(() => {
     if (getToken()) location.replace("/");
   }, []);
+
+  // Saat tab Daftar dibuka: cek status pendaftaran tim (tanpa login).
+  useEffect(() => {
+    if (mode !== "daftar" || daftarTimBuka !== null) return;
+    let hidup = true;
+    api.statusPendaftaran()
+      .then((r) => { if (hidup) setDaftarTimBuka(r?.tim !== false); })
+      .catch(() => { if (hidup) setDaftarTimBuka(true); }); // gagal cek → anggap buka; server tetap memagari
+    return () => { hidup = false; };
+  }, [mode, daftarTimBuka]);
+
+  // Bila tim ditutup, pindahkan pilihan default ke fasilitator agar formulir tetap bisa dipakai.
+  useEffect(() => {
+    if (mode === "daftar" && daftarTimBuka === false && peran === "tim") setPeran("fasilitator");
+  }, [mode, daftarTimBuka, peran]);
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -141,7 +158,7 @@ export default function LoginPage() {
                 type={lihatPass ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === "daftar" ? "minimal 6 karakter" : "password"}
+                placeholder={mode === "daftar" ? "minimal 8 karakter" : "password"}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
               />
               <button
@@ -174,14 +191,23 @@ export default function LoginPage() {
 
               <div className="field">
                 Daftar sebagai
+                {daftarTimBuka === false && (
+                  <div className="login-info" role="status">
+                    Pendaftaran akun <b>Tim</b> sedang ditutup oleh admin — minta admin
+                    membuatkan akun untuk timmu. Pendaftaran fasilitator &amp; dosen tetap dibuka.
+                  </div>
+                )}
                 <div style={{ display: "grid", gap: 8, marginTop: 6 }}>
-                  {PERAN.map((p) => (
+                  {PERAN.map((p) => {
+                    const mati = p.id === "tim" && daftarTimBuka === false;
+                    return (
                     <label
                       key={p.id}
+                      aria-disabled={mati || undefined}
                       style={{
                         display: "flex", alignItems: "flex-start", gap: 10,
-                        cursor: "pointer", userSelect: "none", padding: "9px 12px",
-                        borderRadius: 12, fontWeight: 500,
+                        cursor: mati ? "not-allowed" : "pointer", userSelect: "none", padding: "9px 12px",
+                        borderRadius: 12, fontWeight: 500, opacity: mati ? 0.5 : 1,
                         border: `1px solid ${peran === p.id ? "var(--pri, #4f46e5)" : "rgba(120,130,180,.28)"}`,
                         background: peran === p.id ? "rgba(79,70,229,.07)" : "transparent",
                       }}
@@ -191,15 +217,19 @@ export default function LoginPage() {
                         name="peran"
                         value={p.id}
                         checked={peran === p.id}
+                        disabled={mati}
                         onChange={() => { setPeran(p.id); setKode(""); }}
                         style={{ width: "auto", margin: "3px 0 0" }}
                       />
                       <span>
                         <b>{p.label}</b>
-                        <small style={{ display: "block", opacity: 0.7 }}>{p.ket}</small>
+                        <small style={{ display: "block", opacity: 0.7 }}>
+                          {mati ? "Ditutup sementara oleh admin" : p.ket}
+                        </small>
                       </span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

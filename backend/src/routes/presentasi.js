@@ -24,6 +24,7 @@ import multer from "multer";
 import crypto from "node:crypto";
 import * as store from "../storage.js";
 import { authRequired, hanyaTim } from "../auth.js";
+import { asalPublik } from "../config.js";
 import { catatAktivitas } from "../aktivitas.js";
 import { q } from "../db.js";
 import {
@@ -143,9 +144,7 @@ router.post("/tautan", async (req, res, next) => {
       "INSERT INTO laporan_links (kunci, user_id, exp, jenis) VALUES ($1, $2, $3, 'presentasi')",
       [kunci, req.userId, exp]
     );
-    const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
-    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-    res.json({ url: `${proto}://${host}/api/presentasi/publik/${kunci}`, exp });
+    res.json({ url: `${asalPublik(req)}/api/presentasi/publik/${kunci}`, exp });
   } catch (err) { next(err); }
 });
 

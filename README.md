@@ -79,7 +79,8 @@ tampilan: permintaan yang tidak berhak selalu ditolak dengan kode **403**.
 
 1. Buka alamat aplikasi, lalu pilih tab **✨ Daftar**.
 2. Pilih peran:
-   - **Tim** — dapat langsung mendaftar.
+   - **Tim** — dapat langsung mendaftar *(selama pendaftaran tim dibuka admin;
+     bila ditutup, minta admin membuatkan akun dari panel)*.
    - **Fasilitator** atau **Dosen Pendamping** — memerlukan **kode pendaftaran**
      dari admin (kode untuk keduanya berbeda).
 3. Isi username & password, lalu daftar. Akun baru selalu dimulai dari logbook
@@ -221,10 +222,13 @@ aman diulang berkali-kali. Ekspor khusus keuangan juga **tidak mengganggu**
 ekspor gabungan kegiatan & keuangan; keduanya berdiri sendiri.
 
 **Impor:** pada halaman yang sama, unggah logbook Word lama lalu klik **Impor
-sekarang**. Entri yang belum ada akan ditambahkan lengkap dengan fotonya; entri
-yang sudah ada dilewati sehingga aman diklik berulang. Format tanggal seperti
-`23-Mei-26`, `06 Juni 2026`, `6/5/2026`, durasi `2 jam` atau `1 j 30 mnt`, serta
-harga `Rp 100.000 / bulan` sudah dikenali.
+sekarang**. Berkas dikirim **langsung ke penyimpanan (ImageKit)** — tidak
+melewati server — sehingga dokumen berfoto puluhan MB pun bisa diimpor dari
+browser (maks. 300 MB); server lalu membacanya, memindahkan entri & foto, dan
+menghapus berkas sementaranya. Entri yang belum ada akan ditambahkan lengkap
+dengan fotonya; entri yang sudah ada dilewati sehingga aman diklik berulang.
+Format tanggal seperti `23-Mei-26`, `06 Juni 2026`, `6/5/2026`, durasi `2 jam`
+atau `1 j 30 mnt`, serta harga `Rp 100.000 / bulan` sudah dikenali.
 
 ---
 
@@ -259,16 +263,22 @@ besar, di dalamnya admin dapat:
   ditinjau secara keseluruhan maupun per akun.
 - Mengatur **kode pendaftaran** fasilitator dan dosen, serta **penugasan tim**
   untuk menghubungkan pembimbing dengan tim yang didampingi.
+- **Membuka / menutup pendaftaran akun Tim** — tutup begitu semua tim
+  terdaftar supaya tidak ada akun liar; akun baru tetap bisa dibuat admin dari
+  panel. Pendaftaran fasilitator/dosen tidak terpengaruh (tetap memakai kode).
 - Membaca **catatan aktivitas** panel yang tersimpan otomatis.
 
 Seluruh tampilan panel menyegarkan diri sendiri, jadi perubahan langsung terlihat
 tanpa perlu memuat ulang halaman.
 
-> Alamat panel admin beserta kredensialnya dibuat otomatis saat aplikasi pertama
-> kali dijalankan dan ditampilkan **satu kali** pada log server — catat baik-baik.
-> Kredensial dapat disetel ulang kapan saja dengan `node tools/superuser.mjs`.
-> Karena alamat tersebut tidak pernah ditautkan dari halaman mana pun, simpanlah
-> secara pribadi.
+> Alamat panel admin bawaan adalah `/pusat-kendali`; kredensialnya dibuat
+> otomatis saat aplikasi pertama kali dijalankan dan ditampilkan **satu kali**
+> pada log server — catat baik-baik. Kredensial dapat disetel ulang kapan saja
+> dengan `node tools/superuser.mjs -u NAMA -p SANDI`, dan alamat panel dapat
+> diganti dengan `node tools/superuser.mjs --path /alamat-baru`. Alamat panel
+> tidak pernah ditautkan dari halaman mana pun; login-nya dibatasi 5 percobaan
+> per 15 menit per alamat IP (plus rem darurat lintas-IP) dan sesinya terikat
+> pada peramban yang dipakai.
 
 ---
 
@@ -346,7 +356,8 @@ Utilitas lain di folder `tools/`:
 | Perintah | Fungsi |
 |---|---|
 | `node tools/superuser.mjs -u NAMA -p SANDI` | Setel ulang kredensial panel admin |
-| `node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"` | Impor dokumen Word besar langsung ke sebuah akun |
+| `node tools/superuser.mjs --path /alamat-baru` | Ganti alamat panel admin (bawaan `/pusat-kendali`) |
+| `node tools/impor-logbook.mjs --file "berkas.docx" --user "Nama Akun"` | Impor dokumen Word dari laptop langsung ke sebuah akun (alternatif bila tidak ingin lewat browser) |
 | `node tools/test-pemisah-halaman.mjs` | Uji cepat: bagian keuangan pada ekspor DOCX selalu mulai di halaman baru |
 
 ---
@@ -362,6 +373,7 @@ Salin `.env.example` menjadi `.env` di akar folder proyek, lalu isi:
 | `IMAGEKIT_PRIVATE_KEY` | Kunci privat ImageKit — rahasia. |
 | `IMAGEKIT_URL_ENDPOINT` | Endpoint URL ImageKit. |
 | `IMAGEKIT_FOLDER` | Folder penyimpanan (opsional, bawaan `/logbook`). |
+| `APP_ORIGIN` | Opsional — alamat publik aplikasi (mis. `https://logbook.vercel.app`) yang dipakai untuk menyusun tautan penampil Office. Di Vercel otomatis diisi dari domain produksi; di laptop/tunnel boleh dikosongkan. |
 
 Tabel database dibuat otomatis saat server pertama kali tersambung sehingga
 tidak ada langkah migrasi manual. Bila kunci ImageKit dikosongkan, berkas
@@ -421,6 +433,7 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | Method | Endpoint | Fungsi |
 |---|---|---|
 | POST | `/api/auth/register` | Daftar akun baru (memperoleh token) |
+| GET | `/api/auth/pendaftaran` | Status pendaftaran akun tim (`{ tim: true/false }`, tanpa login) |
 | POST | `/api/auth/login` | Masuk (memperoleh token) |
 | GET | `/api/auth/me` | Profil akun yang sedang masuk |
 | PUT | `/api/auth/username` | Ganti username (konfirmasi password) |
@@ -437,8 +450,10 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
 | GET | `/api/export/keuangan-docx` | Unduh Word **khusus keuangan** (Belmawa per kategori + tabel PT terpisah) |
 | POST | `/api/export/tautan/{jenis}` | Siapkan berkas ekspor lalu kembalikan tautan CDN (`docx`, `pdf`, `xlsx`, `keuangan-docx`) |
-| POST | `/api/import/docx` | Impor entri + foto dari dokumen Word |
-| POST | `/api/import/docx/chunk` \| `/docx/selesai` | Impor berkas besar secara terpotong |
+| POST | `/api/import/izin-unggah` | Izin unggah `.docx` impor **langsung ke ImageKit** (byte tidak lewat server, maks. 300 MB) |
+| POST | `/api/import/docx/langsung` | Verifikasi bagian yang diunggah, jalankan impor, hapus berkas sementara |
+| POST | `/api/import/docx` | Impor entri + foto dari dokumen Word lewat server (cadangan mode lokal) |
+| POST | `/api/import/docx/chunk` \| `/docx/selesai` | Impor berkas besar secara terpotong (cadangan mode lokal) |
 
 **Umum (tanpa login)**
 
@@ -554,6 +569,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:presentasi --workspace backend` | Alur presentasi menyeluruh: unggah `.pptx`, normalisasi tautan Canva, akses pembimbing, komentar & ACC, serta penghapusan terpisah |
 | `npm run diag:presentasi-langsung --workspace backend` | Jalur unggah **langsung ke ImageKit**: penerbitan izin, verifikasi metadata, berkas satu bagian & multi-bagian, redirect 302 ke CDN, dan penolakan izin palsu (butuh internet + env `IMAGEKIT_*`) |
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
+| `npm run diag:impor-langsung --workspace backend` | Jalur **impor `.docx` langsung ke ImageKit**: penerbitan izin, verifikasi metadata, impor berjalan, berkas sementara terhapus (sukses maupun gagal), penolakan izin palsu, pagar peran & login (butuh internet + env `IMAGEKIT_*`) |
+| `npm run diag:keamanan --workspace backend` | Perbaikan keamanan hasil audit: buka/tutup pendaftaran tim (+ endpoint publik & audit panel), whitelist kunci pengaturan, penolakan origin CORS palsu, unggahan bukan gambar → 400 ramah, pembatas laju per-username, cookie sesi panel |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
 | `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, serta **nota tersemat** (thumbnail + lampiran bernomor, relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |
@@ -592,7 +609,21 @@ ruangnya benar-benar kembali ke kuota.
   orang lain tidak dapat "ditebak" lewat parameter.
 - Pendaftaran dibatasi jumlah percobaannya per alamat IP, sehingga kode
   pendaftaran fasilitator/dosen tidak dapat ditebak dengan cara mencoba
-  berulang kali.
+  berulang kali. Pendaftaran akun tim dapat **ditutup sepenuhnya** oleh admin.
+- Percobaan masuk dibatasi **dua lapis**: per alamat IP *dan* per username yang
+  dicoba — serangan dari banyak alamat IP ke satu akun pun tetap terbendung.
+  Penggantian username/password juga dibatasi (5 percobaan / 15 menit).
+- Panel admin memakai **cookie HttpOnly terpisah** yang dibatasi ke alamat
+  panel saja — token panel tidak pernah muncul di URL, riwayat peramban, atau
+  log. Aplikasi utama memakai cookie `logbook_sesi` yang berbeda.
+- Pengaturan per akun hanya menerima **kunci yang dikenal** (whitelist) dengan
+  batas panjang nilai, sehingga tabel pengaturan tidak bisa dijadikan tempat
+  penimbunan data sembarangan.
+- Pesan galat server (5xx) yang dikirim ke peramban selalu generik — detail
+  internal (nama tabel, path berkas) hanya tercatat di log server.
+- Tautan penampil Office disusun dari alamat aplikasi yang **tepercaya**
+  (`APP_ORIGIN` / domain produksi Vercel), bukan dari header `Host` kiriman
+  pemanggil.
 - Unggahan berkas besar yang dipotong-potong dibatasi ukuran, jumlah potongan,
   dan format datanya, lalu sisa potongan yang terbengkalai dibersihkan otomatis.
 - Sesi kedaluwarsa otomatis setelah 30 hari tidak dipakai, dan mengganti password

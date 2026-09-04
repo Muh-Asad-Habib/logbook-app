@@ -12,6 +12,7 @@ import {
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
 import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
+import { useMuatBertahap, TombolMuatLagi } from "@/lib/muatBertahap";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
@@ -144,6 +145,15 @@ function KegiatanFasilitator() {
     return () => { hidup = false; };
   }, [timId]);
 
+  // Daftar tersaring dihitung SEBELUM early-return agar urutan hook tetap.
+  const view = [...(items || [])]
+    .filter((e) =>
+      (!cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase())) &&
+      (!bulan || e.tanggal.startsWith(bulan))
+    );
+  if (urut === "Terbaru") view.reverse();
+  const halaman = useMuatBertahap(view); // paginasi ringan: render 100 entri dulu
+
   if (gagal === "belum-assign")
     return (
       <div className="empty mt">
@@ -154,13 +164,7 @@ function KegiatanFasilitator() {
   if (gagal) return <div className="error-box mt">{`Gagal memuat: ${gagal}`}</div>;
   if (items === null) return <div className="skel mt" style={{ height: 220 }} />;
 
-  const view = [...items]
-    .filter((e) =>
-      (!cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase())) &&
-      (!bulan || e.tanggal.startsWith(bulan))
-    );
-  if (urut === "Terbaru") view.reverse();
-  const grup = grupBulan(view);
+  const grup = grupBulan(halaman.tampil);
   const bulanTersedia = [...new Set(items.map((e) => e.tanggal.slice(0, 7)))].sort().reverse();
 
   const bukaFoto = (e, idx) =>
@@ -255,6 +259,7 @@ function KegiatanFasilitator() {
           </div>
         </div>
       ))}
+      <TombolMuatLagi {...halaman} label="kegiatan" />
       {lb && <Lightbox {...lb} onClose={() => setLb(null)} />}
     </>
   );
@@ -306,17 +311,20 @@ function KegiatanTim() {
       index: idx,
     });
 
-  if (items === undefined && !loadErr)
-    return <div className="skel mt" style={{ height: 220 }} />;
-
-  const err = loadErr && items === undefined ? `Gagal memuat: ${loadErr.message}` : "";
+  // Daftar tersaring dihitung SEBELUM early-return agar urutan hook tetap.
   let view = (items || []).filter((e) =>
     (!cari || e.kegiatan.toLowerCase().includes(cari.toLowerCase())) &&
     (!dari || e.tanggal >= dari) &&
     (!sampai || e.tanggal <= sampai)
   );
   if (urut === "Terbaru") view = [...view].reverse();
-  const grup = grupBulan(view);
+  const halaman = useMuatBertahap(view); // paginasi ringan: render 100 entri dulu
+
+  if (items === undefined && !loadErr)
+    return <div className="skel mt" style={{ height: 220 }} />;
+
+  const err = loadErr && items === undefined ? `Gagal memuat: ${loadErr.message}` : "";
+  const grup = grupBulan(halaman.tampil);
 
   return (
     <>
@@ -417,6 +425,7 @@ function KegiatanTim() {
           </div>
         </div>
       ))}
+      <TombolMuatLagi {...halaman} label="kegiatan" />
 
       {edit && (
         <FormDialog
