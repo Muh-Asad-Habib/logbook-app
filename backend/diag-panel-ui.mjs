@@ -124,7 +124,7 @@ cek("akunOnline hanya berisi yang punya sesi",
 
 const kartuOnline = api.kartuAkunSesi(users[0], sesi);
 cek("kartu akun MEMBUKA: badge online + jumlah perangkat",
-  kartuOnline.includes('class="st on"') && kartuOnline.includes("1 perangkat") &&
+  /class="st on( kecil)?"/.test(kartuOnline) && kartuOnline.includes("1 perangkat") &&
   kartuOnline.includes("sedang membuka aplikasi"));
 cek("kartu akun online: nama pendamping tampil", kartuOnline.includes("pendamping: Bu Rina"));
 cek("kartu akun online: tombol cabut semua ada", kartuOnline.includes('data-act="sesi"'));
@@ -133,7 +133,7 @@ cek("kartu akun online: tombol cabut semua ada", kartuOnline.includes('data-act=
 const sesiDiam = [{ ...sesi[0], membuka: false, layar: "" }];
 const kartuDiam = api.kartuAkunSesi(users[0], sesiDiam);
 cek("kartu akun LOGIN SAJA: badge redup, bukan online",
-  kartuDiam.includes('class="st dim"') && !kartuDiam.includes('class="st on"') &&
+  /class="st dim( kecil)?"/.test(kartuDiam) && !/class="st on( kecil)?"/.test(kartuDiam) &&
   kartuDiam.includes("login, tidak membuka"));
 cek("baris perangkat: lencana 'tidak membuka'",
   api.barisPerangkat(sesiDiam[0]).includes("tidak membuka"));
