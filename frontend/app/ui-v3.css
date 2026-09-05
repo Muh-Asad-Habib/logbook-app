@@ -235,7 +235,8 @@
 
 .ai-panel {
   position: fixed; right: 22px; bottom: 82px; z-index: 77;
-  width: min(420px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 98px));
+  width: min(420px, calc(100vw - 32px)); height: min(480px, calc(100dvh - 98px));
+  max-height: calc(100dvh - 98px);
   display: flex; flex-direction: column;
   background: var(--card-solid); border: 1px solid var(--line); border-radius: 20px;
   box-shadow: 0 24px 60px -16px rgba(18, 20, 46, 0.35), 0 0 0 1px rgba(124, 58, 237, 0.06);
@@ -284,16 +285,20 @@
 .ai-model-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .ai-model-btn .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-model-btn .lucide { flex: 0 0 auto; width: 14px; height: 14px; color: var(--muted); }
+.ai-model-btn[aria-expanded="true"] .lucide { transform: rotate(180deg); }
 
+.ai-content { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
 .ai-model-menu {
-  position: relative; flex: 1 1 auto; min-height: 0;
+  position: absolute; z-index: 2; top: 4px; left: 12px; right: 12px;
+  max-height: min(232px, calc(100% - 8px));
   display: flex; flex-direction: column; gap: 1px;
-  overflow-y: auto; overscroll-behavior: contain;
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
   padding: 4px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--card-solid); scrollbar-width: thin;
+  background: var(--card-solid); scrollbar-width: thin; scrollbar-color: var(--line-hover) transparent;
+  box-shadow: var(--shadow);
 }
 .ai-model-opsi {
-  flex-shrink: 0; min-height: 56px;
+  flex-shrink: 0; min-height: 48px;
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
   border: 0; border-radius: 8px; background: none; color: var(--ink);
   font: inherit; font-size: 0.75rem; font-weight: 600; text-align: left; cursor: pointer;
@@ -305,32 +310,19 @@
   display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere;
   line-height: 1.45;
 }
-/* Keterangan sifat model dalam bahasa sehari-hari ("Cepat · untuk pertanyaan
-   ringan") — menggantikan angka teknis yang tak berarti bagi kebanyakan orang. */
+/* Kegunaan model, bukan kelas ukuran atau janji kecepatan/akurasi. */
 .ai-model-opsi .ket {
   font-size: 0.66rem; font-weight: 600; color: var(--muted);
   white-space: normal; overflow-wrap: anywhere; line-height: 1.5;
 }
 .ai-model-opsi[aria-checked="true"] .ket { color: var(--p2); }
-.ai-model-opsi .tanda {
-  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
-  background: var(--soft); color: var(--p1);
-  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.02em;
-}
-.ai-model-opsi[aria-checked="true"] .tanda { background: var(--card-solid); }
 .ai-model-opsi .tik { flex: 0 0 auto; width: 13px; height: 13px; }
 
-/* Pemilih menggantikan isi chat sementara, bukan menutupinya. */
-.ai-panel.pilih-model { height: min(600px, calc(100dvh - 98px)); }
-.ai-panel.pilih-model .ai-list,
-.ai-panel.pilih-model .ai-input,
-.ai-panel.pilih-model .ai-catatan { display: none; }
-.ai-model-view { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 10px 12px; gap: 8px; }
-.ai-model-intro, .ai-model-note { flex-shrink: 0; }
-.ai-model-intro p, .ai-model-note { margin: 0; font-size: .72rem; color: var(--muted); line-height: 1.5; }
-.ai-model-back { border: 0; background: transparent; color: var(--p1); font: inherit; font-size: .78rem; min-height: 36px; padding: 4px 0; cursor: pointer; }
+/* Dropdown hanya memakai ruang chat; input tetap terlihat dan panel tidak
+   membesar. Chat di belakang diredupkan tanpa mengubah posisi gulirnya. */
+.ai-panel.pilih-model .ai-list { opacity: .2; overflow: hidden; }
 .ai-model-opsi:focus-visible { outline: 2px solid var(--p1); outline-offset: -2px; }
-.ai-model-btn:focus-visible, .ai-model-back:focus-visible { outline: 2px solid var(--p1); outline-offset: 1px; }
+.ai-model-btn:focus-visible { outline: 2px solid var(--p1); outline-offset: 1px; }
 /* Centang hanya tampak pada model yang sedang dipakai — ruangnya tetap
    dipesan supaya teks semua baris tetap sejajar. */
 .ai-model-opsi .tik[aria-hidden="true"] { visibility: hidden; }
@@ -340,11 +332,9 @@
 
 /* --- Pemilih model: penyesuaian tiap ukuran layar --- */
 
-/* Layar sempit (HP 320–430 px): baris dirapatkan; nama model tetap utuh
-   karena keterangan ukuran memang hanya ada di dalam daftar. */
+/* Layar sempit: nama dan kegunaan boleh turun baris, bukan terpotong. */
 @media (max-width: 430px) {
   .ai-model-bar { gap: 6px; padding: 8px 12px; }
-  .ai-model-opsi .ket { font-size: 0.62rem; }
 }
 
 /* HP sangat sempit (≤ 340 px): label "Model" dilepas — tombolnya sudah
@@ -354,13 +344,9 @@
   .ai-model-lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 
-/* Layar pendek sudah tercakup oleh perhitungan clamp() pada .ai-model-menu
-   (dan penyesuaian 64vh di blok ≤900 px). */
-
-/* Perangkat sentuh: sasaran sentuh diperbesar ke ±40 px. */
+/* Sasaran sentuh tetap minimal 44px. */
 @media (pointer: coarse) {
-  .ai-model-btn { height: 34px; }
-  .ai-model-opsi { padding: 10px 8px; }
+  .ai-model-opsi { min-height: 48px; }
 }
 
 .ai-msg-model {
@@ -398,13 +384,13 @@
 .ai-md code { background: rgba(79, 70, 229, 0.1); padding: 1px 5px; border-radius: 5px; font-size: 0.8em; }
 [data-theme="dark"] .ai-md code { background: rgba(129, 140, 248, 0.18); }
 
-.ai-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
+.ai-input { flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
 .ai-input textarea {
   flex: 1; min-width: 0; min-height: 40px; max-height: 120px; resize: none; margin-top: 0;
   padding: 10px 12px; font-size: 0.86rem; border-radius: 12px; line-height: 1.4;
 }
 .ai-input .btn { height: 40px; width: 44px; padding: 0; justify-content: center; border-radius: 12px; flex: 0 0 auto; }
-.ai-catatan { padding: 0 14px 10px; font-size: 0.68rem; color: var(--muted); }
+.ai-catatan { flex-shrink: 0; margin: 0; padding: 0 14px 10px; font-size: 0.68rem; color: var(--muted); }
 
 .spin { animation: ai-spin 0.9s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
@@ -414,16 +400,15 @@
   .ai-fab { left: 16px; right: auto; bottom: calc(76px + env(safe-area-inset-bottom)); height: 46px; }
   .ai-panel {
     left: 10px; right: 10px; width: auto;
-    bottom: calc(132px + env(safe-area-inset-bottom)); max-height: min(560px, calc(100dvh - 148px - env(safe-area-inset-bottom)));
+    bottom: calc(132px + env(safe-area-inset-bottom));
+    height: min(480px, calc(100dvh - 148px - env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - 148px - env(safe-area-inset-bottom));
   }
-  .ai-panel.pilih-model { height: min(560px, calc(100dvh - 148px - env(safe-area-inset-bottom))); }
   .ai-input textarea { font-size: 16px; }
 }
 
 @media (max-height: 520px) {
-  .ai-panel, .ai-panel.pilih-model { top: 8px; bottom: 8px; height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
-  .ai-model-intro p, .ai-model-note { display: none; }
-  .ai-model-view { padding-top: 4px; gap: 4px; }
+  .ai-panel { top: 8px; bottom: 8px; height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
 }
 
 /* ---------- Tombol & kotak usulan AI di formulir (kegiatan / keuangan) ---------- */
