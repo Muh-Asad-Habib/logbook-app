@@ -68,34 +68,23 @@ export function miliarParam(m) {
 }
 
 /**
- * Petunjuk ukuran saja, bukan hasil pengukuran kecepatan atau akurasi.
- * Model besar belum tentu lebih akurat; beban server ikut menentukan waktu.
- */
-const SIFAT = [
-  [1, "Model sangat ringan"],
-  [5, "Model ringan"],
-  [10, "Model berukuran sedang"],
-  [25, "Model besar · dapat lebih lama"],
-  [Infinity, "Model sangat besar · dapat lebih lama"],
-];
-
-/**
- * Keterangan model dalam bahasa sehari-hari.
- *
- * Angka "3.2B · 1,9 GB" tidak berarti apa-apa bagi kebanyakan orang — yang
- * diberikan petunjuk ukuran tanpa mengklaim lebih teliti. Rinciannya tidak hilang,
- * hanya dipindah ke tooltip lewat rincianTeknis().
- * @example sifatModel({ parameter: "3.2B" }) // "Model ringan"
+ * Kegunaan keluarga model yang dikenal, bukan peringkat kualitas.
+ * Tidak disimpulkan dari jumlah parameter/ukuran berkas. UI saat ini hanya
+ * mengirim teks, jadi model VL tidak ditawarkan sebagai fitur unggah gambar.
+ * Nama yang belum dikenal mendapat label netral, bukan kemampuan karangan.
  */
 export function sifatModel(m) {
-  const b = miliarParam(m);
-  if (!b) {
-    // Tanpa data parameter, ukuran berkas masih memberi petunjuk kasar
-    const gb = (m?.ukuran || 0) / 1024 ** 3;
-    if (!gb) return "";
-    return gb < 2 ? SIFAT[1][1] : gb < 7 ? SIFAT[2][1] : gb < 15 ? SIFAT[3][1] : SIFAT[4][1];
-  }
-  return SIFAT.find(([batas]) => b < batas)[1];
+  const nama = String(m?.nama || m?.label || "").toLowerCase();
+  if (!nama) return "";
+  if (nama.startsWith("translategemma")) return "Menerjemahkan teks antarbahasa";
+  if (/^qwen[\d.]*-coder/.test(nama)) return "Membantu menulis & memahami kode";
+  if (/^phi[\d.]*-reasoning/.test(nama)) return "Menguraikan masalah langkah demi langkah";
+  if (nama.includes("sahabatai")) return "Percakapan berbahasa Indonesia";
+  if (/^qwen[\d.]*vl/.test(nama)) return "Tanya jawab teks di asisten ini";
+  if (/^qwen[\d.]*[:\-]/.test(nama) || /^qwen[\d.]+$/.test(nama)) return "Tanya jawab & merapikan tulisan";
+  if (/^gemma\d/.test(nama)) return "Membantu menulis & meringkas teks";
+  if (/^(llama\d|smollm\d|gpt-oss)/.test(nama)) return "Percakapan & pertanyaan sehari-hari";
+  return "Model lain untuk dicoba";
 }
 
 /** Rincian teknis untuk tooltip — bagi yang memang ingin tahu angkanya. */

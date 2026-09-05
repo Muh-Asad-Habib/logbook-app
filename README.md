@@ -263,9 +263,10 @@ bertanya tentang tim yang sedang dipilih di bilah atas.
 
 **Modelnya kamu yang pilih.** Di kepala panel ada daftar **Model** berisi
 seluruh model yang benar-benar terpasang di server kampus, diurutkan dari yang
-paling ringan. Keterangan memakai bahasa sederhana, misalnya **Model ringan**
-atau **Model besar · dapat lebih lama**. Ini petunjuk ukuran, bukan jaminan
-kecepatan atau akurasi; angka teknis tetap tersedia di tooltip.
+paling ringan. Keterangan menjelaskan kegunaan: **Menerjemahkan teks antarbahasa**
+(TranslateGemma), **Membantu menulis & memahami kode** (Qwen Coder), atau
+**Tanya jawab & merapikan tulisan** (Qwen). Bukan peringkat kecepatan/akurasi;
+angka teknis tetap tersedia di tooltip.
 Namanya dirapikan agar enak dibaca — `qwen2.5:7b-instruct` tampil
 sebagai **Qwen 2.5 7B Instruct**, `gpt-oss` jadi **GPT OSS**, dan
 `hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0` jadi **Gemma 2
@@ -276,10 +277,11 @@ tersimpan di akunmu, jadi ikut dipakai tombol AI di formulir Kegiatan &
 Keuangan dan tetap sama saat dibuka di perangkat lain. Tiap jawaban diberi
 label model penjawabnya sehingga mudah membandingkan.
 
-Pemilih model memiliki tampilan sendiri di dalam panel, bukan popup yang
-menutupi pesan dan kotak input. **Kembali ke chat** mengembalikan percakapan
-beserta draf yang belum dikirim. Nama panjang bisa turun baris, daftar memiliki
-satu area gulir, dan panel menyesuaikan tinggi viewport termasuk mode lanskap.
+Pemilih model berupa dropdown ringkas (maksimal 232 px) di bawah baris Model.
+Ukuran panel tetap saat daftar dibuka; kotak mengetik selalu terlihat, tidak
+tertutup daftar. Klik di luar atau pilih model untuk menutupnya; draf tetap utuh.
+Nama panjang bisa turun baris, daftar memiliki satu area gulir, dan panel
+menyesuaikan tinggi viewport termasuk mode lanskap.
 Panah atas/bawah, Home/End, Enter dan Escape mendukung navigasi keyboard.
 
 **Uji browser responsif (tanpa data produksi):** setelah `npm run build`,
@@ -293,7 +295,7 @@ node tools/test-ai-picker.mjs
 
 Pengujian memakai API tiruan dan 16 kombinasi ukuran/tema (280–1920 px,
 termasuk lanskap). Diperiksa batas panel/menu, teks panjang, navigasi keyboard,
-pemilihan model dan keutuhan draf pesan. Screenshot tersimpan di folder
+pemilihan model, panel tidak membesar, input tidak tertutup, dan keutuhan draf pesan. Screenshot tersimpan di folder
 `logbook-picker-screenshots` dalam direktori sementara sistem.
 
 > Model penyemat (*embedding*, mis. `nomic-embed-text`) dan model berakhiran

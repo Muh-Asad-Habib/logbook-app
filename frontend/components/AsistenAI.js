@@ -134,10 +134,10 @@ export default function AsistenAI() {
   useEffect(() => {
     if (!bukaModel) return;
     const luar = (e) => {
-      if (!modelRef.current?.contains(e.target)) setBukaModel(false);
+      if (!menuRef.current?.contains(e.target) && !tombolRef.current?.contains(e.target)) setBukaModel(false);
     };
-    document.addEventListener("mousedown", luar);
-    return () => document.removeEventListener("mousedown", luar);
+    document.addEventListener("pointerdown", luar);
+    return () => document.removeEventListener("pointerdown", luar);
   }, [bukaModel]);
 
   // Saat daftar dibuka: bawa model yang SEDANG dipakai ke dalam pandangan.
@@ -146,7 +146,9 @@ export default function AsistenAI() {
   useEffect(() => {
     if (!bukaModel) return;
     const aktif = menuRef.current?.querySelector('[aria-checked="true"]');
-    if (aktif && menuRef.current) menuRef.current.scrollTop = aktif.offsetTop - menuRef.current.offsetTop;
+    if (aktif && menuRef.current) {
+      menuRef.current.scrollTop = Math.max(0, aktif.offsetTop - 4);
+    }
     aktif?.focus({ preventScroll: true });
   }, [bukaModel]);
 
@@ -281,16 +283,13 @@ export default function AsistenAI() {
             {errModel && <span role="alert" className="ai-model-ket bad">{errModel}</span>}
           </div>
 
-          {bukaModel && model && (
-            <div className="ai-model-view">
-              <div className="ai-model-intro">
-                <button type="button" className="ai-model-back" onClick={() => {
-                  setBukaModel(false); tombolRef.current?.focus();
-                }}>← Kembali ke chat</button>
-                <p>Pilih model sesuai kebutuhan. Jika ragu, gunakan Otomatis.</p>
-              </div>
+          <div className="ai-content">
+            {bukaModel && model && (
                 <div id="ai-model-menu" className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl"
-                     ref={menuRef} onKeyDown={onKeyMenu}>
+                     ref={menuRef} onKeyDown={onKeyMenu}
+                     onBlur={(e) => {
+                       if (!e.currentTarget.contains(e.relatedTarget) && e.relatedTarget !== tombolRef.current) setBukaModel(false);
+                     }}>
                   <button
                     type="button" role="menuitemradio" aria-checked={!model.pilihan}
                     className="ai-model-opsi" onClick={() => gantiModel("")}
@@ -300,13 +299,12 @@ export default function AsistenAI() {
                     <span className="teks">
                       <span className="nm">Otomatis</span>
                       <span className="ket">
-                        {model.bawaan ? `Gunakan model bawaan: ${namaCantik(model.bawaan)}` : "Gunakan model bawaan server"}
+                        Pilihan bawaan untuk asisten logbook
                       </span>
                     </span>
                   </button>
                   {model.daftar.map((m) => {
                     const cantik = namaCantik(m.label);
-                    const bawaan = m.nama === model.bawaan;
                     return (
                       <button
                         key={m.nama}
@@ -318,7 +316,6 @@ export default function AsistenAI() {
                         <span className="teks">
                           <span className="nm">
                             {cantik}
-                            {bawaan && <span className="tanda">bawaan</span>}
                           </span>
                           {/* Bahasa sehari-hari, bukan "3.2B · 1,9 GB" — angkanya
                               tetap ada di tooltip lewat rincianTeknis(). */}
@@ -328,11 +325,9 @@ export default function AsistenAI() {
                     );
                   })}
                 </div>
-                <p className="ai-model-note">Kecepatan bergantung pada beban server. Model lebih besar tidak selalu lebih akurat.</p>
-            </div>
-          )}
+            )}
 
-          <div className="ai-list" ref={listRef}>
+          <div className="ai-list" ref={listRef} inert={bukaModel}>
             {pesan.length === 0 && (
               <div className="ai-kosong">
                 <p>
@@ -367,6 +362,7 @@ export default function AsistenAI() {
                 <Loader2 className="lucide spin" /> Membaca data logbook & menyusun jawaban…
               </div>
             )}
+          </div>
           </div>
 
           <form className="ai-input" onSubmit={(e) => { e.preventDefault(); kirim(); }}>

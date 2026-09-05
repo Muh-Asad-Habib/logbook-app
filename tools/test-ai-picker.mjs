@@ -62,14 +62,22 @@ try {
       const input = page.getByRole('textbox', { name: 'Pertanyaan untuk asisten AI' });
       await input.fill('Draf tetap tersimpan');
       await page.waitForFunction(() => !document.querySelector('.ai-model-btn').disabled);
+      await page.waitForTimeout(250);
+      const closedPanel = await page.locator('.ai-panel').boundingBox();
       await trigger.click();
       const menu = page.getByRole('menu');
       await menu.waitFor();
       await page.waitForTimeout(250); // finish panel entry animation
-      assert.equal(await input.isVisible(), false, 'picker must not overlay a visible input');
-      assert.equal(await page.locator('.ai-list').isVisible(), false);
+      assert.equal(await input.isVisible(), true, 'input stays visible while choosing');
+      assert.equal(await page.locator('.ai-list').isVisible(), true);
+      assert.equal(await page.getByRole('button', { name: 'Kembali ke chat' }).count(), 0);
       const panel = await page.locator('.ai-panel').boundingBox();
       const box = await menu.boundingBox();
+      const inputBox = await input.boundingBox();
+      assert(Math.abs(panel.height - closedPanel.height) < 1, 'opening menu must not enlarge panel');
+      assert(box.height <= 233, 'dropdown must stay compact');
+      assert(box.y + box.height <= inputBox.y, 'menu must not cover input');
+      assert(!/berukuran|Model ringan|Model besar/.test(await menu.innerText()), 'descriptions must explain purpose');
       assert(panel.x >= 0 && panel.y >= 0 && panel.x + panel.width <= width + 1 && panel.y + panel.height <= height + 1, `panel outside ${width}x${height}`);
       assert(box.x >= panel.x && box.y >= panel.y && box.x + box.width <= panel.x + panel.width + 1 && box.y + box.height <= panel.y + panel.height + 1, 'menu outside panel');
       assert(box.height > 50, 'menu needs usable scroll area');
@@ -79,6 +87,7 @@ try {
         assert.equal(await option.evaluate(e => e.scrollWidth <= e.clientWidth + 1), true, 'option overflow');
         const name = option.locator('.nm');
         assert.equal(await name.evaluate(e => e.scrollHeight <= e.clientHeight + 1), true, 'name clipped');
+        assert.equal(await option.locator('.ket').evaluate(e => e.scrollHeight <= e.clientHeight + 1), true, 'purpose clipped');
       }
       await menu.getByRole('menuitemradio').last().focus();
       await page.keyboard.press('Home');
@@ -93,7 +102,8 @@ try {
       await page.keyboard.press('Escape');
       assert.equal(await trigger.evaluate(e => e === document.activeElement), true);
       await trigger.click();
-      await page.getByRole('button', { name: 'Kembali ke chat' }).click();
+      await input.click();
+      await menu.waitFor({ state: 'hidden' });
       assert.equal(await input.isVisible(), true);
       assert.deepEqual(errors, [], 'browser runtime errors');
       console.log(`PASS ${width}x${height} ${theme}: bounds, wrapping, keyboard, selection, draft`);

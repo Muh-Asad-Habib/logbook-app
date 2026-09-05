@@ -5,7 +5,7 @@
  *  - penanda teknis (repo Hugging Face, GGUF, kuantisasi, tag :latest) dibuang
  *  - singkatan resmi tetap benar (GPT, OSS, VL, SmolLM, SahabatAI, …)
  *  - angka teknis ("3.2B · 1,9 GB") diterjemahkan ke bahasa sehari-hari
- *    ("Cepat · untuk pertanyaan ringan"); angkanya pindah ke tooltip
+ *    ("Menerjemahkan teks antarbahasa"); angkanya pindah ke tooltip
  *  - hasilnya cukup pendek untuk baris daftar (dicek pada nama TERPANJANG)
  *  - bila server AI terjangkau, SELURUH model yang benar-benar ada di sana
  *    ikut diuji supaya tidak ada nama/keterangan yang tampil aneh di layar
@@ -68,18 +68,27 @@ try {
   cek("7.6B dibaca 7,6 miliar", miliarParam({ parameter: "7.6B" }) === 7.6);
   cek("tanpa data parameter → 0", miliarParam({}) === 0 && miliarParam({ parameter: "?" }) === 0);
 
-  const sifat = (p) => sifatModel({ parameter: p });
-  const SIFAT_SEMUA = ["135M", "3.2B", "7.6B", "14.7B", "36.0B"].map(sifat);
-  cek("model mungil → sangat ringan", sifat("135M") === "Model sangat ringan");
-  cek("3.2B → model ringan", sifat("3.2B") === "Model ringan");
-  cek("7.6B → sedang", sifat("7.6B") === "Model berukuran sedang");
-  cek("14.7B → besar", sifat("14.7B") === "Model besar · dapat lebih lama");
-  cek("36B → sangat besar", sifat("36.0B") === "Model sangat besar · dapat lebih lama");
-  cek("tanpa parameter, ukuran berkas jadi petunjuk",
-    sifatModel({ ukuran: 0.3 * 1024 ** 3 }) === "Model ringan");
+  const sifat = (nama) => sifatModel({ nama });
+  const contohSifat = {
+    "smollm2:135m": "Percakapan & pertanyaan sehari-hari",
+    "llama3.2:latest": "Percakapan & pertanyaan sehari-hari",
+    "gpt-oss:latest": "Percakapan & pertanyaan sehari-hari",
+    "translategemma:latest": "Menerjemahkan teks antarbahasa",
+    "qwen2.5:7b-instruct": "Tanya jawab & merapikan tulisan",
+    "qwen3-coder:30b": "Membantu menulis & memahami kode",
+    "phi4-reasoning:plus": "Menguraikan masalah langkah demi langkah",
+    "gemma4:latest": "Membantu menulis & meringkas teks",
+    "qwen2.5vl:latest": "Tanya jawab teks di asisten ini",
+    "hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0": "Percakapan berbahasa Indonesia",
+    "model-baru:latest": "Model lain untuk dicoba",
+  };
+  for (const [nama, harap] of Object.entries(contohSifat)) cek(`kegunaan ${nama}`, sifat(nama) === harap);
+  cek("label tanpa nama juga dikenali", sifatModel({ label: "translategemma" }) === contohSifat["translategemma:latest"]);
+  cek("angka ukuran tidak menentukan kegunaan", sifatModel({ nama: "llama3.2", parameter: "300B", ukuran: 1 }) === sifat("llama3.2"));
+  cek("angka saja tidak mengarang kegunaan", sifatModel({ parameter: "7.6B", ukuran: 1e9 }) === "");
   cek("tanpa data apa pun → kosong", sifatModel({}) === "");
   cek("keterangan tidak menjanjikan kecepatan atau akurasi",
-    SIFAT_SEMUA.every((s) => !/teliti|akurat|cepat/.test(s)));
+    Object.keys(contohSifat).map(sifat).every((s) => !/teliti|akurat|cepat|berukuran|ringan/.test(s)));
 
   console.log("\n== Rincian teknis pindah ke tooltip ==");
   const contoh = { nama: "llama3.2:latest", parameter: "3.2B", ukuran: 1.9 * 1024 ** 3 };
