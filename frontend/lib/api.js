@@ -543,6 +543,10 @@ export const api = {
   ai: {
     /** { aktif, model, host, tersedia, modelAda } — dipakai untuk menampilkan/menyembunyikan tombol. */
     status: () => aFetch("/api/ai/status", { cache: "no-store" }),
+    profilPkm: (tim = "") => aFetch(`/api/ai/profil-pkm${tim ? `?tim=${encodeURIComponent(tim)}` : ""}`, { cache: "no-store" }),
+    setProfilPkm: (profil) => aFetch("/api/ai/profil-pkm", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(profil),
+    }),
     /**
      * Model yang bisa dipilih pengguna:
      * { bawaan, pilihan, daftar: [{ nama, label, ukuran, keluarga, parameter }] }.

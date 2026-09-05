@@ -18,11 +18,11 @@ export default function GaleriPage() {
     if (!keg || !keu) return null;
     const all = [];
     for (const e of keg)
-      for (const k of e.foto_keys)
-        all.push({ key: k, tanggal: e.tanggal, ket: e.kegiatan.slice(0, 80), jenis: "Kegiatan" });
+      for (const [i, k] of e.foto_keys.entries())
+        all.push({ id: `kegiatan:${e.id}:${i}`, key: k, tanggal: e.tanggal, ket: e.kegiatan.slice(0, 80), jenis: "Kegiatan" });
     for (const e of keu)
-      for (const k of e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [])
-        all.push({ key: k, tanggal: e.tanggal, ket: e.item.slice(0, 80), jenis: "Bukti belanja" });
+      for (const [i, k] of (e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : []).entries())
+        all.push({ id: `keuangan:${e.id}:${i}`, key: k, tanggal: e.tanggal, ket: e.item.slice(0, 80), jenis: "Bukti belanja" });
     all.sort((a, b) => (a.tanggal < b.tanggal ? 1 : -1));
     return all;
   }, [keg, keu]);
@@ -68,7 +68,7 @@ export default function GaleriPage() {
 
       <div className="galeri mt stagger">
         {view.map((it, idx) => (
-          <button type="button" key={it.key} className="g-item" onClick={() => bukaLb(idx)}
+          <button type="button" key={it.id} className="g-item" onClick={() => bukaLb(idx)}
                   aria-label={`Lihat foto ${fmtTgl(it.tanggal)}: ${it.ket}`}>
             {/* Petak galeri hanya butuh gambar kecil — pakai thumbnail (±320px).
                 Versi resolusi penuh baru dimuat saat foto dibuka di Lightbox. */}

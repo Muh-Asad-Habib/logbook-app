@@ -150,13 +150,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 @keyframes lbIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lbImg { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 
-/* Animasi "masuk" HANYA untuk 7 kartu pertama.
-   Penting: `animation-fill-mode: both` menahan elemen pada keadaan awal
-   (opacity 0) sampai animasinya benar-benar dijalankan. Pada daftar panjang
-   (puluhan kartu) browser menunda animasi elemen yang berada di luar layar,
-   sehingga saat di-scroll cepat kartu bisa muncul KOSONG (hanya ruang putih)
-   sebelum akhirnya tampil. Karena itu kartu ke-8 dan seterusnya tidak
-   dianimasikan sama sekali — selalu langsung terlihat. */
+/* Animasi isi tetap dipertahankan; perbaikan kedipan dibatasi ke navigasi. */
 .stagger > *:nth-child(-n+7) { animation: fadeUp 0.42s ease both; }
 .stagger > *:nth-child(2) { animation-delay: 0.05s; }
 .stagger > *:nth-child(3) { animation-delay: 0.1s; }
@@ -164,7 +158,6 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .stagger > *:nth-child(5) { animation-delay: 0.2s; }
 .stagger > *:nth-child(6) { animation-delay: 0.25s; }
 .stagger > *:nth-child(7) { animation-delay: 0.3s; }
-.stagger > *:nth-child(8) { animation-delay: 0.35s; }
 
 /* Hormati setelan sistem "kurangi gerakan" + jaring pengaman: konten daftar
    tidak boleh bergantung pada animasi untuk bisa terlihat. */
@@ -215,10 +208,10 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   display: flex; align-items: center; gap: 11px;
   padding: 11px 13px; border-radius: 12px; text-decoration: none;
   color: var(--muted); font-weight: 700; font-size: 0.88rem;
-  transition: all 0.16s ease; position: relative;
+  transition: none; position: relative;
 }
 .sb-menu a svg.lucide { font-size: 1.12rem; }
-.sb-menu a:hover { color: var(--p1); background: var(--soft-2); transform: translateX(3px); }
+.sb-menu a:hover { color: var(--p1); background: var(--soft-2); }
 .sb-menu a.active {
   color: #fff; background: var(--grad);
   box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
@@ -332,7 +325,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   letter-spacing: 0.04em; color: var(--muted);
 }
 .tim-chips .menu-pisah { border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0; }
-
+/* Header mobile */
 .mob-head { display: none; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .mob-logo {
   width: 34px; height: 34px; border-radius: 10px; flex: 0 0 34px;
@@ -802,10 +795,17 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 .progress { height: 12px; background: var(--soft); border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(18, 20, 46, 0.08); }
 .progress > div {
-  height: 100%; border-radius: 999px; transition: width 0.5s ease;
-  background:
-    repeating-linear-gradient(-55deg, rgba(255, 255, 255, 0.16) 0 8px, transparent 8px 16px),
-    var(--grad3);
+  height: 100%; border-radius: inherit; transition: width 0.5s ease;
+  background: var(--grad3);
+}
+/* Hanya lapisan garis yang bergerak, bukan gradien dasar. Pergeseran 28px
+   sama persis dengan ukuran tile sehingga sambungan loop tidak melompat. */
+.progress > div, .bd-bar > div { position: relative; overflow: hidden; isolation: isolate; max-width: 100%; }
+.progress > div::before, .bd-bar > div::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background-image: linear-gradient(45deg, rgba(255,255,255,.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.2) 75%, transparent 75%);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
   animation: stripeMove 1.4s linear infinite;
 }
 
@@ -1163,9 +1163,10 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 }
 
 @media (max-width: 640px) {
-  .bd-row { gap: 8px; font-size: 0.75rem; }
-  .bd-label { flex: 0 0 30%; }
-  .bd-val { flex: 0 0 86px; font-size: 0.68rem; }
+  .bd-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; margin-top: 14px; font-size: 0.8rem; }
+  .bd-label { min-width: 0; }
+  .bd-val { grid-column: 2; grid-row: 1; font-size: 0.76rem; }
+  .bd-bar { grid-column: 1 / -1; grid-row: 2; width: 100%; }
 }
 
 /* ================= Tabel ================= */
@@ -1730,6 +1731,26 @@ a { color: var(--link-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .progress > div::before, .bd-bar > div::before { animation: none; }
+}
+
+/* Form entri: satu area gulir, kepala dan aksi tetap mudah dijangkau. */
+.entry-dialog .btn { min-height: 44px; }
+@media (max-width: 640px) {
+  .entry-dialog[open] { display: flex; flex-direction: column; overflow: hidden; max-height: calc(100dvh - 16px); }
+  .entry-dialog .dlg-head { flex-shrink: 0; padding: 18px 16px 14px; gap: 10px; }
+  .entry-dialog .dlg-head h3 { flex: 1; min-width: 0; font-size: 1rem; }
+  .entry-dialog .dlg-head .btn { min-height: 44px; }
+  .entry-dialog .dlg-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 0; scroll-padding-block: 16px 90px; }
+  .entry-dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+  .entry-dialog .field { font-size: 0.82rem; line-height: 1.45; }
+  .entry-dialog .field-wide { grid-column: 1 / -1; }
+  .entry-dialog input:not([type="checkbox"]), .entry-dialog select { min-height: 48px; font-size: 16px; border-radius: 12px; }
+  .entry-dialog textarea { min-height: 112px; font-size: 16px; line-height: 1.5; border-radius: 12px; }
+  .entry-dialog input[type="file"] { font-size: 0.8rem; padding: 10px; background: var(--soft-2); border-style: dashed; }
+  .entry-dialog .entry-actions { position: sticky; bottom: 0; z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; margin: 18px -16px 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--card-solid); border-top: 1px solid var(--line); }
+  .entry-dialog .entry-actions .btn { width: 100%; min-height: 48px; justify-content: center; }
+  .entry-dialog .total-form { padding: 12px; border-radius: 12px; background: var(--soft-2); }
 }
 
 

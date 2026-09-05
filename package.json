@@ -16,7 +16,7 @@
     "deploy": "npx --yes vercel --prod --yes",
     "cek:online": "node tools/cek-online.mjs",
     "audit:desain": "node tools/audit-desain.mjs",
-    "test:pradeploy": "node --test tools/test-dependensi.mjs tools/test-pradeploy.mjs && npm run diag:panel --workspace backend && npm run diag:panel-ui --workspace backend"
+    "test:pradeploy": "node --test tools/test-dependensi.mjs tools/test-pradeploy.mjs tools/test-pkm.mjs tools/test-static-export.mjs && npm run diag:panel --workspace backend && npm run diag:panel-ui --workspace backend"
   },
   "engines": {
     "node": ">=20"

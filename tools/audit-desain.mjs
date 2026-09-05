@@ -5,6 +5,9 @@ import JSZip from 'jszip';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { PANEL_HTML } from '../backend/src/admin/panel.js';
+import { auditNavigasi } from './audit-navigasi.mjs';
+import { auditMobile } from './audit-mobile.mjs';
+import { SKEMA_PKM, SUMBER_PKM } from '../backend/src/ai/pkm-knowledge.js';
 
 const base = process.env.AUDIT_URL || 'http://localhost:3100';
 if (!['localhost', '127.0.0.1'].includes(new URL(base).hostname)) throw new Error('Audit hanya untuk server lokal.');
@@ -83,6 +86,7 @@ async function contextFor(role = 'tim', theme = 'light', state = 'filled', teamC
     if (p.startsWith('/api/komentar')) return send(p === '/api/komentar' ? [{ id: 'c1', target_id: 'k0', penulis_id: user.id, penulis_username: user.username, penulis_role: role, isi: text, createdAt: file.updated_at }] : {});
     if (p.startsWith('/api/persetujuan')) return send({});
     if (p === '/api/ai/status') return send({ aktif: true, tersedia: true, modelAda: true, model: 'audit-model' });
+    if (p === '/api/ai/profil-pkm') return send({ profil: { skema: '', tahun: null, judul: '', indikasi: [], status: 'perlu_konfirmasi' }, skema: SKEMA_PKM, sumber: Object.values(SUMBER_PKM), bisaUbah: role === 'tim' });
     if (p === '/api/ai/model') return send({ bawaan: 'audit-model', pilihan: '', daftar: [{ nama: 'audit-model', label: text }] });
     if (p === '/api/tunnel') return send({ url: '' });
     if (p === '/api/export/info') return send({ kegiatan: 6, keuangan: 6 });
@@ -117,6 +121,7 @@ async function measure(page, name) {
 }
 
 try {
+  if (process.env.AUDIT_NAV_ONLY !== '1' && process.env.AUDIT_MOBILE_ONLY !== '1') {
   for (const role of ['tim', 'fasilitator', 'dosen']) {
     for (const theme of (quick ? ['light'] : ['light', 'dark'])) {
       const context = await contextFor(role, theme);
@@ -307,6 +312,9 @@ try {
   await ap.locator('#v-login').waitFor();
   await measure(ap, 'admin-login-mobile');
   await admin.close();
+  }
+  if (process.env.AUDIT_MOBILE_ONLY !== '1') results.push(...await auditNavigasi(contextFor, base, quick));
+  if (process.env.AUDIT_NAV_ONLY !== '1') await auditMobile(contextFor, base, quick, measure, out);
 } finally {
   await browser.close();
   await writeFile(`${out}/hasil.json`, JSON.stringify({ generatedAt: new Date().toISOString(), unknownApi: [...unknown], results }, null, 2));

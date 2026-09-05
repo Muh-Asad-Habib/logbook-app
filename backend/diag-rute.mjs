@@ -86,7 +86,7 @@ for (const [mount, path, pagar] of target) {
       // juga anonim, jadi endpoint yang terbatasi laju punya ≥ 2 lapis anonim.
       const adaLaju = nama.filter((n) => !n || n === "<anonymous>").length >= 2;
       const perluModel = AI_PAKAI_MODEL.has(jalur);
-      if (!nama.includes("wajibAktif") && jalur !== "/status") masalah.push(`${jalur}: wajibAktif hilang`);
+      if (!nama.includes("wajibAktif") && !["/status", "/profil-pkm"].includes(jalur)) masalah.push(`${jalur}: wajibAktif hilang`);
       if (perluModel && !adaLaju) masalah.push(`${jalur}: pembatas laju hilang`);
       if (AI_WAJIB_HANYA_TIM.has(jalur) && !nama.includes("hanyaTim")) {
         masalah.push(`${jalur}: hanyaTim hilang`);

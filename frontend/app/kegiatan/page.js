@@ -505,7 +505,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   };
 
   return (
-    <dialog ref={ref} onClose={onClose} aria-label={entri ? "Edit kegiatan" : "Tambah kegiatan"}>
+    <dialog ref={ref} className="entry-dialog" onClose={onClose} aria-label={entri ? "Edit kegiatan" : "Tambah kegiatan"}>
       <div className="dlg-head">
         <div className="ic">{entri ? <Pencil className="lucide" /> : <Plus className="lucide" />}</div>
         <h3>{entri ? "Edit kegiatan" : "Tambah kegiatan"}</h3>
@@ -519,25 +519,25 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           </p>
         )}
         <div className="form-grid">
-          <label className="field">
+          <label className="field field-wide">
             Tanggal
             <input type="date" name="tanggal" required value={tanggal}
                    onChange={(e) => setTanggal(e.target.value)} />
           </label>
-          <label className="field">
+          <label className="field field-wide">
             Capaian entri ini (%)
-            <input type="number" name="capaian_delta" min="0" max="100"
+            <input type="number" inputMode="decimal" name="capaian_delta" min="0" max="100"
                    value={capaian} onChange={(e) => setCapaian(e.target.value)} />
           </label>
           <label className="field">
             Waktu — jam
-            <input type="number" name="waktu_jam_input" min="0" step="any"
+            <input type="number" inputMode="decimal" name="waktu_jam_input" min="0" step="any"
                    value={jam} onChange={(e) => setJam(e.target.value)}
                    placeholder="0" />
           </label>
           <label className="field">
             Waktu — menit
-            <input type="number" name="waktu_menit_input" min="0" step="any"
+            <input type="number" inputMode="decimal" name="waktu_menit_input" min="0" step="any"
                    value={menit} onChange={(e) => setMenit(e.target.value)}
                    placeholder="0" />
           </label>
@@ -582,7 +582,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
         </label>
 
         {err && <div className="error-box mt">{err}</div>}
-        <div className="row mt" style={{ justifyContent: "flex-end" }}>
+        <div className="row mt entry-actions" style={{ justifyContent: "flex-end" }}>
           <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}
