@@ -321,6 +321,11 @@
 }
 .ai-model-opsi[aria-checked="true"] .tanda { background: var(--card-solid); }
 .ai-model-opsi .tik { flex: 0 0 auto; width: 13px; height: 13px; }
+
+/* Saat daftar model terbuka, percakapan di belakangnya tidak perlu ikut
+   bergulir. Tanpa ini muncul DUA batang gulir berdampingan (milik daftar dan
+   milik percakapan) yang terlihat berantakan. */
+.ai-panel.pilih-model .ai-list { overflow: hidden; }
 /* Centang hanya tampak pada model yang sedang dipakai — ruangnya tetap
    dipesan supaya teks semua baris tetap sejajar. */
 .ai-model-opsi .tik[aria-hidden="true"] { visibility: hidden; }
