@@ -9,6 +9,7 @@ import {
 import { api, getUser, getRole, setUser as simpanUser } from "@/lib/api";
 import KodeTim from "@/components/KodeTim";
 import SesiAktif from "@/components/SesiAktif";
+import ProfilPkm from "@/components/ProfilPkm";
 import { toast } from "@/components/Toast";
 
 function PassInput({ value, onChange, placeholder, autoComplete }) {
@@ -186,6 +187,7 @@ export default function ProfilPage() {
 
       {/* Kode tim → dibagikan ke fasilitator/dosen supaya mereka bisa bergabung sendiri */}
       {getRole() === "tim" && <KodeTim />}
+      <ProfilPkm pendamping={getRole() !== "tim"} />
 
       <div className="grid half mt stagger">
         <div className="card">

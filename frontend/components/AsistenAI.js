@@ -193,7 +193,8 @@ export default function AsistenAI() {
     try {
       // Model yang sedang dipilih pengguna ikut dikirim ("" = Otomatis).
       const r = await api.ai.tanya(t, riwayat.slice(-8), pendamping ? timId : "", modelPilihan());
-      setPesan((p) => [...p, { role: "assistant", content: r.jawaban, model: r.model }]);
+      setPesan((p) => [...p, { role: "assistant", content: r.jawaban, model: r.model,
+        sumber: r.sumber, profilPkm: r.profilPkm }]);
     } catch (e) {
       setPesan((p) => [...p, { role: "assistant", content: e.message || "Gagal menghubungi asisten", gagal: true }]);
     } finally {
@@ -220,8 +221,11 @@ export default function AsistenAI() {
   };
 
   const onKey = (e) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); kirim(); }
+    if (e.nativeEvent.isComposing || e.keyCode === 229) {
+      if (e.key === "Enter") e.preventDefault();
+      return;
+    }
+    if (e.key === "Enter") { e.preventDefault(); if (!e.shiftKey) kirim(); }
   };
 
   const bersihkan = () => {
@@ -382,6 +386,17 @@ export default function AsistenAI() {
                 {m.role === "assistant" && m.model && !m.gagal && (
                   <div className="ai-msg-model" title={m.model}>{namaCantik(m.model)}</div>
                 )}
+                {m.role === "assistant" && !m.gagal && m.profilPkm?.status === "perlu_konfirmasi" && (
+                  <p className="ai-msg-model">Skema/tahun tim belum dikonfirmasi. Periksa Profil &amp; rujukan PKM sebelum memakai aturan untuk menilai kepatuhan.</p>
+                )}
+                {m.role === "assistant" && !m.gagal && Array.isArray(m.sumber) && m.sumber.length > 0 && (
+                  <details className="ai-sumber">
+                    <summary>Rujukan PKM yang disediakan untuk jawaban</summary>
+                    <ul>{m.sumber.slice(0, 6).filter((s) => /^https:\/\/(?:simbelmawa\.kemdiktisaintek\.go\.id|drive\.google\.com)\//i.test(s.url || "")).map((s) => (
+                      <li key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.judul} · halaman PDF {s.halaman?.join(", ")}</a></li>
+                    ))}</ul>
+                  </details>
+                )}
               </div>
             ))}
             {busy && (
@@ -393,13 +408,14 @@ export default function AsistenAI() {
           </div>
 
           <form className="ai-input" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
-            <textarea
+            <input
               ref={inputRef}
-              rows={1}
+              type="text"
+              enterKeyHint="send"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
-              placeholder={bisaTanya ? "Tulis pertanyaan… (Enter untuk kirim)" : "Pilih tim dulu"}
+              placeholder={bisaTanya ? "Tulis pertanyaan…" : "Pilih tim dulu"}
               disabled={busy || !bisaTanya}
               aria-label="Pertanyaan untuk asisten AI"
             />

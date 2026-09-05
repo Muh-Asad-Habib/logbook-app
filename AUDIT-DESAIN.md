@@ -87,7 +87,7 @@ Log validasi berada di `artifacts/audit-desain/clean-install.*`, `clean-build.*`
 
 ## Pengujian
 
-Validasi akhir pada 5 September 2026 (hasil audit penuh pada ekspor produksi dari instalasi bersih: `2026-09-05T11:26:03.057Z`):
+Validasi sebelumnya pada 5 September 2026 (hasil audit penuh pada ekspor produksi dari instalasi bersih: `2026-09-05T11:26:03.057Z`):
 
 - **521 skenario tata letak/interaksi selesai; 0 overflow horizontal halaman dan 0 error runtime yang terdeteksi; exit code 0.**
 - Pemeriksaan singkat setelah perbaikan chip tim juga berhasil: **103 skenario, exit code 0**.
@@ -102,7 +102,44 @@ Pengujian otomatis memeriksa batas horizontal elemen, lebar dokumen, kesiapan ko
 
 Regresi tambahan memeriksa tepat satu heading topbar terlihat, menu akun mobile/sidebar mini, navigasi dan pengembalian fokus menu 24 tim, fokus awal panel AI, Enter selama komposisi IME, Escape dari luar panel, serta fokus di luar panel yang tetap terjaga ketika jawaban AI tiba. Log dan kode keluar validasi lanjutan disimpan sebagai `full-lanjutan.*`, `quick-lanjutan.*`, `build-lanjutan.*`, dan `admin-lanjutan.*` di direktori artefak yang sama.
 
-Audit produksi terakhir memakai `tools/serve-audit.mjs` pada `127.0.0.1:3101`, dengan API tetap ditiru. Log serta exit code 0 tersimpan di `static-pradeploy-final.log` dan `static-pradeploy-final.exit`. Percobaan awal dengan server statis sederhana sempat berhenti karena pemetaan URL tanpa `.html` tidak menangani folder Next bernama sama; server uji telah diperbaiki dan matriks penuh diulang hingga selesai. Tidak ada kegagalan yang tersisa pada rangkaian validasi akhir ini.
+Audit produksi awal memakai `tools/serve-audit.mjs` pada `127.0.0.1:3101`, dengan API tetap ditiru. Log serta exit code 0 tersimpan di `static-pradeploy-final.log` dan `static-pradeploy-final.exit`. Percobaan awal dengan server statis sederhana sempat berhenti karena pemetaan URL tanpa `.html` tidak menangani folder Next bernama sama; server uji telah diperbaiki dan matriks penuh diulang hingga selesai.
+
+### Perbaikan nav dan mobile berdasarkan tangkapan layar
+
+- **Skeleton isi tetap dipertahankan**, termasuk pada Dashboard, Kegiatan, Keuangan, Laporan, dan Presentasi. Percobaan menghapus skeleton/animasi isi sebelumnya dibatalkan sesuai klarifikasi pengguna; yang distabilkan adalah navigasinya.
+- **Nav desktop:** pergeseran hover dan transisi menyeluruh pada tautan sidebar dihapus. Gaya nav mobile dikembalikan seperti sebelumnya sesuai klarifikasi pengguna bahwa mobile sudah aman; penanda aktif dan fokus keyboard tetap ada.
+- **Pertanyaan AI satu baris:** memakai input teks native dengan placeholder singkat, tinggi 44 px, tombol kirim sejajar, dan `enterKeyHint="send"`. Enter selama komposisi IME tidak mengirim; teks panjang tetap satu baris tanpa scrollbar vertikal.
+- **Formulir entri mobile:** kolom tanggal/harga/capaian/kode unik cukup lebar, jam–menit dan satuan–jumlah berpasangan, keyboard desimal untuk angka, textarea deskripsi tetap multiline, serta area isi yang dapat digulir dengan aksi Simpan/Batal mudah dijangkau. Kontrol saran AI dan unggahan ditata ulang.
+- **Bar dana:** gradien dasar tetap diam; hanya lapisan garis yang bergerak. Tile 28×28 px bergeser tepat 28 px tiap siklus, dengan mask lembut di ujung membulat agar sambungannya tidak kentara. Efek sama diterapkan pada bar komposisi pengeluaran; pada mobile label/nominal berada di atas bar selebar kartu. Angka dan proporsi dana tidak diubah. Reduced motion tetap dihormati.
+- **Galeri:** identitas React memakai jenis entri + id entri + posisi lampiran, sehingga gambar yang sama pada kegiatan dan bukti belanja tidak menghasilkan key ganda.
+- Indikator pengembangan Next.js dinonaktifkan agar tidak menutupi tombol Beranda pada pengujian mobile lokal.
+
+Regresi baru berada di `tools/audit-navigasi.mjs` dan `tools/audit-mobile.mjs`, dipanggil otomatis oleh audit utama. Navigasi diuji melalui klik menu (termasuk Lainnya dan Profil), sidebar lebar/mini, serta Back/Forward dengan animasi sistem aktif. Setiap frame memeriksa identitas/posisi/opacity/latar nav, transform tombol, tema, dan keberlangsungan dokumen; pemeriksaan tanpa animasi tombol berlaku untuk **desktop**, sedangkan **skeleton isi bukan kegagalan**. Animasi toggle sidebar diselesaikan sebelum mengambil baseline navigasi. Kasus jaringan lambat menahan API sampai skeleton terlihat, lalu memastikan isi muncul setelah respons dilepas. Form, input AI panjang, animasi bar, reduced motion, dan screenshot diperiksa pada ukuran mobile potret/landscape.
+
+Tes terarah awal berhasil: **14 skenario navigasi/skeleton** dan **4 skenario mobile**, masing-masing exit code 0. Build produksi dan rangkaian pradeploy juga berhasil (12 tes serta 32 diagnostik UI admin). Log tersedia sebagai `nav-polish-quick2.*`, `mobile-polish-quick2.*`, `mobile-polish-build.*`, dan `mobile-polish-pradeploy.*`. Hasil matriks lengkap disimpan di `mobile-polish-full.*` dan `hasil.json`.
+
+### Navigasi produksi dan pengetahuan PKM
+
+- Ditemukan **404 segmen RSC**: klien meminta `kegiatan/__next.kegiatan.__PAGE__.txt`, sedangkan exporter menulis `kegiatan/__next.kegiatan/__PAGE__.txt`. `tools/prepare-static-export.mjs` kini dipanggil otomatis setelah build untuk menerbitkan alias berisi byte yang sama. Alias yang bertabrakan dengan data berbeda ditolak. Ini berlaku pada CDN Vercel maupun server statis lokal, tanpa mengubah routing API. Build terakhir menghasilkan sembilan alias; URL yang sebelumnya 404 telah diuji membalas 200.
+- Pengetahuan PKM berasal dari ringkasan dokumen resmi **2022–2026** dengan pemilihan tahun/skema dan referensi halaman. Bukan pelatihan ulang model atau klaim menguasai seluruh juknis. Rincian sumber, cakupan, keterbatasan, serta cara pembaruan berada di `docs/AI-PKM.md`.
+- Profil PKM per tim dapat dikonfirmasi pemilik akun tim. Pendamping dapat memilih semua tim yang ditugaskan untuk memeriksa profil; akses tim lain tetap ditolak. Indikasi kode di catatan tidak dianggap verifikasi surat pendanaan. Nama tim saja tidak dipakai untuk menetapkan skema.
+- Prompt membedakan persentase **Belmawa diterima** pada statistik aplikasi dengan **jumlah dana diusulkan** pada tabel RAB resmi. AI tidak boleh memvonis pelanggaran hanya dari statistik tanpa basis RAB yang tepat.
+- Verifikasi terarah terbaru: **27 skenario desktop/skeleton lulus**, **28 tes pradeploy lulus**, dan **32 diagnostik UI admin lulus**. Tes PKM juga memastikan pertanyaan tahun di luar korpus tidak diam-diam memakai aturan 2026. Log pradeploy terakhir: `pkm-pradeploy-complete.*`.
+- Temuan tambahan pada formulir landscape: tombol Simpan sebelumnya 38 px pada viewport di atas 640 px. Seluruh tombol dialog entri kini minimal 44 px; **32 skenario mobile lengkap lulus** setelah perbaikan. Build akhir berhasil beserta sembilan alias RSC. Log: `pkm-complete-build.*`, `pkm-mobile-complete.*`; matriks akhir memakai `pkm-complete-full.*`.
+
+### Hasil akhir perbaikan desktop, mobile, dan AI PKM
+
+Audit penuh selesai pada **5 September 2026, `2026-09-05T13:04:55.724Z`**:
+
+- **836 skenario lulus, exit code 0**, tanpa overflow halaman atau error runtime yang terdeteksi pada cakupan fixture.
+- Termasuk **280 perpindahan menu** pada tiga peran dan dua tema; **140 di desktop** (sidebar lebar/mini) dengan **0 kedipan nav terukur**. **0 reload dokumen** pada keseluruhan perpindahan menu dan **0 endpoint API tanpa fixture**.
+- Skeleton jaringan lambat terverifikasi untuk tim, fasilitator dan dosen. Animasi isi dan perilaku nav mobile tetap dipertahankan.
+- **32 skenario formulir/AI/bar mobile** tercakup dalam matriks akhir, termasuk landscape.
+- **28 tes pradeploy**, **32 diagnostik UI admin**, dan build produksi berhasil.
+
+Hasil akhir tersimpan di `artifacts/audit-desain/hasil.json`, `pkm-complete-full.log`, `pkm-complete-full.exit`, serta `hasil-final-ringkas.json`. Angka ini menggantikan hasil percobaan yang berhenti pada 404 segmen, pengukuran sidebar saat toggle, atau tombol landscape 38 px.
+
+Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepatan jawaban model Ollama nyata belum dibenchmark**, dan skema tim nyata tidak dinyatakan terverifikasi hanya dari nama/catatan. Konfirmasi per tim mengikuti proposal/surat pendanaan melalui Profil PKM. Perubahan lanjutan ini belum di-commit, di-push atau di-redeploy pada saat laporan diperbarui.
 
 ### Menjalankan ulang
 
@@ -117,6 +154,8 @@ Untuk menguji hasil produksi, jalankan `npm run build`, lalu `node tools/serve-a
 
 `AUDIT_URL` dapat mengganti alamat server, tetapi skrip menolak hostname selain localhost/127.0.0.1. Seluruh permintaan API browser ditiru, termasuk jika frontend memiliki NEXT_PUBLIC_API_URL terkonfigurasi.
 
+Untuk uji terarah, gunakan `$env:AUDIT_NAV_ONLY='1'` (nav + skeleton) atau `$env:AUDIT_MOBILE_ONLY='1'` (form + AI + bar), bukan keduanya. Hapus variabel mode tersebut sebelum menjalankan matriks penuh.
+
 ## Batas hasil dan tindak lanjut
 
 - Tidak ada klaim identik piksel dengan referensi JPG. Identitas warna, kartu, sidebar, dan layout yang ada dipertahankan; fokus pada masalah konkret dan konsistensi.
@@ -124,7 +163,7 @@ Untuk menguji hasil produksi, jalankan `npm run build`, lalu `node tools/serve-a
 - Pengujian utama Chromium dengan emulasi ukuran/touch; **Safari/iOS, Firefox, keyboard virtual perangkat fisik, screen reader, dan zoom browser 200% belum diuji langsung**. Pengujian viewport sempit tidak sama dengan pengujian zoom 200%.
 - Office/Canva eksternal ditiru untuk menghindari akses layanan nyata. Akurasi seluruh dokumen PPTX/DOCX pengguna, unggah, unduh, dan integrasi backend bukan bagian dari tes tata letak ini.
 - Tujuh dialog admin diuji secara struktural dengan `showModal`; ini tidak memverifikasi seluruh aksi pengelolaan akun di dalamnya.
-- Error/empty states diuji; loading skeleton pada jaringan lambat dan seluruh transisi tidak diberi pengujian khusus.
+- Error/empty states serta skeleton dengan API yang ditahan telah diuji. Ini bukan emulasi penuh jaringan seluler, keyboard virtual perangkat fisik, atau seluruh transisi aplikasi.
 - CSS masih memiliki beberapa lapisan override lama. Refaktor menyeluruh perlu dilakukan bertahap agar tidak merusak halaman yang memakai aturan bersama.
 - Temuan dependency awal **12 kerentanan (5 moderate, 7 high)** sudah ditindaklanjuti. Setelah pembaruan dan instalasi bersih `npm ci`, **npm audit workspace dan frontend terpisah melaporkan 0 kerentanan terdeteksi**. Tidak menggunakan `npm audit fix --force` atau menurunkan ExcelJS. Override `qs@6.16.0` dan `exceljs → uuid@11.1.1` dipakai untuk dependensi transitif; tinjau ulang saat upstream memperbarui dependensinya. Next.js terkunci pada 16.3.4 dan Express pada 4.22.2. Status audit bukan jaminan tidak adanya kerentanan yang belum diketahui.
 - Root Turbopack ditetapkan eksplisit lewat `import.meta.url`, dan lockfile frontend terpisah ikut diperbarui. Dua lockfile tetap dipertahankan, tanpa peringatan root ambigu pada konfigurasi baru.

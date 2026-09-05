@@ -385,13 +385,18 @@
 .ai-md code { background: rgba(79, 70, 229, 0.1); padding: 1px 5px; border-radius: 5px; font-size: 0.8em; }
 [data-theme="dark"] .ai-md code { background: rgba(129, 140, 248, 0.18); }
 
-.ai-input { flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
-.ai-input textarea {
-  flex: 1; min-width: 0; min-height: 40px; max-height: 120px; resize: none; margin-top: 0;
-  padding: 10px 12px; font-size: 0.86rem; border-radius: 12px; line-height: 1.4;
+.ai-input { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; padding: 12px 12px 8px; border-top: 1px solid var(--line); background: var(--card-solid); }
+.ai-input input {
+  width: 100%; min-width: 0; height: 44px; min-height: 44px; margin: 0;
+  padding: 10px 12px; font-size: 16px; border-radius: 12px; line-height: 22px;
 }
-.ai-input .btn { height: 40px; width: 44px; padding: 0; justify-content: center; border-radius: 12px; flex: 0 0 auto; }
+.ai-input input::placeholder { text-overflow: ellipsis; }
+.ai-input .btn { height: 44px; min-height: 44px; width: 44px; padding: 0; justify-content: center; border-radius: 12px; }
 .ai-catatan { flex-shrink: 0; margin: 0; padding: 0 14px 10px; font-size: 0.68rem; color: var(--muted); }
+.ai-sumber { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 0.72rem; line-height: 1.5; }
+.ai-sumber summary { cursor: pointer; font-weight: 700; }
+.ai-sumber ul { margin: 6px 0 0; padding-left: 18px; }
+.ai-sumber li + li { margin-top: 5px; }
 
 .spin { animation: ai-spin 0.9s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
@@ -405,7 +410,11 @@
     height: min(480px, calc(100dvh - 148px - env(safe-area-inset-bottom)));
     max-height: calc(100dvh - 148px - env(safe-area-inset-bottom));
   }
-  .ai-input textarea { font-size: 16px; }
+  .ai-head { gap: 8px; padding: 10px 12px; }
+  .ai-head .icon-btn { flex: 0 0 44px; }
+  .ai-head-txt b { font-size: 0.86rem; }
+  .ai-input { padding-inline: 10px; }
+  .ai-catatan { font-size: 0.7rem; line-height: 1.4; }
 }
 
 @media (max-height: 520px) {
@@ -429,7 +438,7 @@
 .ai-usul-aksi { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
 @media (pointer: coarse) {
-  .tb-sel-wrap .tb-sel, .ai-saran-bar select, .ai-input textarea { font-size: 16px; }
+  .tb-sel-wrap .tb-sel, .ai-saran-bar select, .ai-input input { font-size: 16px; }
   .seg-btn, .ai-chip, .ai-input .btn { min-height: 44px; }
   .in-clear { width: 36px; height: 36px; right: 4px; }
   .tb-baris .tb-cari input { padding-right: 44px; }
@@ -438,5 +447,11 @@
 @media (max-width: 400px) {
   .seg-sumber { border-radius: 16px; }
   .seg-sumber .seg-btn { flex: 1 1 calc(50% - 3px); }
+}
+
+@media (max-width: 640px) {
+  .entry-dialog .ai-saran-bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .entry-dialog .ai-saran-bar .btn, .entry-dialog .ai-saran-bar select { width: 100%; min-height: 44px; margin: 0; }
+  .entry-dialog .ai-usul-aksi .btn { flex: 1 1 120px; justify-content: center; min-height: 44px; }
 }
 

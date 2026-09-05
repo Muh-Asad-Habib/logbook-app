@@ -792,7 +792,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   };
 
   return (
-    <dialog ref={ref} onClose={onClose} aria-label={entri ? "Edit belanja" : "Tambah belanja"}>
+    <dialog ref={ref} className="entry-dialog" onClose={onClose} aria-label={entri ? "Edit belanja" : "Tambah belanja"}>
       <div className="dlg-head">
         <div className="ic">{entri ? <Pencil className="lucide" /> : <Plus className="lucide" />}</div>
         <h3>{entri ? "Edit belanja" : "Tambah belanja"}</h3>
@@ -811,14 +811,14 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             <input name="item" required value={item} onChange={(e) => setItem(e.target.value)}
                    placeholder="mis. Sewa Canva Pro" />
           </label>
-          <label className="field">
+          <label className="field field-wide">
             Tanggal
             <input type="date" name="tanggal" required value={tanggal}
                    onChange={(e) => setTanggal(e.target.value)} />
           </label>
-          <label className="field">
+          <label className="field field-wide">
             Harga satuan (Rp)
-            <input type="number" name="harga_satuan" min="0" step="any" value={harga}
+            <input type="number" inputMode="decimal" name="harga_satuan" min="0" step="any" value={harga}
                    onChange={(e) => setHarga(e.target.value)} />
           </label>
           <label className="field">
@@ -828,12 +828,12 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
           </label>
           <label className="field">
             Jumlah
-            <input type="number" name="jumlah" min="0" step="any" value={jumlah}
+            <input type="number" inputMode="decimal" name="jumlah" min="0" step="any" value={jumlah}
                    onChange={(e) => setJumlah(e.target.value)} />
           </label>
-          <label className="field">
+          <label className="field field-wide">
             Kode unik (Rp) <span className="muted">(opsional)</span>
-            <input type="number" name="kode_unik" min="0" step="any" value={kodeUnik}
+            <input type="number" inputMode="decimal" name="kode_unik" min="0" step="any" value={kodeUnik}
                    onChange={(e) => setKodeUnik(e.target.value)} placeholder="mis. 123" />
           </label>
           <div className="field-blok">
@@ -887,7 +887,7 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
         </label>
 
         {err && <div className="error-box mt">{err}</div>}
-        <div className="row mt" style={{ justifyContent: "flex-end" }}>
+        <div className="row mt entry-actions" style={{ justifyContent: "flex-end" }}>
           <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}
