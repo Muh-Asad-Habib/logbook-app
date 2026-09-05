@@ -86,6 +86,8 @@ export default function AsistenAI() {
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const modelRef = useRef(null);
+  const menuRef = useRef(null);
+  const tombolRef = useRef(null);
 
   useEffect(() => {
     setPendamping(isPendamping());
@@ -136,6 +138,28 @@ export default function AsistenAI() {
     return () => document.removeEventListener("mousedown", luar);
   }, [bukaModel]);
 
+  // Saat daftar dibuka: bawa model yang SEDANG dipakai ke dalam pandangan.
+  // Tanpa ini, pengguna yang memilih model di urutan bawah selalu disuguhi
+  // bagian atas daftar dan mengira pilihannya hilang.
+  useEffect(() => {
+    if (!bukaModel) return;
+    const aktif = menuRef.current?.querySelector('[aria-checked="true"]');
+    aktif?.scrollIntoView({ block: "nearest" });
+    aktif?.focus({ preventScroll: true });
+  }, [bukaModel]);
+
+  /** Panah atas/bawah, Home & End untuk menjelajah daftar tanpa mouse. */
+  const onKeyMenu = (e) => {
+    const opsi = [...(menuRef.current?.querySelectorAll('[role="menuitemradio"]') || [])];
+    if (!opsi.length) return;
+    const i = opsi.indexOf(document.activeElement);
+    const ke = (n) => { e.preventDefault(); opsi[n]?.focus(); };
+    if (e.key === "ArrowDown") ke(i < 0 ? 0 : (i + 1) % opsi.length);
+    else if (e.key === "ArrowUp") ke(i < 0 ? opsi.length - 1 : (i - 1 + opsi.length) % opsi.length);
+    else if (e.key === "Home") ke(0);
+    else if (e.key === "End") ke(opsi.length - 1);
+  };
+
   if (!status?.aktif) return null;
 
   const kirim = async (teks) => {
@@ -161,6 +185,7 @@ export default function AsistenAI() {
   const gantiModel = async (nilai) => {
     setErrModel("");
     setBukaModel(false);
+    tombolRef.current?.focus(); // fokus kembali ke pemicu, bukan hilang entah ke mana
     try {
       await pilihModelAI(nilai);
     } catch (e) {
@@ -194,7 +219,8 @@ export default function AsistenAI() {
       </button>
 
       {buka && (
-        <section className="ai-panel" role="dialog" aria-label="Asisten AI logbook">
+        <section className={`ai-panel${bukaModel ? " pilih-model" : ""}`} role="dialog"
+                 aria-label="Asisten AI logbook">
           <header className="ai-head">
             <div className="ai-head-ic"><Sparkles className="lucide" /></div>
             <div className="ai-head-txt">
@@ -226,6 +252,7 @@ export default function AsistenAI() {
             <div className="ai-model-pilih">
               <button
                 type="button"
+                ref={tombolRef}
                 className="ai-model-btn"
                 aria-haspopup="menu"
                 aria-expanded={bukaModel}
@@ -245,7 +272,8 @@ export default function AsistenAI() {
               </button>
 
               {bukaModel && model && (
-                <div className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl">
+                <div className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl"
+                     ref={menuRef} onKeyDown={onKeyMenu}>
                   <button
                     type="button" role="menuitemradio" aria-checked={!model.pilihan}
                     className="ai-model-opsi" onClick={() => gantiModel("")}
