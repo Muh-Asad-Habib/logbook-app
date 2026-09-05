@@ -49,6 +49,7 @@
 /* ---------- Segmented control (sumber dana & mode tampilan) ---------- */
 .seg {
   display: inline-flex; gap: 3px; padding: 3px;
+  min-width: 0; max-width: 100%; flex-wrap: wrap;
   background: var(--soft); border: 1px solid var(--line); border-radius: 999px;
 }
 .seg-btn {
@@ -355,7 +356,7 @@
 }
 
 
-.ai-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ai-list { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ai-kosong p { font-size: 0.84rem; color: var(--muted); line-height: 1.5; }
 .ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ai-chip {
@@ -426,4 +427,16 @@
 .ai-usul-ket { font-size: 0.74rem; color: var(--muted); margin-top: 6px; }
 .ai-usul-ket ul { margin: 4px 0 0 16px; }
 .ai-usul-aksi { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+@media (pointer: coarse) {
+  .tb-sel-wrap .tb-sel, .ai-saran-bar select, .ai-input textarea { font-size: 16px; }
+  .seg-btn, .ai-chip, .ai-input .btn { min-height: 44px; }
+  .in-clear { width: 36px; height: 36px; right: 4px; }
+  .tb-baris .tb-cari input { padding-right: 44px; }
+}
+
+@media (max-width: 400px) {
+  .seg-sumber { border-radius: 16px; }
+  .seg-sumber .seg-btn { flex: 1 1 calc(50% - 3px); }
+}
 

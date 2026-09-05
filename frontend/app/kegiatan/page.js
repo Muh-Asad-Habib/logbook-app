@@ -505,10 +505,12 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   };
 
   return (
-    <dialog ref={ref} onClose={onClose}>
+    <dialog ref={ref} onClose={onClose} aria-label={entri ? "Edit kegiatan" : "Tambah kegiatan"}>
       <div className="dlg-head">
         <div className="ic">{entri ? <Pencil className="lucide" /> : <Plus className="lucide" />}</div>
         <h3>{entri ? "Edit kegiatan" : "Tambah kegiatan"}</h3>
+        <button type="button" className="btn sm" style={{ marginLeft: "auto", flexShrink: 0 }}
+                onClick={onClose} disabled={busy}>Tutup</button>
       </div>
       <form onSubmit={submit} className="dlg-body">
         {!entri && draf && (

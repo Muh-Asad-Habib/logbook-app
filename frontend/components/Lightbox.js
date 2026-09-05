@@ -39,7 +39,8 @@ export default function Lightbox({ items, index = 0, onClose }) {
         // Focus-trap: Tab berputar di antara tombol & tautan lightbox saja
         const fokusable = boxRef.current?.querySelectorAll("button, a[href]");
         if (!fokusable?.length) return;
-        const daftar = [...fokusable];
+        const daftar = [...fokusable].filter((el) => el.getClientRects().length > 0 && !el.disabled);
+        if (!daftar.length) return;
         const idx = daftar.indexOf(document.activeElement);
         e.preventDefault();
         const arah = e.shiftKey ? -1 : 1;

@@ -216,6 +216,24 @@ npm run deploy            # deploy produksi
 > **Settings → Git → Connect Git Repository** → pilih **GitHub** → izinkan akses
 > ke repo `logbook-app` (repo privat perlu tombol *Configure GitHub App*).
 
+### Pemeriksaan sebelum push / redeploy
+
+Jalankan dari root proyek:
+
+1. `npm ci` — instal persis dari `package-lock.json`; Vercel memakai perintah yang sama. Commit manifest dan lockfile yang berubah bersama-sama.
+2. `npm run test:pradeploy` — tes dependensi, CSP ImageKit, cache service worker, konfigurasi Vercel, sintaks serta UI panel. Tidak membutuhkan `.env` atau database.
+3. `npm run build` — pastikan ekspor statis `frontend/out` berhasil. Hasil build dan `node_modules` tidak perlu masuk repo.
+4. Untuk regresi tampilan, jalankan frontend pada port 3100 di terminal terpisah lalu `npm run audit:desain`. Lihat `AUDIT-DESAIN.md` untuk cakupan dan opsi.
+5. Periksa `git status --short` dan `git diff --check` sebelum commit. Jangan menambahkan `.env`, unggahan, database lokal, atau artefak pengujian. Sertakan berkas sumber dan tes baru yang belum terlacak.
+
+Untuk mengaudit **hasil build produksi**, setelah `npm run build` jalankan `node tools/serve-audit.mjs` di terminal terpisah. Kemudian di PowerShell jalankan `$env:AUDIT_URL='http://127.0.0.1:3101'; npm run audit:desain`. Hapus pengaturan ini setelah selesai dengan `Remove-Item Env:AUDIT_URL`. Server tersebut hanya melayani berkas statis di localhost; API tetap ditiru oleh skrip audit, bukan tersambung ke database. Folder ekspor alternatif dapat diberikan sebagai argumen `serve-audit.mjs`.
+
+`npm run test:pradeploy` sengaja **tidak** menjalankan seluruh `backend/diag-*.mjs`: sejumlah diagnostik integrasi membuat akun, mengubah pengaturan, atau menulis ke database. Jalankan tes integrasi tersebut hanya pada lingkungan uji terpisah, bukan database produksi.
+
+Service worker hanya menyimpan kerangka frontend yang dikenal, tidak menangani panel admin/API/health, dan menghormati respons `private`/`no-store`. Versi baru membersihkan cache Logbook lama tanpa menghapus cache aplikasi lain. Header Vercel untuk `/sw.js` meminta validasi ulang setelah redeploy.
+
+CSP server mengizinkan koneksi ke API upload dan CDN ImageKit. Untuk CDN kustom, isi `IMAGEKIT_URL_ENDPOINT` dengan URL HTTPS; server mengambil origin-nya saja. Tes lokal tidak menggantikan pengecekan unggah/unduh nyata pada deployment preview. Halaman statis yang dilayani langsung CDN Vercel tidak melewati middleware header Express.
+
 ### Update aplikasi di kemudian hari
 
 ```powershell

@@ -491,7 +491,7 @@ function PresentasiTim() {
         <div className="metric" style={{ marginBottom: 10 }}>
           <div className="metric-ic v1"><Presentation className="lucide" /></div>
           <div>
-            <div className="metric-value" style={{ fontSize: "1.02rem" }}>
+            <div id="unggah-presentasi-label" className="metric-value" style={{ fontSize: "1.02rem" }}>
               Unggah presentasi (.pptx)
             </div>
             <div className="muted">
@@ -503,6 +503,7 @@ function PresentasiTim() {
         <div className="row">
           <input
             ref={inputRef} type="file" accept=".pptx"
+            aria-labelledby="unggah-presentasi-label"
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
@@ -525,7 +526,7 @@ function PresentasiTim() {
         <div className="metric" style={{ marginBottom: 10 }}>
           <div className="metric-ic v2"><Link2 className="lucide" /></div>
           <div>
-            <div className="metric-value" style={{ fontSize: "1.02rem" }}>
+            <div id="tautan-canva-label" className="metric-value" style={{ fontSize: "1.02rem" }}>
               Tautan presentasi Canva
             </div>
             <div className="muted">
@@ -538,6 +539,7 @@ function PresentasiTim() {
         <div className="row">
           <input
             type="url" inputMode="url" placeholder="https://www.canva.com/design/…/view atau https://canva.link/…"
+            aria-labelledby="tautan-canva-label"
             value={linkCanva}
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setLinkCanva(e.target.value)}

@@ -134,13 +134,14 @@ export default function AccPanel({ jenis, targetId, timId, acc, onChange }) {
 
       {dosen && formRevisi && (
         <div style={{ marginTop: 6 }}>
-          <div className="row" style={{ gap: 6, flexWrap: "nowrap", marginTop: 0 }}>
+          <div className="row" style={{ gap: 6, marginTop: 0 }}>
             <input
+              aria-label="Catatan perbaikan untuk tim"
               placeholder="Apa yang perlu diperbaiki tim?"
               value={catatan}
               onChange={(e) => setCatatan(e.target.value)}
               maxLength={1000}
-              style={{ flex: 1, marginTop: 0 }}
+              style={{ flex: "1 1 200px", marginTop: 0 }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && catatan.trim() && !busy) simpan("revisi", catatan.trim());
               }}
@@ -150,7 +151,7 @@ export default function AccPanel({ jenis, targetId, timId, acc, onChange }) {
                     onClick={() => simpan("revisi", catatan.trim())}>
               <RotateCcw className="lucide" /> Kirim
             </button>
-            <button className="btn sm" onClick={() => setFormRevisi(false)}>
+            <button className="btn sm" aria-label="Batal meminta revisi" onClick={() => setFormRevisi(false)}>
               <X className="lucide" />
             </button>
           </div>
