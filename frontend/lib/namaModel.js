@@ -50,21 +50,58 @@ export function namaCantik(nama) {
 /** Dua kata pertama — untuk kepala panel yang ruangnya sempit. */
 export const namaSingkat = (s) => namaCantik(s).split(" ").slice(0, 2).join(" ");
 
-/** Jumlah parameter (7B/9B) sudah tampak di namanya? */
-export const adaParamDiNama = (s) => /\b\d+(\.\d+)?[BM]\b/.test(String(s));
-
-/** "4,7 GB" — ukuran unduhan model, membantu menebak kecepatan jawabannya. */
+/** "4,7 GB" — ukuran unduhan model. */
 export const fmtUkuran = (byte) =>
   byte > 0 ? `${(byte / 1024 ** 3).toLocaleString("id-ID", { maximumFractionDigits: 1 })} GB` : "";
 
 /**
- * Keterangan kanan tiap baris, mis. "8.0B · 8,9 GB". Jumlah parameter
- * dilewati bila sudah tampak di nama, supaya barisnya tidak mengulang
- * informasi yang sama ("Qwen 2.5 7B Instruct" + "7.6B" → cukup ukurannya).
+ * Jumlah parameter dalam MILIAR (0 bila tak diketahui).
+ * Ollama melaporkannya sebagai teks: "7.6B", "134.52M", "355B".
  */
-export function metaModel(m, nama = "") {
-  const bagian = [];
-  if (m?.parameter && !adaParamDiNama(nama)) bagian.push(m.parameter);
+export function miliarParam(m) {
+  const cocok = String(m?.parameter || "").trim().match(/^([\d.]+)\s*([BMK])?$/i);
+  if (!cocok) return 0;
+  const n = parseFloat(cocok[1]);
+  if (!Number.isFinite(n)) return 0;
+  const satuan = (cocok[2] || "B").toUpperCase();
+  return satuan === "B" ? n : satuan === "M" ? n / 1e3 : n / 1e6;
+}
+
+/**
+ * Ambang jumlah parameter → sifat yang BENAR-BENAR dirasakan pengguna.
+ * Makin besar modelnya makin teliti jawabannya, tetapi makin lama menunggunya.
+ */
+const SIFAT = [
+  [1, "Sangat cepat · paling sederhana"],
+  [5, "Cepat · untuk pertanyaan ringan"],
+  [10, "Seimbang · cepat & cukup teliti"],
+  [25, "Lebih teliti · agak lambat"],
+  [Infinity, "Paling teliti · paling lambat"],
+];
+
+/**
+ * Keterangan model dalam bahasa sehari-hari.
+ *
+ * Angka "3.2B · 1,9 GB" tidak berarti apa-apa bagi kebanyakan orang — yang
+ * ingin mereka tahu hanyalah "cepat atau teliti?". Rinciannya tidak hilang,
+ * hanya dipindah ke tooltip lewat rincianTeknis().
+ * @example sifatModel({ parameter: "3.2B" }) // "Cepat · untuk pertanyaan ringan"
+ */
+export function sifatModel(m) {
+  const b = miliarParam(m);
+  if (!b) {
+    // Tanpa data parameter, ukuran berkas masih memberi petunjuk kasar
+    const gb = (m?.ukuran || 0) / 1024 ** 3;
+    if (!gb) return "";
+    return gb < 2 ? SIFAT[1][1] : gb < 7 ? SIFAT[2][1] : gb < 15 ? SIFAT[3][1] : SIFAT[4][1];
+  }
+  return SIFAT.find(([batas]) => b < batas)[1];
+}
+
+/** Rincian teknis untuk tooltip — bagi yang memang ingin tahu angkanya. */
+export function rincianTeknis(m) {
+  const bagian = [m?.nama].filter(Boolean);
+  if (m?.parameter) bagian.push(`${m.parameter} parameter`);
   const ukuran = fmtUkuran(m?.ukuran);
   if (ukuran) bagian.push(ukuran);
   return bagian.join(" · ");

@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check } from "lucide-react";
 import { api, getTimAktif, isPendamping } from "@/lib/api";
 import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
-import { namaCantik, namaSingkat, metaModel } from "@/lib/namaModel";
+import { namaCantik, namaSingkat, sifatModel, rincianTeknis } from "@/lib/namaModel";
 
 const PROMPT_CEPAT = [
   "Uang kami paling banyak terpakai untuk apa?",
@@ -252,21 +252,33 @@ export default function AsistenAI() {
                     title={`Model bawaan server: ${model.bawaan || "-"}`}
                   >
                     <Check className="lucide tik" aria-hidden={!!model.pilihan} />
-                    <span className="nm">Otomatis</span>
-                    <span className="mt">{namaCantik(model.bawaan)}</span>
+                    <span className="teks">
+                      <span className="nm">Otomatis</span>
+                      <span className="ket">
+                        {model.bawaan ? `${namaCantik(model.bawaan)} · pilihan aman` : "Model bawaan server"}
+                      </span>
+                    </span>
                   </button>
                   {model.daftar.map((m) => {
                     const cantik = namaCantik(m.label);
+                    const bawaan = m.nama === model.bawaan;
                     return (
                       <button
                         key={m.nama}
                         type="button" role="menuitemradio" aria-checked={model.pilihan === m.nama}
                         className="ai-model-opsi" onClick={() => gantiModel(m.nama)}
-                        title={m.nama}
+                        title={rincianTeknis(m)}
                       >
                         <Check className="lucide tik" aria-hidden={model.pilihan !== m.nama} />
-                        <span className="nm">{cantik}</span>
-                        <span className="mt">{metaModel(m, cantik)}</span>
+                        <span className="teks">
+                          <span className="nm">
+                            {cantik}
+                            {bawaan && <span className="tanda">disarankan</span>}
+                          </span>
+                          {/* Bahasa sehari-hari, bukan "3.2B · 1,9 GB" — angkanya
+                              tetap ada di tooltip lewat rincianTeknis(). */}
+                          <span className="ket">{sifatModel(m)}</span>
+                        </span>
                       </button>
                     );
                   })}
