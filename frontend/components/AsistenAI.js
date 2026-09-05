@@ -16,7 +16,7 @@
  * - Markdown dirender ringan TANPA innerHTML (aman dari XSS).
  */
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert } from "lucide-react";
+import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check } from "lucide-react";
 import { api, getTimAktif, isPendamping } from "@/lib/api";
 import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
 
@@ -74,6 +74,21 @@ function Markdown({ teks }) {
 const fmtUkuran = (byte) =>
   byte > 0 ? `${(byte / 1024 ** 3).toLocaleString("id-ID", { maximumFractionDigits: 1 })} GB` : "";
 
+/**
+ * Nama model yang enak dibaca: awalan repo Hugging Face
+ * ("hf.co/gmonsoon/…") dan penanda "-GGUF" dibuang — tanpa ini satu nama bisa
+ * sepanjang 60 karakter dan merusak lebar daftar. Nama utuh tetap tersedia di
+ * atribut title.
+ */
+const namaRingkas = (s) =>
+  String(s || "")
+    .replace(/^hf\.co\/[^/]+\//i, "")
+    .replace(/[-_]?GGUF/i, "")
+    .replace(/:latest$/i, "");
+
+/** "7.6B · 4,4 GB" */
+const metaModel = (m) => [m?.parameter, fmtUkuran(m?.ukuran)].filter(Boolean).join(" · ");
+
 export default function AsistenAI() {
   const status = useStatusAI();
   const [buka, setBuka] = useState(false);
@@ -83,9 +98,11 @@ export default function AsistenAI() {
   const [timId, setTimId] = useState("");
   const [pendamping, setPendamping] = useState(false);
   const [errModel, setErrModel] = useState("");
+  const [bukaModel, setBukaModel] = useState(false);
   const model = useModelAI(buka); // daftar model diunduh saat panel dibuka
   const listRef = useRef(null);
   const inputRef = useRef(null);
+  const modelRef = useRef(null);
 
   useEffect(() => {
     setPendamping(isPendamping());
@@ -114,13 +131,27 @@ export default function AsistenAI() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [pesan, buka, busy]);
 
-  // Esc → tutup
+  // Esc → tutup daftar model dulu (bila terbuka), baru panelnya
   useEffect(() => {
     if (!buka) return;
-    const esc = (e) => { if (e.key === "Escape") setBuka(false); };
+    const esc = (e) => {
+      if (e.key !== "Escape") return;
+      if (bukaModel) setBukaModel(false);
+      else setBuka(false);
+    };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
-  }, [buka]);
+  }, [buka, bukaModel]);
+
+  // Klik di luar pemilih model → tutup daftarnya
+  useEffect(() => {
+    if (!bukaModel) return;
+    const luar = (e) => {
+      if (!modelRef.current?.contains(e.target)) setBukaModel(false);
+    };
+    document.addEventListener("mousedown", luar);
+    return () => document.removeEventListener("mousedown", luar);
+  }, [bukaModel]);
 
   if (!status?.aktif) return null;
 
@@ -146,6 +177,7 @@ export default function AsistenAI() {
   /** Ganti model — disimpan di akun agar berlaku juga di tombol AI pada formulir. */
   const gantiModel = async (nilai) => {
     setErrModel("");
+    setBukaModel(false);
     try {
       await pilihModelAI(nilai);
     } catch (e) {
@@ -169,7 +201,7 @@ export default function AsistenAI() {
       <button
         type="button"
         className={`ai-fab${buka ? " on" : ""}`}
-        onClick={() => setBuka((v) => !v)}
+        onClick={() => { setBuka((v) => !v); setBukaModel(false); }}
         aria-label={buka ? "Tutup asisten AI" : "Buka asisten AI"}
         aria-expanded={buka}
         title="Tanya asisten AI tentang logbook"
@@ -185,7 +217,7 @@ export default function AsistenAI() {
             <div className="ai-head-txt">
               <b>Asisten Logbook</b>
               <small>
-                {(model?.pilihan || status.model)?.split(":")[0] || "AI"}
+                {namaRingkas(model?.pilihan || status.model).split(":")[0] || "AI"}
                 {model && !model.pilihan ? " · otomatis" : ""}
                 {status.tersedia === false ? " · server tidak terjangkau" : ""}
                 {pendamping && timId ? " · tim yang sedang dilihat" : ""}
@@ -202,32 +234,67 @@ export default function AsistenAI() {
             </button>
           </header>
 
-          {/* Pemilih model — kamu yang menentukan, bukan sistem. */}
-          <div className="ai-model-bar">
-            <label htmlFor="ai-model">Model</label>
-            <select
-              id="ai-model"
-              value={model?.pilihan || ""}
-              onChange={(e) => gantiModel(e.target.value)}
-              disabled={busy || !model || model.daftar.length === 0}
-              title="Pilih model yang dipakai menjawab. 'Otomatis' memakai model bawaan server."
-            >
-              <option value="">
-                {model?.bawaan ? `Otomatis (${model.bawaan})` : "Otomatis (bawaan server)"}
-              </option>
-              {(model?.daftar || []).map((m) => (
-                <option key={m.nama} value={m.nama}>
-                  {m.label}
-                  {m.parameter ? ` · ${m.parameter}` : ""}
-                  {fmtUkuran(m.ukuran) ? ` · ${fmtUkuran(m.ukuran)}` : ""}
-                </option>
-              ))}
-            </select>
+          {/* Pemilih model — kamu yang menentukan, bukan sistem.
+              Sengaja BUKAN <select> bawaan: popup asli peramban melebar
+              mengikuti nama terpanjang (mis. "hf.co/gmonsoon/gemma2-9b-…")
+              sampai menutupi layar. Daftar ini terkunci selebar panel. */}
+          <div className="ai-model-bar" ref={modelRef}>
+            <span className="ai-model-lbl" id="ai-model-lbl">Model</span>
+            <div className="ai-model-pilih">
+              <button
+                type="button"
+                className="ai-model-btn"
+                aria-haspopup="menu"
+                aria-expanded={bukaModel}
+                aria-labelledby="ai-model-lbl"
+                disabled={busy || !model || model.daftar.length === 0}
+                onClick={() => setBukaModel((v) => !v)}
+                title={
+                  model?.pilihan
+                    ? model.pilihan
+                    : `Otomatis — memakai ${model?.bawaan || "model bawaan server"}`
+                }
+              >
+                <span className="nm">{model?.pilihan ? namaRingkas(model.pilihan) : "Otomatis"}</span>
+                <span className="mt">
+                  {model?.pilihan
+                    ? metaModel(model.daftar.find((m) => m.nama === model.pilihan))
+                    : "bawaan"}
+                </span>
+                <ChevronDown className="lucide" />
+              </button>
+
+              {bukaModel && model && (
+                <div className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl">
+                  <button
+                    type="button" role="menuitemradio" aria-checked={!model.pilihan}
+                    className="ai-model-opsi" onClick={() => gantiModel("")}
+                    title={`Model bawaan server: ${model.bawaan || "-"}`}
+                  >
+                    <Check className="lucide tik" aria-hidden={!!model.pilihan} />
+                    <span className="nm">Otomatis</span>
+                    <span className="mt">{namaRingkas(model.bawaan)}</span>
+                  </button>
+                  {model.daftar.map((m) => (
+                    <button
+                      key={m.nama}
+                      type="button" role="menuitemradio" aria-checked={model.pilihan === m.nama}
+                      className="ai-model-opsi" onClick={() => gantiModel(m.nama)}
+                      title={m.nama}
+                    >
+                      <Check className="lucide tik" aria-hidden={model.pilihan !== m.nama} />
+                      <span className="nm">{namaRingkas(m.label)}</span>
+                      <span className="mt">{metaModel(m)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {!model && <Loader2 className="lucide spin" aria-label="Memuat daftar model" />}
             {model && model.daftar.length === 0 && (
-              <span className="muted">daftar model tidak terbaca — memakai bawaan</span>
+              <span className="ai-model-ket">daftar tidak terbaca — memakai bawaan</span>
             )}
-            {errModel && <span style={{ color: "var(--bad)" }}>{errModel}</span>}
+            {errModel && <span className="ai-model-ket bad">{errModel}</span>}
           </div>
 
           <div className="ai-list" ref={listRef}>
