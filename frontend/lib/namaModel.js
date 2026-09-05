@@ -59,10 +59,10 @@ export const fmtUkuran = (byte) =>
  * Ollama melaporkannya sebagai teks: "7.6B", "134.52M", "355B".
  */
 export function miliarParam(m) {
-  const cocok = String(m?.parameter || "").trim().match(/^([\d.]+)\s*([BMK])?$/i);
+  const cocok = String(m?.parameter || "").trim().match(/^(\d+(?:\.\d+)?)\s*([BMK])$/i);
   if (!cocok) return 0;
   const n = parseFloat(cocok[1]);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n) || n <= 0) return 0;
   const satuan = (cocok[2] || "B").toUpperCase();
   return satuan === "B" ? n : satuan === "M" ? n / 1e3 : n / 1e6;
 }
@@ -86,6 +86,29 @@ export function sifatModel(m) {
   if (/^(llama\d|smollm\d|gpt-oss)/.test(nama)) return "Percakapan & pertanyaan sehari-hari";
   return "Model lain untuk dicoba";
 }
+
+/** Label heuristik, BUKAN hasil benchmark, waktu tunggu, atau peringkat akurasi.
+ * Batas 5B/10B hanya panduan kasar untuk model dense pada server yang sama.
+ * Total parameter MoE/layanan cloud bukan ukuran komputasi aktif, jadi jangan
+ * mengurutkan kecepatannya dari angka itu. Ukuran berkas juga bukan pengganti.
+ */
+export function kecepatanModel(m) {
+  const nama = String(m?.nama || m?.label || "").toLowerCase();
+  const keluarga = String(m?.keluarga || "").toLowerCase();
+  if (/:cloud$/.test(nama) ||
+      /moe|gptoss|qwen3next|mixtral|deepseek[23]|dbrx|arctic/.test(keluarga) ||
+      /gpt-oss|mixtral|qwen3-coder:30b|[-:]a\d+b/.test(nama)) {
+    return "Belum ada perkiraan";
+  }
+  const b = miliarParam(m);
+  if (!b) return "Belum ada perkiraan";
+  if (/reasoning/.test(nama)) return "Perkiraan: lebih lama";
+  if (b < 5) return "Perkiraan: cepat";
+  if (b <= 10) return "Perkiraan: sedang";
+  return "Perkiraan: lebih lama";
+}
+
+export const CATATAN_KECEPATAN = "Perkiraan kasar, bukan hasil uji kecepatan. Waktu sebenarnya dipengaruhi beban server, panjang percakapan dan jawaban. Bukan penilaian akurasi model.";
 
 /** Rincian teknis untuk tooltip — bagi yang memang ingin tahu angkanya. */
 export function rincianTeknis(m) {

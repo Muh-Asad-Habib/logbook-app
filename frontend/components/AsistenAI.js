@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check } from "lucide-react";
 import { api, getTimAktif, isPendamping } from "@/lib/api";
 import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
-import { namaCantik, namaSingkat, sifatModel, rincianTeknis } from "@/lib/namaModel";
+import { namaCantik, namaSingkat, sifatModel, rincianTeknis, kecepatanModel, CATATAN_KECEPATAN } from "@/lib/namaModel";
 
 const PROMPT_CEPAT = [
   "Uang kami paling banyak terpakai untuk apa?",
@@ -310,7 +310,8 @@ export default function AsistenAI() {
                         key={m.nama}
                         type="button" role="menuitemradio" aria-checked={model.pilihan === m.nama}
                         className="ai-model-opsi" onClick={() => gantiModel(m.nama)}
-                        title={rincianTeknis(m)}
+                        title={`${rincianTeknis(m)}\n${CATATAN_KECEPATAN}`}
+                        aria-description={CATATAN_KECEPATAN}
                       >
                         <Check className="lucide tik" aria-hidden={model.pilihan !== m.nama} />
                         <span className="teks">
@@ -319,7 +320,7 @@ export default function AsistenAI() {
                           </span>
                           {/* Bahasa sehari-hari, bukan "3.2B · 1,9 GB" — angkanya
                               tetap ada di tooltip lewat rincianTeknis(). */}
-                          <span className="ket">{sifatModel(m)}</span>
+                          <span className="ket"><b>{kecepatanModel(m)}</b> · {sifatModel(m)}</span>
                         </span>
                       </button>
                     );
