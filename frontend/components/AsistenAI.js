@@ -121,8 +121,10 @@ export default function AsistenAI() {
     if (!buka) return;
     const esc = (e) => {
       if (e.key !== "Escape") return;
-      if (bukaModel) setBukaModel(false);
-      else setBuka(false);
+      if (bukaModel) {
+        setBukaModel(false);
+        tombolRef.current?.focus();
+      } else setBuka(false);
     };
     document.addEventListener("keydown", esc);
     return () => document.removeEventListener("keydown", esc);
@@ -144,7 +146,7 @@ export default function AsistenAI() {
   useEffect(() => {
     if (!bukaModel) return;
     const aktif = menuRef.current?.querySelector('[aria-checked="true"]');
-    aktif?.scrollIntoView({ block: "nearest" });
+    if (aktif && menuRef.current) menuRef.current.scrollTop = aktif.offsetTop - menuRef.current.offsetTop;
     aktif?.focus({ preventScroll: true });
   }, [bukaModel]);
 
@@ -219,7 +221,7 @@ export default function AsistenAI() {
       </button>
 
       {buka && (
-        <section className={`ai-panel${bukaModel ? " pilih-model" : ""}`} role="dialog"
+        <section ref={modelRef} className={`ai-panel${bukaModel ? " pilih-model" : ""}`} role="dialog"
                  aria-label="Asisten AI logbook">
           <header className="ai-head">
             <div className="ai-head-ic"><Sparkles className="lucide" /></div>
@@ -238,7 +240,7 @@ export default function AsistenAI() {
                 <Trash2 className="lucide" />
               </button>
             )}
-            <button type="button" className="icon-btn" onClick={() => setBuka(false)} aria-label="Tutup">
+            <button type="button" className="icon-btn" onClick={() => { setBuka(false); setBukaModel(false); }} aria-label="Tutup">
               <X className="lucide" />
             </button>
           </header>
@@ -247,7 +249,7 @@ export default function AsistenAI() {
               Sengaja BUKAN <select> bawaan: popup asli peramban melebar
               mengikuti nama terpanjang (mis. "hf.co/gmonsoon/gemma2-9b-…")
               sampai menutupi layar. Daftar ini terkunci selebar panel. */}
-          <div className="ai-model-bar" ref={modelRef}>
+          <div className="ai-model-bar">
             <span className="ai-model-lbl" id="ai-model-lbl">Model</span>
             <div className="ai-model-pilih">
               <button
@@ -256,7 +258,8 @@ export default function AsistenAI() {
                 className="ai-model-btn"
                 aria-haspopup="menu"
                 aria-expanded={bukaModel}
-                aria-labelledby="ai-model-lbl"
+                aria-label={`Pilih model: ${model?.pilihan ? namaCantik(model.pilihan) : "Otomatis"}`}
+                aria-controls="ai-model-menu"
                 disabled={busy || !model || model.daftar.length === 0}
                 onClick={() => setBukaModel((v) => !v)}
                 title={
@@ -270,9 +273,23 @@ export default function AsistenAI() {
                 </span>
                 <ChevronDown className="lucide" />
               </button>
+            </div>
+            {!model && <Loader2 className="lucide spin" aria-label="Memuat daftar model" />}
+            {model && model.daftar.length === 0 && (
+              <span className="ai-model-ket">Daftar model belum tersedia. Coba buka kembali nanti.</span>
+            )}
+            {errModel && <span role="alert" className="ai-model-ket bad">{errModel}</span>}
+          </div>
 
-              {bukaModel && model && (
-                <div className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl"
+          {bukaModel && model && (
+            <div className="ai-model-view">
+              <div className="ai-model-intro">
+                <button type="button" className="ai-model-back" onClick={() => {
+                  setBukaModel(false); tombolRef.current?.focus();
+                }}>← Kembali ke chat</button>
+                <p>Pilih model sesuai kebutuhan. Jika ragu, gunakan Otomatis.</p>
+              </div>
+                <div id="ai-model-menu" className="ai-model-menu" role="menu" aria-labelledby="ai-model-lbl"
                      ref={menuRef} onKeyDown={onKeyMenu}>
                   <button
                     type="button" role="menuitemradio" aria-checked={!model.pilihan}
@@ -283,7 +300,7 @@ export default function AsistenAI() {
                     <span className="teks">
                       <span className="nm">Otomatis</span>
                       <span className="ket">
-                        {model.bawaan ? `${namaCantik(model.bawaan)} · pilihan aman` : "Model bawaan server"}
+                        {model.bawaan ? `Gunakan model bawaan: ${namaCantik(model.bawaan)}` : "Gunakan model bawaan server"}
                       </span>
                     </span>
                   </button>
@@ -301,7 +318,7 @@ export default function AsistenAI() {
                         <span className="teks">
                           <span className="nm">
                             {cantik}
-                            {bawaan && <span className="tanda">disarankan</span>}
+                            {bawaan && <span className="tanda">bawaan</span>}
                           </span>
                           {/* Bahasa sehari-hari, bukan "3.2B · 1,9 GB" — angkanya
                               tetap ada di tooltip lewat rincianTeknis(). */}
@@ -311,14 +328,9 @@ export default function AsistenAI() {
                     );
                   })}
                 </div>
-              )}
+                <p className="ai-model-note">Kecepatan bergantung pada beban server. Model lebih besar tidak selalu lebih akurat.</p>
             </div>
-            {!model && <Loader2 className="lucide spin" aria-label="Memuat daftar model" />}
-            {model && model.daftar.length === 0 && (
-              <span className="ai-model-ket">daftar tidak terbaca — memakai bawaan</span>
-            )}
-            {errModel && <span className="ai-model-ket bad">{errModel}</span>}
-          </div>
+          )}
 
           <div className="ai-list" ref={listRef}>
             {pesan.length === 0 && (
@@ -346,7 +358,7 @@ export default function AsistenAI() {
                 {m.role === "assistant" ? <Markdown teks={m.content} /> : <p>{m.content}</p>}
                 {/* Jejak model penjawab — penting saat pengguna membandingkan model */}
                 {m.role === "assistant" && m.model && !m.gagal && (
-                  <div className="ai-msg-model">{m.model}</div>
+                  <div className="ai-msg-model" title={m.model}>{namaCantik(m.model)}</div>
                 )}
               </div>
             ))}

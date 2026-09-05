@@ -235,7 +235,7 @@
 
 .ai-panel {
   position: fixed; right: 22px; bottom: 82px; z-index: 77;
-  width: min(420px, calc(100vw - 32px)); max-height: min(72vh, 640px);
+  width: min(420px, calc(100vw - 32px)); max-height: min(640px, calc(100dvh - 98px));
   display: flex; flex-direction: column;
   background: var(--card-solid); border: 1px solid var(--line); border-radius: 20px;
   box-shadow: 0 24px 60px -16px rgba(18, 20, 46, 0.35), 0 0 0 1px rgba(124, 58, 237, 0.06);
@@ -244,6 +244,7 @@
 @keyframes ai-masuk { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 .ai-head {
+  flex-shrink: 0;
   display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, var(--soft-2), transparent);
@@ -264,6 +265,7 @@
    Dibuat sendiri (bukan <select>) karena popup bawaan peramban melebar
    mengikuti nama model terpanjang sampai menutupi layar. */
 .ai-model-bar {
+  flex-shrink: 0;
   position: relative; /* jangkar label tersembunyi pada layar sangat sempit */
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--soft-2);
@@ -273,7 +275,7 @@
 .ai-model-lbl { flex: 0 0 auto; }
 .ai-model-pilih { position: relative; flex: 1 1 auto; min-width: 0; }
 .ai-model-btn {
-  display: flex; align-items: center; gap: 6px; width: 100%; height: 30px; padding: 0 8px;
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 44px; padding: 6px 10px;
   border: 1px solid var(--line); border-radius: 9px;
   background: var(--card-solid); color: var(--ink);
   font: inherit; font-size: 0.74rem; font-weight: 600; text-align: left; cursor: pointer;
@@ -284,18 +286,14 @@
 .ai-model-btn .lucide { flex: 0 0 auto; width: 14px; height: 14px; color: var(--muted); }
 
 .ai-model-menu {
-  position: absolute; z-index: 30; top: calc(100% + 5px); left: 0; right: 0;
+  position: relative; flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column; gap: 1px;
-  /* Panel memakai overflow:hidden, jadi daftar TIDAK boleh lebih tinggi dari
-     ruang tersisa di dalamnya. Tingginya diturunkan dari batas tinggi panel
-     itu sendiri (72vh di layar lebar) dikurangi kepala + baris model (±124 px),
-     sehingga tetap utuh dari jendela mungil sampai monitor besar. */
-  max-height: clamp(84px, calc(72vh - 124px), 246px);
   overflow-y: auto; overscroll-behavior: contain;
   padding: 4px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--card-solid); box-shadow: var(--shadow-hover);
+  background: var(--card-solid); scrollbar-width: thin;
 }
 .ai-model-opsi {
+  flex-shrink: 0; min-height: 56px;
   display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
   border: 0; border-radius: 8px; background: none; color: var(--ink);
   font: inherit; font-size: 0.75rem; font-weight: 600; text-align: left; cursor: pointer;
@@ -304,28 +302,35 @@
 .ai-model-opsi[aria-checked="true"] { background: var(--soft); color: var(--p1); }
 .ai-model-opsi .teks { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .ai-model-opsi .nm {
-  display: flex; align-items: center; gap: 6px; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: block; min-width: 0; white-space: normal; overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 /* Keterangan sifat model dalam bahasa sehari-hari ("Cepat · untuk pertanyaan
    ringan") — menggantikan angka teknis yang tak berarti bagi kebanyakan orang. */
 .ai-model-opsi .ket {
   font-size: 0.66rem; font-weight: 600; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.5;
 }
 .ai-model-opsi[aria-checked="true"] .ket { color: var(--p2); }
 .ai-model-opsi .tanda {
-  flex: 0 0 auto; padding: 1px 6px; border-radius: 999px;
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
   background: var(--soft); color: var(--p1);
   font-size: 0.6rem; font-weight: 800; letter-spacing: 0.02em;
 }
 .ai-model-opsi[aria-checked="true"] .tanda { background: var(--card-solid); }
 .ai-model-opsi .tik { flex: 0 0 auto; width: 13px; height: 13px; }
 
-/* Saat daftar model terbuka, percakapan di belakangnya tidak perlu ikut
-   bergulir. Tanpa ini muncul DUA batang gulir berdampingan (milik daftar dan
-   milik percakapan) yang terlihat berantakan. */
-.ai-panel.pilih-model .ai-list { overflow: hidden; }
+/* Pemilih menggantikan isi chat sementara, bukan menutupinya. */
+.ai-panel.pilih-model { height: min(600px, calc(100dvh - 98px)); }
+.ai-panel.pilih-model .ai-list,
+.ai-panel.pilih-model .ai-input,
+.ai-panel.pilih-model .ai-catatan { display: none; }
+.ai-model-view { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 10px 12px; gap: 8px; }
+.ai-model-intro, .ai-model-note { flex-shrink: 0; }
+.ai-model-intro p, .ai-model-note { margin: 0; font-size: .72rem; color: var(--muted); line-height: 1.5; }
+.ai-model-back { border: 0; background: transparent; color: var(--p1); font: inherit; font-size: .78rem; min-height: 36px; padding: 4px 0; cursor: pointer; }
+.ai-model-opsi:focus-visible { outline: 2px solid var(--p1); outline-offset: -2px; }
+.ai-model-btn:focus-visible, .ai-model-back:focus-visible { outline: 2px solid var(--p1); outline-offset: 1px; }
 /* Centang hanya tampak pada model yang sedang dipakai — ruangnya tetap
    dipesan supaya teks semua baris tetap sejajar. */
 .ai-model-opsi .tik[aria-hidden="true"] { visibility: hidden; }
@@ -364,7 +369,7 @@
 }
 
 
-.ai-list { flex: 1 1 auto; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ai-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ai-kosong p { font-size: 0.84rem; color: var(--muted); line-height: 1.5; }
 .ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ai-chip {
@@ -395,7 +400,7 @@
 
 .ai-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
 .ai-input textarea {
-  flex: 1; min-height: 40px; max-height: 120px; resize: none; margin-top: 0;
+  flex: 1; min-width: 0; min-height: 40px; max-height: 120px; resize: none; margin-top: 0;
   padding: 10px 12px; font-size: 0.86rem; border-radius: 12px; line-height: 1.4;
 }
 .ai-input .btn { height: 40px; width: 44px; padding: 0; justify-content: center; border-radius: 12px; flex: 0 0 auto; }
@@ -409,12 +414,16 @@
   .ai-fab { left: 16px; right: auto; bottom: calc(76px + env(safe-area-inset-bottom)); height: 46px; }
   .ai-panel {
     left: 10px; right: 10px; width: auto;
-    bottom: calc(132px + env(safe-area-inset-bottom)); max-height: min(64vh, 560px);
+    bottom: calc(132px + env(safe-area-inset-bottom)); max-height: min(560px, calc(100dvh - 148px - env(safe-area-inset-bottom)));
   }
-  /* Panelnya lebih pendek di sini (64vh), jadi batas tinggi daftar model ikut
-     diturunkan supaya tidak terpotong — termasuk saat HP dipakai melintang. */
-  .ai-model-menu { max-height: clamp(84px, calc(64vh - 124px), 246px); }
+  .ai-panel.pilih-model { height: min(560px, calc(100dvh - 148px - env(safe-area-inset-bottom))); }
   .ai-input textarea { font-size: 16px; }
+}
+
+@media (max-height: 520px) {
+  .ai-panel, .ai-panel.pilih-model { top: 8px; bottom: 8px; height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
+  .ai-model-intro p, .ai-model-note { display: none; }
+  .ai-model-view { padding-top: 4px; gap: 4px; }
 }
 
 /* ---------- Tombol & kotak usulan AI di formulir (kegiatan / keuangan) ---------- */
