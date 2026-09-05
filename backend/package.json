@@ -19,6 +19,7 @@
     "diag:impor-langsung": "node diag-impor-langsung.mjs",
     "diag:keamanan": "node diag-keamanan.mjs",
     "diag:ai": "node diag-ai.mjs",
+    "diag:nama-model": "node diag-nama-model.mjs",
     "diag:ekspor-foto": "node diag-ekspor-foto.mjs",
     "diag:ekspor-impor": "node diag-ekspor-impor.mjs",
     "bersih:db": "node --env-file=../.env bersih-db.mjs",

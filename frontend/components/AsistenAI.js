@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check } from "lucide-react";
 import { api, getTimAktif, isPendamping } from "@/lib/api";
 import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
+import { namaCantik, namaSingkat, metaModel } from "@/lib/namaModel";
 
 const PROMPT_CEPAT = [
   "Uang kami paling banyak terpakai untuk apa?",
@@ -70,24 +71,6 @@ function Markdown({ teks }) {
 
 /* ---------- komponen utama ---------- */
 
-/** "4,7 GB" — ukuran unduhan model, membantu menebak kecepatan jawabannya. */
-const fmtUkuran = (byte) =>
-  byte > 0 ? `${(byte / 1024 ** 3).toLocaleString("id-ID", { maximumFractionDigits: 1 })} GB` : "";
-
-/**
- * Nama model yang enak dibaca: awalan repo Hugging Face
- * ("hf.co/gmonsoon/…") dan penanda "-GGUF" dibuang — tanpa ini satu nama bisa
- * sepanjang 60 karakter dan merusak lebar daftar. Nama utuh tetap tersedia di
- * atribut title.
- */
-const namaRingkas = (s) =>
-  String(s || "")
-    .replace(/^hf\.co\/[^/]+\//i, "")
-    .replace(/[-_]?GGUF/i, "")
-    .replace(/:latest$/i, "");
-
-/** "7.6B · 4,4 GB" */
-const metaModel = (m) => [m?.parameter, fmtUkuran(m?.ukuran)].filter(Boolean).join(" · ");
 
 export default function AsistenAI() {
   const status = useStatusAI();
@@ -217,7 +200,7 @@ export default function AsistenAI() {
             <div className="ai-head-txt">
               <b>Asisten Logbook</b>
               <small>
-                {namaRingkas(model?.pilihan || status.model).split(":")[0] || "AI"}
+                {namaSingkat(model?.pilihan || status.model) || "AI"}
                 {model && !model.pilihan ? " · otomatis" : ""}
                 {status.tersedia === false ? " · server tidak terjangkau" : ""}
                 {pendamping && timId ? " · tim yang sedang dilihat" : ""}
@@ -251,15 +234,12 @@ export default function AsistenAI() {
                 onClick={() => setBukaModel((v) => !v)}
                 title={
                   model?.pilihan
-                    ? model.pilihan
+                    ? `${namaCantik(model.pilihan)} — ${model.pilihan}`
                     : `Otomatis — memakai ${model?.bawaan || "model bawaan server"}`
                 }
               >
-                <span className="nm">{model?.pilihan ? namaRingkas(model.pilihan) : "Otomatis"}</span>
-                <span className="mt">
-                  {model?.pilihan
-                    ? metaModel(model.daftar.find((m) => m.nama === model.pilihan))
-                    : "bawaan"}
+                <span className="nm">
+                  {model?.pilihan ? namaCantik(model.pilihan) : "Otomatis"}
                 </span>
                 <ChevronDown className="lucide" />
               </button>
@@ -273,20 +253,23 @@ export default function AsistenAI() {
                   >
                     <Check className="lucide tik" aria-hidden={!!model.pilihan} />
                     <span className="nm">Otomatis</span>
-                    <span className="mt">{namaRingkas(model.bawaan)}</span>
+                    <span className="mt">{namaCantik(model.bawaan)}</span>
                   </button>
-                  {model.daftar.map((m) => (
-                    <button
-                      key={m.nama}
-                      type="button" role="menuitemradio" aria-checked={model.pilihan === m.nama}
-                      className="ai-model-opsi" onClick={() => gantiModel(m.nama)}
-                      title={m.nama}
-                    >
-                      <Check className="lucide tik" aria-hidden={model.pilihan !== m.nama} />
-                      <span className="nm">{namaRingkas(m.label)}</span>
-                      <span className="mt">{metaModel(m)}</span>
-                    </button>
-                  ))}
+                  {model.daftar.map((m) => {
+                    const cantik = namaCantik(m.label);
+                    return (
+                      <button
+                        key={m.nama}
+                        type="button" role="menuitemradio" aria-checked={model.pilihan === m.nama}
+                        className="ai-model-opsi" onClick={() => gantiModel(m.nama)}
+                        title={m.nama}
+                      >
+                        <Check className="lucide tik" aria-hidden={model.pilihan !== m.nama} />
+                        <span className="nm">{cantik}</span>
+                        <span className="mt">{metaModel(m, cantik)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

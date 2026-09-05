@@ -255,7 +255,10 @@
 .ai-head-ic .lucide { width: 18px; height: 18px; }
 .ai-head-txt { flex: 1; min-width: 0; line-height: 1.2; }
 .ai-head-txt b { display: block; font-size: 0.9rem; }
-.ai-head-txt small { display: block; color: var(--muted); font-size: 0.7rem; font-weight: 600; margin-top: 2px; }
+.ai-head-txt small {
+  display: block; color: var(--muted); font-size: 0.7rem; font-weight: 600; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Pemilih model — pengguna yang menentukan model penjawab, bukan sistem.
    Dibuat sendiri (bukan <select>) karena popup bawaan peramban melebar
@@ -278,7 +281,6 @@
 .ai-model-btn:hover:not(:disabled) { border-color: var(--line-hover); }
 .ai-model-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .ai-model-btn .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-model-btn .mt { flex: 0 0 auto; font-size: 0.66rem; font-weight: 700; color: var(--muted); }
 .ai-model-btn .lucide { flex: 0 0 auto; width: 14px; height: 14px; color: var(--muted); }
 
 .ai-model-menu {
@@ -301,7 +303,12 @@
 .ai-model-opsi:hover, .ai-model-opsi:focus-visible { background: var(--soft-2); }
 .ai-model-opsi[aria-checked="true"] { background: var(--soft); color: var(--p1); }
 .ai-model-opsi .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-model-opsi .mt { flex: 0 0 auto; font-size: 0.66rem; font-weight: 700; color: var(--muted); }
+/* Keterangan kanan tidak boleh menggusur nama: lebarnya dibatasi & ikut
+   dipotong bila perlu (mis. nama model bawaan pada baris "Otomatis"). */
+.ai-model-opsi .mt {
+  flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.66rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums;
+}
 .ai-model-opsi .tik { flex: 0 0 auto; width: 13px; height: 13px; }
 /* Centang hanya tampak pada model yang sedang dipakai — ruangnya tetap
    dipesan supaya teks semua baris tetap sejajar. */
@@ -312,12 +319,11 @@
 
 /* --- Pemilih model: penyesuaian tiap ukuran layar --- */
 
-/* Layar sempit (HP 320–430 px): keterangan ukuran pada TOMBOL dilepas supaya
-   nama model dapat ruang; keterangan tetap ada di dalam daftar. */
+/* Layar sempit (HP 320–430 px): baris dirapatkan; nama model tetap utuh
+   karena keterangan ukuran memang hanya ada di dalam daftar. */
 @media (max-width: 430px) {
   .ai-model-bar { gap: 6px; padding: 8px 12px; }
-  .ai-model-btn .mt { display: none; }
-  .ai-model-opsi .mt { font-size: 0.62rem; }
+  .ai-model-opsi .mt { font-size: 0.62rem; max-width: 40%; }
 }
 
 /* HP sangat sempit (≤ 340 px): label "Model" dilepas — tombolnya sudah

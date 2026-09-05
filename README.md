@@ -264,7 +264,11 @@ bertanya tentang tim yang sedang dipilih di bilah atas.
 **Modelnya kamu yang pilih.** Di kepala panel ada daftar **Model** berisi
 seluruh model yang benar-benar terpasang di server kampus, diurutkan dari yang
 paling ringan (jawaban paling cepat) lengkap dengan jumlah parameter &
-ukurannya. Pilihan **Otomatis** berarti memakai model bawaan pemasangan
+ukurannya. Namanya dirapikan agar enak dibaca — `qwen2.5:7b-instruct` tampil
+sebagai **Qwen 2.5 7B Instruct**, `gpt-oss` jadi **GPT OSS**, dan
+`hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0` jadi **Gemma 2
+9B CPT SahabatAI v1 Instruct** (nama asli tetap muncul saat kursor diarahkan).
+Pilihan **Otomatis** berarti memakai model bawaan pemasangan
 (`OLLAMA_MODEL`) — sistem tidak pernah menggantinya diam-diam. Pilihan
 tersimpan di akunmu, jadi ikut dipakai tombol AI di formulir Kegiatan &
 Keuangan dan tetap sama saat dibuka di perangkat lain. Tiap jawaban diberi
@@ -647,6 +651,7 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:keamanan --workspace backend` | Perbaikan keamanan hasil audit: buka/tutup pendaftaran tim (+ endpoint publik & audit panel), whitelist kunci pengaturan, penolakan origin CORS palsu, unggahan bukan gambar → 400 ramah, pembatas laju per-username, cookie sesi panel, serta **denyut kehadiran** (`/denyut` → `membuka`, beacon tutup → tidak membuka) |
 | `npm run diag:ai --workspace backend` | Asisten **AI**: penyusun konteks (angka rekap benar, ukuran terbatas, kata kunci), parser JSON model, status server Ollama, **pemilihan model oleh pengguna** (daftar tersaring, model asing ditolak, `auto` kembali ke bawaan, pilihan tersimpan dipakai), lalu tanya-jawab & perbaikan deskripsi nyata (butuh internet) |
 | `npm run diag:ekspor-impor --workspace backend` | Putar-balik **ekspor → impor** beserta foto: foto 2000px dikecilkan CDN jadi sematan 1000px tanpa crop, cache sidik jari (pakai ulang / `?segar=1` / batal saat data berubah), berkas ekspor lama dibuang, PDF & XLSX terbit, dokumen hasil ekspor diimpor ke akun lain lengkap dengan fotonya, dan impor ulang tidak mengunggah foto lagi (butuh internet + env `IMAGEKIT_*`) |
+| `npm run diag:nama-model --workspace backend` | **Perapi nama model AI**: nama mentah Ollama (`qwen2.5:7b-instruct`, `gpt-oss`, `hf.co/…-GGUF:Q8_0`) jadi bentuk yang enak dibaca, penanda teknis dibuang, singkatan resmi benar (GPT/OSS/VL/SmolLM/SahabatAI), ukuran parameter tidak diulang, panjangnya muat di baris daftar — plus seluruh model NYATA di server kampus ikut diperiksa (tanpa database) |
 | `node backend/diag-ekspor-foto.mjs` | Pengambil foto sematan (`export/foto.js`): pemilihan resolusi dari jumlah foto, pembaca dimensi JPEG/PNG, pembatas paralel, dan sidik jari cache ekspor (tanpa database) |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
