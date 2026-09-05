@@ -226,6 +226,8 @@ Jalankan dari root proyek:
 4. Untuk regresi tampilan, jalankan frontend pada port 3100 di terminal terpisah lalu `npm run audit:desain`. Lihat `AUDIT-DESAIN.md` untuk cakupan dan opsi.
 5. Periksa `git status --short` dan `git diff --check` sebelum commit. Jangan menambahkan `.env`, unggahan, database lokal, atau artefak pengujian. Sertakan berkas sumber dan tes baru yang belum terlacak.
 
+**Paket Vercel CLI berbeda dari commit Git.** Pertahankan `.vercelignore`: berkas ini mengecualikan `.env` di semua folder, data/unggahan lokal, artefak, hasil build lama, dan dokumen pribadi dari upload CLI. `.gitignore` saja tidak cukup. Rahasia produksi tetap diatur melalui Environment Variables Vercel, bukan berkas lokal. Template runtime di `backend/src/assets/` dan skrip penyiapan ekspor tetap harus ikut.
+
 Untuk mengaudit **hasil build produksi**, setelah `npm run build` jalankan `node tools/serve-audit.mjs` di terminal terpisah. Kemudian di PowerShell jalankan `$env:AUDIT_URL='http://127.0.0.1:3101'; npm run audit:desain`. Hapus pengaturan ini setelah selesai dengan `Remove-Item Env:AUDIT_URL`. Server tersebut hanya melayani berkas statis di localhost; API tetap ditiru oleh skrip audit, bukan tersambung ke database. Folder ekspor alternatif dapat diberikan sebagai argumen `serve-audit.mjs`.
 
 `npm run test:pradeploy` sengaja **tidak** menjalankan seluruh `backend/diag-*.mjs`: sejumlah diagnostik integrasi membuat akun, mengubah pengaturan, atau menulis ke database. Jalankan tes integrasi tersebut hanya pada lingkungan uji terpisah, bukan database produksi.
