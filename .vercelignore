@@ -1,0 +1,42 @@
+# Vercel CLI upload rules are separate from Git ignore rules.
+.git/
+.vercel/
+node_modules/
+**/node_modules/
+frontend/.next/
+frontend/out/
+
+# Credentials and private local data never belong in deployment source.
+.env
+.env.*
+**/.env
+**/.env.*
+data/
+uploads/
+artifacts/
+
+# Local diagnostics, generated documents, plans, binaries and references.
+*.log
+**/*.log
+diag.txt
+hasil-deploy.txt
+vv.txt
+start.ps1
+stop.ps1
+*.prompt.md
+Referensi Desain UI/
+/*.jpg
+/*.jpeg
+/*.png
+/*.docx
+/*.pptx
+/*.xlsx
+/*.pdf
+/*.zip
+tools/*.docx
+tools/*.pdf
+tools/*.xlsx
+tools/*.exe
+
+# backend/src/assets stays included: these templates are runtime dependencies.
+
