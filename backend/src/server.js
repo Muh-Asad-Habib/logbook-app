@@ -24,6 +24,7 @@ import komentarRouter from "./routes/komentar.js";
 import persetujuanRouter from "./routes/persetujuan.js";
 import timRouter from "./routes/tim.js";
 import tunnelRouter from "./routes/tunnel.js";
+import aiRouter from "./routes/ai.js";
 import adminRouter from "./admin/routes.js";
 import { loadAdmin, panelPath } from "./admin/store.js";
 
@@ -199,6 +200,7 @@ app.use("/api/komentar", komentarRouter);
 app.use("/api/persetujuan", persetujuanRouter);
 app.use("/api/tim", timRouter);
 app.use("/api/tunnel", tunnelRouter);
+app.use("/api/ai", aiRouter);
 
 // panel admin — path diambil dari database saat request masuk,
 // jadi bisa diganti tanpa restart. Tidak ada referensi apa pun di frontend.
@@ -281,7 +283,10 @@ app.use((err, _req, res, _next) => {
   }
   const status = Number(err?.status) || 500;
   console.error("[error]", err);
-  const pesan = status >= 500
+  // Galat 5xx yang ditandai `aman` (mis. dari klien AI) memang ditulis untuk
+  // dibaca pengguna — pesannya tidak berisi detail internal, jadi diteruskan
+  // apa adanya supaya orang tahu apa yang harus dilakukan.
+  const pesan = status >= 500 && !err?.aman
     ? "Terjadi gangguan di server — coba lagi sebentar"
     : (err.message || "permintaan tidak valid");
   res.status(status).json({ error: pesan });
@@ -295,6 +300,7 @@ if (!config.diVercel) {
     console.log(`[server] Dokumentasi API: http://localhost:${config.port}/docs`);
     console.log(`[server] Data: Neon Postgres (DATABASE_URL)`);
     console.log(`[server] Gambar: ${process.env.IMAGEKIT_PRIVATE_KEY ? "ImageKit (cloud)" : `folder lokal ${config.uploadsDir}`}`);
+    console.log(`[server] AI: ${/^(1|true|ya)$/i.test(process.env.AI_NONAKTIF || "") ? "nonaktif" : `${process.env.OLLAMA_MODEL || "qwen2.5:7b-instruct"} @ ${process.env.OLLAMA_URL || "https://ollama.if.unismuh.ac.id"}`}`);
   });
 }
 

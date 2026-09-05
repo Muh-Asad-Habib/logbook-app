@@ -5,11 +5,11 @@
  * beserta fotonya; baris kosong yang tersisa dihapus agar dokumen rapi.
  */
 import fs from "node:fs";
-import path from "node:path";
 import JSZip from "jszip";
 import { config } from "../config.js";
 import * as store from "../storage.js";
-import { getFileBufferRetry, compressForEmbed, siapkanEmbed } from "../files.js";
+import { compressForEmbed, siapkanEmbed } from "../files.js";
+import { ambilFotoEmbed, ukuranGambar, extDariByte } from "./foto.js";
 
 /** Template resmi — ikut ter-bundle ke serverless function (backend/src/assets). */
 export const TEMPLATE = config.templatePath;
@@ -110,24 +110,7 @@ function cellStyles(tblXml) {
 
 /** Baca dimensi JPEG/PNG dari buffer (fallback 4:3). */
 function imgSize(buf) {
-  try {
-    if (buf[0] === 0x89 && buf[1] === 0x50) { // PNG
-      return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
-    }
-    if (buf[0] === 0xff && buf[1] === 0xd8) { // JPEG
-      let i = 2;
-      while (i < buf.length - 8) {
-        if (buf[i] !== 0xff) { i++; continue; }
-        const marker = buf[i + 1];
-        const len = buf.readUInt16BE(i + 2);
-        if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
-          return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
-        }
-        i += 2 + len;
-      }
-    }
-  } catch {}
-  return { w: 4, h: 3 };
+  return ukuranGambar(buf) || { w: 4, h: 3 };
 }
 
 /* ---------------- ukuran foto di dokumen ---------------- */
@@ -240,11 +223,14 @@ function drawingXml(rid, docPrId, cx, cy) {
  *  Foto sudah di-prefetch (bufferMap: key -> Buffer) supaya penyisipan
  *  ke XML tetap sinkron walau sumbernya cloud.
  *  `sizeMap` berisi dimensi ASLI foto (rasio selalu benar, gambar tak terpotong);
- *  `docXml` dipindai agar id drawing baru tidak bentrok dengan bawaan template. */
+ *  `docXml` dipindai agar id drawing baru tidak bentrok dengan bawaan template.
+ *  Satu kunci foto hanya disimpan SEKALI di word/media — bila kunci yang sama
+ *  dipakai beberapa baris, relationship-nya dipakai ulang (hanya docPr id baru). */
 function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap, sizeMap, docXml = "") {
   let mediaN = 1000;
   let relN = 1000;
   let docPrN = 9000;
+  const ridDariKey = new Map(); // key foto → rId (dedup media)
   const existing = relsXmlRef.value.match(/Id="rId(\d+)"/g) || [];
   for (const m of existing) {
     const n = parseInt(m.match(/\d+/)[0], 10);
@@ -262,21 +248,26 @@ function makeImageStore(zip, relsXmlRef, ctypesRef, bufferMap, sizeMap, docXml =
       try {
         const buf = bufferMap.get(fileKey);
         if (!buf) return null;
-        const ext = path.extname(fileKey).replace(".", "").toLowerCase() || "jpeg";
-        const extNorm = ext === "jpg" ? "jpeg" : ext;
-        if (!ctypesRef.value.includes(`Extension="${extNorm}"`)) {
-          ctypesRef.value = ctypesRef.value.replace(
-            "</Types>",
-            `<Default Extension="${extNorm}" ContentType="image/${extNorm}"/></Types>`
+        let rid = ridDariKey.get(fileKey);
+        if (!rid) {
+          // Ekstensi dari ISI byte — nama di cloud belum tentu cocok (mis.
+          // .png yang oleh CDN dikirim sebagai JPEG).
+          const extNorm = extDariByte(buf, fileKey);
+          if (!ctypesRef.value.includes(`Extension="${extNorm}"`)) {
+            ctypesRef.value = ctypesRef.value.replace(
+              "</Types>",
+              `<Default Extension="${extNorm}" ContentType="image/${extNorm}"/></Types>`
+            );
+          }
+          const name = `media/lb_${mediaN++}.${extNorm}`;
+          zip.file(`word/${name}`, buf);
+          rid = `rId${relN++}`;
+          relsXmlRef.value = relsXmlRef.value.replace(
+            "</Relationships>",
+            `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${name}"/></Relationships>`
           );
+          ridDariKey.set(fileKey, rid);
         }
-        const name = `media/lb_${mediaN++}.${extNorm}`;
-        zip.file(`word/${name}`, buf);
-        const rid = `rId${relN++}`;
-        relsXmlRef.value = relsXmlRef.value.replace(
-          "</Relationships>",
-          `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${name}"/></Relationships>`
-        );
         // Ukuran tampil mengikuti RASIO ASLI foto (tidak dipangkas) —
         // imgSize() hanya cadangan untuk format yang tak didukung sharp (gif).
         const info = sizeMap?.get(fileKey) || imgSize(buf);
@@ -621,37 +612,15 @@ export async function buildDocx(userId) {
     ...kegList.flatMap((e) => e.foto_keys || []),
     ...keuList.flatMap((e) => e.bukti_keys || []),
   ];
+  // Foto ditarik dari CDN SUDAH berukuran sematan (ImageKit yang mengecilkan),
+  // paralel terbatas, resolusi dipilih sekali dari jumlah foto — lihat foto.js.
+  // Menggantikan: unduh utuh → sharp per foto → kompres ulang bila > anggaran.
+  const fotoMap = await ambilFotoEmbed(semuaKey);
   const bufferMap = new Map();
   const sizeMap = new Map(); // key → { w, h } dimensi ASLI (untuk rasio tampil)
-  await Promise.all(
-    [...new Set(semuaKey)].map(async (k) => {
-      // RETRY singkat: permintaan CDN sesekali meleset (propagasi/cache) —
-      // tanpa ini foto akan hilang diam-diam dari dokumen hasil ekspor.
-      const buf = await getFileBufferRetry(k, 3, 800);
-      if (!buf) return;
-      // Disiapkan beresolusi tinggi tanpa dipangkas; foto lama yang kecil
-      // (mis. hasil impor DOCX) di-upscale agar tidak pecah saat dicetak.
-      const r = await siapkanFoto(buf);
-      if (r) {
-        bufferMap.set(k, r.buf);
-        sizeMap.set(k, { w: r.w, h: r.h });
-      } else {
-        bufferMap.set(k, buf); // gif/format lain: apa adanya
-      }
-    })
-  );
-
-  // PENJAGA UKURAN — jaring pengaman untuk logbook dengan RATUSAN foto.
-  // Batas respons serverless tidak lagi relevan (berkas ekspor diunggah ke
-  // ImageKit lalu diunduh dari CDN), tetapi berkas raksasa tetap tidak nyaman
-  // dibuka di Word, jadi kompresi diperketat bertahap bila melewati anggaran.
-  const EMBED_BUDGET = 14 * 1024 * 1024;
-  const totalEmbed = () => [...bufferMap.values()].reduce((s, b) => s + b.length, 0);
-  for (const [dim, mutu] of [[800, 80], [640, 76]]) {
-    if (totalEmbed() <= EMBED_BUDGET) break;
-    await Promise.all([...bufferMap.entries()].map(async ([k, b]) => {
-      bufferMap.set(k, await compressForEmbed(b, dim, mutu));
-    }));
+  for (const [k, r] of fotoMap) {
+    bufferMap.set(k, r.buffer);
+    sizeMap.set(k, { w: r.w, h: r.h });
   }
 
   // Dimensi asli foto sudah dicatat di sizeMap oleh siapkanFoto di atas.

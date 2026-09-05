@@ -114,73 +114,94 @@ router.post("/izin-unggah", async (req, res, next) => {
 router.post("/docx/langsung", async (req, res, next) => {
   const terdaftar = [];
   try {
-    if (!pakaiCloud()) return res.status(400).json({ error: "Mode cloud tidak aktif" });
-    const stem = String(req.body?.stem || "");
-    const jumlah = Number(req.body?.jumlah);
-    const daftar = Array.isArray(req.body?.bagian) ? req.body.bagian : [];
-    const tanda = String(req.body?.tanda || "");
-
-    if (!STEM_RE.test(stem) || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 15) {
-      return res.status(400).json({ error: "Parameter unggahan tidak valid" });
-    }
-    if (tanda !== tandaInternal(`impor|${req.userId}|${stem}|${jumlah}`)) {
-      return res.status(400).json({ error: "Izin unggah tidak sah — ulangi unggahan" });
-    }
-    if (daftar.length !== jumlah) {
-      return res.status(400).json({ error: `Bagian tidak lengkap (${daftar.length}/${jumlah})` });
-    }
-
-    // Verifikasi ke ImageKit: nama & ukuran tiap bagian, fileId milik akun kita.
-    const kunci = [];
-    let total = 0;
-    for (let i = 0; i < jumlah; i++) {
-      const seharusnya = namaBagian(stem, i, jumlah, ".docx");
-      const b = daftar.find((x) => String(x?.key) === seharusnya);
-      if (!b?.fileId) return res.status(400).json({ error: `Bagian #${i} tidak ditemukan` });
-      const meta = await metaFileIK(String(b.fileId));
-      if (!meta || meta.name !== seharusnya) {
-        return res.status(400).json({ error: `Bagian #${i} gagal diverifikasi` });
-      }
-      const size = Number(meta.size) || 0;
-      if (size <= 0 || size > PART_MAX + 1024) {
-        return res.status(400).json({ error: `Ukuran bagian #${i} tidak wajar` });
-      }
-      total += size;
-      await catatFileIK(seharusnya, meta.fileId, meta.url || "");
-      terdaftar.push(seharusnya);
-      kunci.push(seharusnya);
-    }
-    if (total <= 0 || total > MAKS_UKURAN) {
-      return res.status(400).json({ error: "Ukuran total berkas tidak wajar" });
-    }
-
-    // Tarik tiap bagian dari CDN (dengan retry — propagasi CDN bisa 1–5 dtk), rakit.
-    const potongan = [];
-    for (const k of kunci) {
-      const buf = await getFileBufferRetry(k);
-      if (!buf) return res.status(400).json({ error: "Berkas belum tersedia di penyimpanan — coba lagi" });
-      potongan.push(buf);
-    }
-    const buffer = Buffer.concat(potongan);
-    if (!(buffer[0] === 0x50 && buffer[1] === 0x4b)) {
-      return res.status(400).json({ error: "Berkas bukan dokumen Word (.docx) yang valid" });
-    }
-
-    let hasil;
-    try {
-      hasil = await importDocx(buffer, req.userId);
-    } catch (e) {
-      e.status = 400;
-      throw e;
-    }
-    res.json(hasil);
+    const hasil = await prosesImporLangsung(req, terdaftar);
+    // Berkas sementara dibersihkan SEBELUM respons dikirim. Sebelumnya
+    // pembersihan berjalan "tembak-lupakan" di blok finally; di serverless
+    // Vercel pekerjaan yang belum rampung ketika respons terkirim bisa
+    // dihentikan runtime, sehingga potongan .docx sementara tertinggal di
+    // ImageKit dan memakan kuota.
+    await bersihkanSementara(terdaftar);
+    if (hasil.error) return res.status(hasil.status || 400).json({ error: hasil.error });
+    res.json(hasil.data);
   } catch (err) {
+    await bersihkanSementara(terdaftar);
     next(err);
-  } finally {
-    // Berkas impor hanya sementara — selalu dibersihkan, sukses maupun gagal.
-    if (terdaftar.length) removeFiles(terdaftar).catch(() => {});
   }
 });
+
+/** Hapus berkas impor sementara; kegagalan tidak boleh menggagalkan respons. */
+async function bersihkanSementara(kunci) {
+  if (!kunci.length) return;
+  const salinan = kunci.splice(0, kunci.length);
+  await removeFiles(salinan).catch(() => {});
+}
+
+/**
+ * Verifikasi bagian unggahan, rakit, lalu jalankan impor.
+ * @returns {Promise<{data?: object, error?: string, status?: number}>}
+ *   `error` dipakai untuk penolakan yang sudah ramah pengguna (400) — pemanggil
+ *   yang mengirim respons agar pembersihan berkas sementara selalu kebagian.
+ */
+async function prosesImporLangsung(req, terdaftar) {
+  if (!pakaiCloud()) return { error: "Mode cloud tidak aktif" };
+  const stem = String(req.body?.stem || "");
+  const jumlah = Number(req.body?.jumlah);
+  const daftar = Array.isArray(req.body?.bagian) ? req.body.bagian : [];
+  const tanda = String(req.body?.tanda || "");
+
+  if (!STEM_RE.test(stem) || !Number.isInteger(jumlah) || jumlah < 1 || jumlah > 15) {
+    return { error: "Parameter unggahan tidak valid" };
+  }
+  if (tanda !== tandaInternal(`impor|${req.userId}|${stem}|${jumlah}`)) {
+    return { error: "Izin unggah tidak sah — ulangi unggahan" };
+  }
+  if (daftar.length !== jumlah) {
+    return { error: `Bagian tidak lengkap (${daftar.length}/${jumlah})` };
+  }
+
+  // Verifikasi ke ImageKit: nama & ukuran tiap bagian, fileId milik akun kita.
+  const kunci = [];
+  let total = 0;
+  for (let i = 0; i < jumlah; i++) {
+    const seharusnya = namaBagian(stem, i, jumlah, ".docx");
+    const b = daftar.find((x) => String(x?.key) === seharusnya);
+    if (!b?.fileId) return { error: `Bagian #${i} tidak ditemukan` };
+    const meta = await metaFileIK(String(b.fileId));
+    if (!meta || meta.name !== seharusnya) {
+      return { error: `Bagian #${i} gagal diverifikasi` };
+    }
+    const size = Number(meta.size) || 0;
+    if (size <= 0 || size > PART_MAX + 1024) {
+      return { error: `Ukuran bagian #${i} tidak wajar` };
+    }
+    total += size;
+    await catatFileIK(seharusnya, meta.fileId, meta.url || "");
+    terdaftar.push(seharusnya);
+    kunci.push(seharusnya);
+  }
+  if (total <= 0 || total > MAKS_UKURAN) {
+    return { error: "Ukuran total berkas tidak wajar" };
+  }
+
+  // Tarik tiap bagian dari CDN (dengan retry — propagasi CDN bisa 1–5 dtk), rakit.
+  const potongan = [];
+  for (const k of kunci) {
+    const buf = await getFileBufferRetry(k);
+    if (!buf) return { error: "Berkas belum tersedia di penyimpanan — coba lagi" };
+    potongan.push(buf);
+  }
+  const buffer = Buffer.concat(potongan);
+  if (!(buffer[0] === 0x50 && buffer[1] === 0x4b)) {
+    return { error: "Berkas bukan dokumen Word (.docx) yang valid" };
+  }
+
+  try {
+    return { data: await importDocx(buffer, req.userId) };
+  } catch (e) {
+    e.status = 400;
+    throw e;
+  }
+}
 
 /**
  * @openapi

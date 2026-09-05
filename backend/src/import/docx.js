@@ -2,13 +2,25 @@
  * Impor DOCX — membaca dokumen logbook resmi (template atau salinan terisi),
  * lalu memasukkan entri yang BELUM ada di aplikasi beserta foto-fotonya.
  * Aman dijalankan berulang (entri yang sudah ada dilewati).
+ *
+ * Alur (dua tahap, hemat waktu & kuota):
+ *  1. PARSE seluruh tabel → daftar entri baru + rId gambar per entri
+ *     (tanpa menyentuh jaringan).
+ *  2. UNGGAH foto: tiap media di dalam .docx dikompresi SEKALI (satu gambar
+ *     bisa dirujuk beberapa baris), lalu diunggah dengan paralel terbatas —
+ *     dulu satu per satu berurutan sehingga 100 foto = 100 × latensi.
+ *  3. SIMPAN entri berurutan. Bila ada yang gagal di tengah, seluruh foto
+ *     yang sudah terunggah pada sesi ini dihapus (tidak ada berkas yatim).
  */
 import fs from "node:fs";
 import path from "node:path";
 import JSZip from "jszip";
 import * as store from "../storage.js";
-import { putFile } from "../files.js";
+import { putFile, compressImage, removeFiles, jalankanTerbatas, ALLOWED_EXT } from "../files.js";
 import { TEMPLATE } from "../export/docx.js";
+
+/** Jumlah unggahan foto yang berjalan bersamaan saat impor. */
+const PARALEL_UNGGAH = 5;
 
 const BULAN_MAP = {
   jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6,
@@ -95,19 +107,32 @@ function cellText(tc) {
 /** Daftar rId gambar pada sel, urut kemunculan. */
 const cellImageIds = (tc) => [...tc.matchAll(/r:embed="([^"]+)"/g)].map((m) => m[1]);
 
-/** Simpan gambar dari zip docx ke folder uploads; kembalikan key (null bila gagal). */
-async function saveImage(zip, relMap, rid, prefix) {
-  try {
+/**
+ * Pembaca media di dalam paket .docx dengan CACHE: satu berkas media hanya
+ * dibaca dari zip & dikompresi SEKALI walau dirujuk banyak baris.
+ * @returns {(rid: string) => Promise<{buffer: Buffer, ext: string}|null>}
+ */
+function bikinPembacaMedia(zip, relMap) {
+  const cache = new Map(); // target → Promise<{buffer, ext}|null>
+  return (rid) => {
     const target = (relMap[rid] || "").replace(/^\//, "");
-    if (!target || !target.includes("media/")) return null;
-    const f = zip.file(`word/${target}`) || zip.file(target);
-    if (!f) return null;
-    const buf = await f.async("nodebuffer");
-    const ext = path.extname(target) || ".jpeg";
-    return putFile(`impor${ext}`, buf, prefix);
-  } catch {
-    return null;
-  }
+    if (!target || !target.includes("media/")) return Promise.resolve(null);
+    if (!cache.has(target)) {
+      cache.set(target, (async () => {
+        try {
+          const f = zip.file(`word/${target}`) || zip.file(target);
+          if (!f) return null;
+          const buf = await f.async("nodebuffer");
+          let ext = (path.extname(target) || ".jpeg").toLowerCase();
+          if (!ALLOWED_EXT.has(ext)) ext = ".jpg";
+          return compressImage(buf, ext); // { buffer, ext }
+        } catch {
+          return null;
+        }
+      })());
+    }
+    return cache.get(target);
+  };
 }
 
 /**
@@ -182,9 +207,11 @@ export async function importDocx(buffer, userId) {
   // Template resmi: Tanggal | Kegiatan | Capaian | Waktu | …
   // Varian umum:    Tanggal | Dokumentasi | Waktu | Persentase | Keterangan
   // Peta kolom dideteksi dari baris header; tanpa header → asumsi template.
+  // Tahap ini HANYA mengumpulkan entri baru ke `antrean` — foto diunggah nanti.
+  const antrean = []; // { jenis, data, rids: string[], prefix }
   let kegBaru = 0, kegLewat = 0, prevCum = 0, lastTglKeg = null;
   let kolom = { kegiatan: 1, capaian: 2, waktu: 3 };
-  async function prosesKegiatan(tbl) {
+  function prosesKegiatan(tbl) {
     for (const tr of rowsOf(tbl)) {
       const cells = cellsOf(tr);
       if (cells.length < 4) continue;
@@ -223,16 +250,11 @@ export async function importDocx(buffer, userId) {
 
       // Foto bisa diletakkan pengguna di sel mana pun (kolom Berkas, kolom
       // Kegiatan, bahkan kolom Tanggal/Validasi) — sisir seluruh sel baris.
-      const fotoKeys = [];
-      for (const tc of cells) {
-        for (const rid of cellImageIds(tc)) {
-          const k = await saveImage(zip, relMap, rid, `keg_${tanggal}`);
-          if (k) fotoKeys.push(k);
-        }
-      }
-      await store.addKegiatan(userId, {
-        tanggal, kegiatan, capaian_delta: delta,
-        waktu_menit: parseWaktu(teks[kolom.waktu]), foto_keys: fotoKeys,
+      antrean.push({
+        jenis: "kegiatan",
+        prefix: `keg_${tanggal}`,
+        rids: cells.flatMap(cellImageIds),
+        data: { tanggal, kegiatan, capaian_delta: delta, waktu_menit: parseWaktu(teks[kolom.waktu]) },
       });
       kegAda.add(`${tanggal}|${norm(kegiatan)}`);
       kegBaru += 1;
@@ -246,7 +268,7 @@ export async function importDocx(buffer, userId) {
   // dari Total ÷ Harga (total tersimpan = harga × jumlah).
   let keuBaru = 0, keuLewat = 0, lastTglKeu = null;
   let kolomKeu = { item: 1, harga: 2, jumlah: 3, total: 4, bukti: 5 };
-  async function prosesKeuangan(tbl) {
+  function prosesKeuangan(tbl) {
     for (const tr of rowsOf(tbl)) {
       const cells = cellsOf(tr);
       if (cells.length < 4) continue;
@@ -311,27 +333,23 @@ export async function importDocx(buffer, userId) {
         if (selisih > 0 && selisih < Math.max(1000, dasar * 0.01)) kodeUnik = selisih;
       }
 
-
-      const buktiKeys = [];
       // Utamakan kolom Bukti/Gambar, tetapi terima juga bila foto diletakkan
       // di sel lain pada baris yang sama — SEMUA gambar disimpan.
       const selBukti = cells[kolomKeu.bukti] || "";
-      const ids = [
-        ...cellImageIds(selBukti),
-        ...cells.filter((_, c) => c !== kolomKeu.bukti).flatMap(cellImageIds),
-      ];
-      for (const rid of ids) {
-        const k = await saveImage(zip, relMap, rid, `keu_${tanggal}`);
-        if (k) buktiKeys.push(k);
-      }
-
-      await store.addKeuangan(userId, {
-        tanggal, item,
-        harga_satuan: harga,
-        satuan_suffix: parseSuffix(teks[kolomKeu.harga]),
-        jumlah,
-        kode_unik: kodeUnik,
-        bukti_keys: buktiKeys,
+      antrean.push({
+        jenis: "keuangan",
+        prefix: `keu_${tanggal}`,
+        rids: [
+          ...cellImageIds(selBukti),
+          ...cells.filter((_, c) => c !== kolomKeu.bukti).flatMap(cellImageIds),
+        ],
+        data: {
+          tanggal, item,
+          harga_satuan: harga,
+          satuan_suffix: parseSuffix(teks[kolomKeu.harga]),
+          jumlah,
+          kode_unik: kodeUnik,
+        },
       });
       keuAda.add(`${tanggal}|${norm(item)}`);
       keuBaru += 1;
@@ -343,14 +361,63 @@ export async function importDocx(buffer, userId) {
   let jenisSebelumnya = null;
   for (let i = 0; i < tables.length; i++) {
     const jenis = jenisTabel(tables[i], jenisSebelumnya) || (i === 0 ? "kegiatan" : null);
-    if (jenis === "kegiatan") await prosesKegiatan(tables[i]);
-    else if (jenis === "keuangan") await prosesKeuangan(tables[i]);
+    if (jenis === "kegiatan") prosesKegiatan(tables[i]);
+    else if (jenis === "keuangan") prosesKeuangan(tables[i]);
     else if (warnings.length < 8) {
       warnings.push(`Tabel ke-${i + 1} dilewati (bukan tabel kegiatan/keuangan yang dikenali)`);
     }
     jenisSebelumnya = jenis;
   }
 
-  return { keg_baru: kegBaru, keg_lewat: kegLewat, keu_baru: keuBaru, keu_lewat: keuLewat, warnings };
+  // ---------- Tahap 2: unggah foto (paralel terbatas, kompres sekali) ----------
+  const bacaMedia = bikinPembacaMedia(zip, relMap);
+  const tugas = antrean.flatMap((e, ei) => e.rids.map((rid, ri) => ({ ei, ri, rid })));
+  const terunggah = []; // semua key yang berhasil — untuk pembersihan bila gagal
+  let fotoGagal = 0;
+  const hasilFoto = await jalankanTerbatas(tugas, PARALEL_UNGGAH, async ({ ei, rid }) => {
+    const m = await bacaMedia(rid);
+    if (!m) return null;
+    // sudah dikompresi oleh pembaca media → putFile tidak mengompres ulang
+    const key = await putFile(`impor${m.ext}`, m.buffer, antrean[ei].prefix, { kompres: false });
+    terunggah.push(key);
+    return key;
+  });
+  // Susun kembali key per entri sesuai urutan kemunculan gambar di barisnya
+  const fotoPerEntri = antrean.map(() => []);
+  tugas.forEach((t, i) => {
+    const key = hasilFoto[i];
+    if (key) fotoPerEntri[t.ei][t.ri] = key;
+    else fotoGagal += 1;
+  });
+  if (fotoGagal && warnings.length < 8) {
+    warnings.push(`${fotoGagal} gambar tidak dapat dipindahkan (format tidak dikenali / gagal diunggah)`);
+  }
+
+  // ---------- Tahap 3: simpan entri (berurutan agar capaian kumulatif benar) ----------
+  let iGagal = -1;
+  try {
+    for (let i = 0; i < antrean.length; i++) {
+      iGagal = i;
+      const e = antrean[i];
+      const keys = fotoPerEntri[i].filter(Boolean);
+      if (e.jenis === "kegiatan") {
+        await store.addKegiatan(userId, { ...e.data, foto_keys: keys });
+      } else {
+        await store.addKeuangan(userId, { ...e.data, bukti_keys: keys });
+      }
+    }
+  } catch (err) {
+    // Gagal di tengah → foto milik entri yang BELUM tersimpan (mulai indeks
+    // gagal) dihapus supaya tidak jadi berkas yatim. Entri yang sudah masuk
+    // tetap utuh — impor ulang akan melewatinya.
+    const yatim = fotoPerEntri.slice(iGagal).flat().filter(Boolean);
+    await removeFiles(yatim);
+    throw err;
+  }
+
+  return {
+    keg_baru: kegBaru, keg_lewat: kegLewat, keu_baru: keuBaru, keu_lewat: keuLewat,
+    foto_baru: terunggah.length, warnings,
+  };
 }
 

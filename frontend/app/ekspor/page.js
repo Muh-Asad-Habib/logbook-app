@@ -215,6 +215,9 @@ export default function EksporPage() {
             <span className="badge info">{hasilImpor.keg_lewat} dilewati</span>
             <span className="badge ok">belanja: {hasilImpor.keu_baru} baru</span>
             <span className="badge info">{hasilImpor.keu_lewat} dilewati</span>
+            {hasilImpor.foto_baru > 0 && (
+              <span className="badge info">{hasilImpor.foto_baru} foto dipindahkan</span>
+            )}
             {hasilImpor.warnings?.map((w, i) => (
               <p key={i} className="muted mts"><TriangleAlert className="lucide" /> {w}</p>
             ))}
@@ -226,6 +229,10 @@ export default function EksporPage() {
         <h3><Lightbulb className="lucide" /> Catatan</h3>
         <ul className="eks-list">
           <li>Ekspor tidak mengubah data — berkas selalu salinan terbaru, aman diunduh berulang.</li>
+          <li>
+            Bila data belum berubah sejak unduhan terakhir, berkas yang sama langsung diberikan dari
+            penyimpanan (tidak dibangun ulang) — unduhan berikutnya jadi instan.
+          </li>
           <li>Foto disematkan utuh beresolusi tinggi, tanpa batas ukuran unduhan.</li>
           <li>
             <b>Khusus Keuangan</b> berdiri sendiri: nota tampil di kolom <i>Nota</i> dan

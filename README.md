@@ -48,6 +48,7 @@ bisa dicetak menjadi dokumen laporan.
 | 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
 | 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. Tersedia pula **Word khusus keuangan** (dana Belmawa per kategori & dana PT terpisah). |
 | 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
+| 🤖 **Asisten AI** | Tanya langsung soal logbookmu — *"uang paling banyak ke mana?"*, *"berapa persen bahan habis pakai?"*, *"ringkas kegiatan bulan ini"* — dijawab dari data tim yang tersimpan. Juga bisa **merapikan deskripsi kegiatan** dan **mengusulkan sumber dana & kategori PKM** saat mengisi form. Ditenagai model Ollama di server kampus (`ollama.if.unismuh.ac.id`). |
 | 💬 **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
 | ✅ **Pengesahan (ACC)** | Dosen menyetujui atau meminta revisi tiap entri; statusnya terlihat jelas oleh tim. |
 | 🌙 **Nyaman dipakai** | Tampilan terang/gelap, responsif di ponsel, dan bisa dipasang sebagai aplikasi (PWA). |
@@ -221,6 +222,14 @@ Ekspor **tidak pernah mengubah data** — yang diunduh selalu salinan baru dan
 aman diulang berkali-kali. Ekspor khusus keuangan juga **tidak mengganggu**
 ekspor gabungan kegiatan & keuangan; keduanya berdiri sendiri.
 
+> ⚡ **Cepat & hemat.** Foto untuk dokumen diminta ke CDN **sudah dalam ukuran
+> sematan** (ImageKit yang mengecilkan, bukan server), diunduh dengan paralel
+> terbatas, dan satu foto yang dipakai beberapa baris hanya disimpan sekali di
+> dalam berkas. Bila data belum berubah sejak unduhan terakhir, tautan berkas
+> yang sama langsung dikembalikan tanpa dibangun ulang (`cache: true`);
+> tambahkan `?segar=1` pada `POST /api/export/tautan/{jenis}` untuk memaksa
+> bangun ulang.
+
 **Impor:** pada halaman yang sama, unggah logbook Word lama lalu klik **Impor
 sekarang**. Berkas dikirim **langsung ke penyimpanan (ImageKit)** — tidak
 melewati server — sehingga dokumen berfoto puluhan MB pun bisa diimpor dari
@@ -228,7 +237,47 @@ browser (maks. 300 MB); server lalu membacanya, memindahkan entri & foto, dan
 menghapus berkas sementaranya. Entri yang belum ada akan ditambahkan lengkap
 dengan fotonya; entri yang sudah ada dilewati sehingga aman diklik berulang.
 Format tanggal seperti `23-Mei-26`, `06 Juni 2026`, `6/5/2026`, durasi `2 jam`
-atau `1 j 30 mnt`, serta harga `Rp 100.000 / bulan` sudah dikenali.
+atau `1 j 30 mnt`, serta harga `Rp 100.000 / bulan` sudah dikenali. Setiap
+gambar di dalam dokumen dikompresi **sekali** lalu diunggah **paralel** (5
+sekaligus); bila impor gagal di tengah, foto yang sudah naik untuk entri yang
+belum tersimpan dihapus otomatis — tidak ada berkas yatim.
+
+### 9. Asisten AI
+
+Tombol **✨ Tanya AI** (kanan bawah; di ponsel kiri bawah) membuka panel
+percakapan. Server menyusun ringkasan data tim — dana, rekap kategori PKM
+(60/15/30/15 %), pengeluaran per bulan, daftar belanja & kegiatan — lalu
+mengirimkannya ke model **Ollama** di server kampus, sehingga jawaban memakai
+angka yang benar, bukan mengarang. Contoh pertanyaan:
+
+- *Uang kami paling banyak terpakai untuk apa?*
+- *Berapa persen pemakaian tiap kategori dana Belmawa? Ada yang melebihi batas?*
+- *Berapa sisa dana dan berapa entri yang belum ditandai sumbernya?*
+- *Kegiatan apa saja di bulan Juli, dan berapa capaian totalnya?*
+
+Di formulir **Kegiatan** ada tombol **Perbaiki dengan AI** (gaya formal /
+ringkas / rinci) yang mengusulkan deskripsi lebih rapi **tanpa menambah fakta**
+— tekan **Gunakan** bila cocok. Di formulir **Keuangan** ada **Saran kategori
+AI** yang menebak sumber dana & kategori PKM dari nama item. Pembimbing dapat
+bertanya tentang tim yang sedang dipilih di bilah atas.
+
+**Modelnya kamu yang pilih.** Di kepala panel ada daftar **Model** berisi
+seluruh model yang benar-benar terpasang di server kampus, diurutkan dari yang
+paling ringan (jawaban paling cepat) lengkap dengan jumlah parameter &
+ukurannya. Pilihan **Otomatis** berarti memakai model bawaan pemasangan
+(`OLLAMA_MODEL`) — sistem tidak pernah menggantinya diam-diam. Pilihan
+tersimpan di akunmu, jadi ikut dipakai tombol AI di formulir Kegiatan &
+Keuangan dan tetap sama saat dibuka di perangkat lain. Tiap jawaban diberi
+label model penjawabnya sehingga mudah membandingkan.
+
+> Model penyemat (*embedding*, mis. `nomic-embed-text`) dan model berakhiran
+> `:cloud` tidak ditawarkan karena tidak bisa diajak mengobrol / menuntut
+> kredensial awan tersendiri. Setel `AI_MODEL_AWAN=1` bila pemasanganmu
+> memang punya kredensialnya.
+
+> Semua hasil AI hanya **usulan** — tidak ada yang tersimpan otomatis. Angka
+> resmi tetap yang tertera di halaman Keuangan & Kegiatan. Permintaan dibatasi
+> 12 per menit per akun. Fitur ini bisa dimatikan dengan `AI_NONAKTIF=1`.
 
 ---
 
@@ -379,6 +428,11 @@ Salin `.env.example` menjadi `.env` di akar folder proyek, lalu isi:
 | `IMAGEKIT_URL_ENDPOINT` | Endpoint URL ImageKit. |
 | `IMAGEKIT_FOLDER` | Folder penyimpanan (opsional, bawaan `/logbook`). |
 | `APP_ORIGIN` | Opsional — alamat publik aplikasi (mis. `https://logbook.vercel.app`) yang dipakai untuk menyusun tautan penampil Office. Di Vercel otomatis diisi dari domain produksi; di laptop/tunnel boleh dikosongkan. |
+| `OLLAMA_URL` | Opsional — server Ollama untuk asisten AI (bawaan `https://ollama.if.unismuh.ac.id`). |
+| `OLLAMA_MODEL` | Opsional — model **bawaan**, dipakai saat pengguna memilih "Otomatis" (bawaan `qwen2.5:7b-instruct`). Pengguna bebas memilih model lain sendiri; daftarnya diambil dari `GET <OLLAMA_URL>/api/tags`. |
+| `OLLAMA_API_KEY` | Opsional — bila server AI mewajibkan `Authorization: Bearer …`. |
+| `AI_MODEL_AWAN` | Opsional — `1` agar model berakhiran `:cloud` ikut bisa dipilih (butuh kredensial awan; di server kampus selalu 401). |
+| `AI_NONAKTIF` | Opsional — `1` mematikan seluruh fitur AI. |
 
 Tabel database dibuat otomatis saat server pertama kali tersambung sehingga
 tidak ada langkah migrasi manual. Bila kunci ImageKit dikosongkan, berkas
@@ -459,7 +513,7 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/export/info` | Jumlah entri baru yang akan masuk ke dokumen |
 | GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
 | GET | `/api/export/keuangan-docx` | Unduh Word **khusus keuangan** (Belmawa per kategori + tabel PT terpisah) |
-| POST | `/api/export/tautan/{jenis}` | Siapkan berkas ekspor lalu kembalikan tautan CDN (`docx`, `pdf`, `xlsx`, `keuangan-docx`) |
+| POST | `/api/export/tautan/{jenis}` | Siapkan berkas ekspor lalu kembalikan tautan CDN (`docx`, `pdf`, `xlsx`, `keuangan-docx`); data tak berubah → tautan lama (`cache: true`), `?segar=1` memaksa bangun ulang |
 | POST | `/api/import/izin-unggah` | Izin unggah `.docx` impor **langsung ke ImageKit** (byte tidak lewat server, maks. 300 MB) |
 | POST | `/api/import/docx/langsung` | Verifikasi bagian yang diunggah, jalankan impor, hapus berkas sementara |
 | POST | `/api/import/docx` | Impor entri + foto dari dokumen Word lewat server (cadangan mode lokal) |
@@ -529,6 +583,15 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/persetujuan` \| `/ringkas` | Status & rekap ACC |
 | PUT | `/api/persetujuan` | Beri ACC / minta revisi (khusus dosen) |
 
+**Asisten AI** (Ollama server kampus — dipanggil lewat backend, dibatasi 12×/menit per akun)
+
+| Method | Endpoint | Fungsi |
+|---|---|---|
+| GET | `/api/ai/status` | Fitur aktif? model & server terjangkau? |
+| POST | `/api/ai/tanya` | Tanya-jawab tentang logbook (`pesan`, `riwayat[]`; pembimbing: `tim`) |
+| POST | `/api/ai/perbaiki-kegiatan` | Usulan deskripsi kegiatan yang lebih rapi (`teks`, `tanggal`, `gaya`) — tim |
+| POST | `/api/ai/saran-belanja` | Usulan sumber dana & kategori PKM dari nama item (`item`, `harga`) — tim |
+
 ---
 
 ## 🗂️ Struktur proyek
@@ -549,10 +612,11 @@ logbook-app/
 │       ├── files.js     ← unggah foto, .docx & .pptx ke penyimpanan berkas
 │       ├── auth.js      ← sesi login + pembatasan hak akses per peran
 │       ├── assets/      ← template-logbook.docx (kerangka dokumen ekspor)
-│       ├── export/      ← penyusun berkas docx, pdf, xlsx
+│       ├── export/      ← penyusun berkas docx, pdf, xlsx (+ foto.js: pengambil foto sematan)
 │       ├── import/      ← pembaca logbook Word lama
+│       ├── ai/          ← klien Ollama + penyusun konteks data tim
 │       ├── admin/       ← panel admin (panel.js + routes.js)
-│       └── routes/      ← kegiatan, keuangan, laporan, presentasi, dst.
+│       └── routes/      ← kegiatan, keuangan, laporan, presentasi, ai, dst.
 └── frontend/            ← Next.js, dibangun menjadi berkas statis
     ├── app/             ← Dashboard, Kegiatan, Keuangan, Laporan, Presentasi,
     │                       Galeri, Ekspor, Profil
@@ -581,6 +645,9 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `npm run diag:laporan-langsung --workspace backend` | Jalur langsung untuk laporan `.docx` — termasuk memastikan tautan penampil **Word Online tetap dilayani server** (tidak di-redirect) sehingga hasil rendernya tidak berubah |
 | `npm run diag:impor-langsung --workspace backend` | Jalur **impor `.docx` langsung ke ImageKit**: penerbitan izin, verifikasi metadata, impor berjalan, berkas sementara terhapus (sukses maupun gagal), penolakan izin palsu, pagar peran & login (butuh internet + env `IMAGEKIT_*`) |
 | `npm run diag:keamanan --workspace backend` | Perbaikan keamanan hasil audit: buka/tutup pendaftaran tim (+ endpoint publik & audit panel), whitelist kunci pengaturan, penolakan origin CORS palsu, unggahan bukan gambar → 400 ramah, pembatas laju per-username, cookie sesi panel, serta **denyut kehadiran** (`/denyut` → `membuka`, beacon tutup → tidak membuka) |
+| `npm run diag:ai --workspace backend` | Asisten **AI**: penyusun konteks (angka rekap benar, ukuran terbatas, kata kunci), parser JSON model, status server Ollama, **pemilihan model oleh pengguna** (daftar tersaring, model asing ditolak, `auto` kembali ke bawaan, pilihan tersimpan dipakai), lalu tanya-jawab & perbaikan deskripsi nyata (butuh internet) |
+| `npm run diag:ekspor-impor --workspace backend` | Putar-balik **ekspor → impor** beserta foto: foto 2000px dikecilkan CDN jadi sematan 1000px tanpa crop, cache sidik jari (pakai ulang / `?segar=1` / batal saat data berubah), berkas ekspor lama dibuang, PDF & XLSX terbit, dokumen hasil ekspor diimpor ke akun lain lengkap dengan fotonya, dan impor ulang tidak mengunggah foto lagi (butuh internet + env `IMAGEKIT_*`) |
+| `node backend/diag-ekspor-foto.mjs` | Pengambil foto sematan (`export/foto.js`): pemilihan resolusi dari jumlah foto, pembaca dimensi JPEG/PNG, pembatas paralel, dan sidik jari cache ekspor (tanpa database) |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
 | `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, serta **nota tersemat** (thumbnail + lampiran bernomor, relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |

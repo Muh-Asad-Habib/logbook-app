@@ -214,3 +214,132 @@
   .rekap-val { font-size: 1.08rem; }
   .rekap-ket { font-size: 0.72rem; }
 }
+
+/* ============================================================
+   Asisten AI — tombol melayang + panel percakapan (components/AsistenAI.js)
+   ============================================================ */
+.ai-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 76;
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 48px; padding: 0 18px 0 14px; border-radius: 99px; border: none; cursor: pointer;
+  background: var(--grad3); color: #fff; font-weight: 800; font-size: 0.86rem; font-family: inherit;
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.ai-fab:hover { transform: translateY(-2px); box-shadow: 0 18px 38px rgba(124, 58, 237, 0.5); }
+.ai-fab:active { transform: scale(0.95); }
+.ai-fab .lucide { width: 20px; height: 20px; }
+.ai-fab.on { background: var(--card-solid); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.ai-fab.on .ai-fab-txt { display: none; }
+.ai-fab.on { width: 48px; padding: 0; justify-content: center; }
+
+.ai-panel {
+  position: fixed; right: 22px; bottom: 82px; z-index: 77;
+  width: min(420px, calc(100vw - 32px)); max-height: min(72vh, 640px);
+  display: flex; flex-direction: column;
+  background: var(--card-solid); border: 1px solid var(--line); border-radius: 20px;
+  box-shadow: 0 24px 60px -16px rgba(18, 20, 46, 0.35), 0 0 0 1px rgba(124, 58, 237, 0.06);
+  overflow: hidden; animation: ai-masuk 0.18s ease;
+}
+@keyframes ai-masuk { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.ai-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--soft-2), transparent);
+}
+.ai-head-ic {
+  width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--grad3); color: #fff; flex: 0 0 auto;
+}
+.ai-head-ic .lucide { width: 18px; height: 18px; }
+.ai-head-txt { flex: 1; min-width: 0; line-height: 1.2; }
+.ai-head-txt b { display: block; font-size: 0.9rem; }
+.ai-head-txt small { display: block; color: var(--muted); font-size: 0.7rem; font-weight: 600; margin-top: 2px; }
+
+/* Pemilih model — pengguna yang menentukan model penjawab, bukan sistem */
+.ai-model-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--soft-2);
+  font-size: 0.72rem; font-weight: 700; color: var(--muted);
+}
+.ai-model-bar select {
+  flex: 1 1 160px; min-width: 0; height: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--card); color: var(--ink); font: inherit; font-size: 0.74rem;
+  font-weight: 600; cursor: pointer;
+}
+.ai-model-bar select:disabled { opacity: 0.55; cursor: not-allowed; }
+.ai-model-bar .lucide { width: 14px; height: 14px; }
+.ai-msg-model {
+  margin-top: 5px; font-size: 0.63rem; font-weight: 700; color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+
+.ai-list { flex: 1 1 auto; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ai-kosong p { font-size: 0.84rem; color: var(--muted); line-height: 1.5; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ai-chip {
+  border: 1px solid var(--line); background: var(--soft-2); color: var(--ink);
+  border-radius: 12px; padding: 7px 11px; font-size: 0.76rem; font-weight: 600; text-align: left;
+  cursor: pointer; font-family: inherit; line-height: 1.35;
+}
+.ai-chip:hover { border-color: var(--line-hover); color: var(--p1); }
+.ai-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ai-msg {
+  max-width: 88%; padding: 9px 12px; border-radius: 14px; font-size: 0.84rem; line-height: 1.5;
+  word-break: break-word;
+}
+.ai-msg.user { align-self: flex-end; background: var(--grad); color: #fff; border-bottom-right-radius: 5px; }
+.ai-msg.user p { margin: 0; white-space: pre-wrap; }
+.ai-msg.assistant { align-self: flex-start; background: var(--soft-2); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+.ai-msg.gagal { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: var(--bad); }
+.ai-tunggu { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 600; }
+.ai-tunggu .lucide { width: 15px; height: 15px; }
+.ai-md p { margin: 0 0 6px; }
+.ai-md p:last-child { margin-bottom: 0; }
+.ai-md .ai-h { font-weight: 800; margin-top: 4px; }
+.ai-md ul, .ai-md ol { margin: 2px 0 8px 18px; }
+.ai-md li { margin: 2px 0; }
+.ai-md code { background: rgba(79, 70, 229, 0.1); padding: 1px 5px; border-radius: 5px; font-size: 0.8em; }
+[data-theme="dark"] .ai-md code { background: rgba(129, 140, 248, 0.18); }
+
+.ai-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px 6px; border-top: 1px solid var(--line); }
+.ai-input textarea {
+  flex: 1; min-height: 40px; max-height: 120px; resize: none; margin-top: 0;
+  padding: 10px 12px; font-size: 0.86rem; border-radius: 12px; line-height: 1.4;
+}
+.ai-input .btn { height: 40px; width: 44px; padding: 0; justify-content: center; border-radius: 12px; flex: 0 0 auto; }
+.ai-catatan { padding: 0 14px 10px; font-size: 0.68rem; color: var(--muted); }
+
+.spin { animation: ai-spin 0.9s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 900px) {
+  /* HP: tombol AI di kiri bawah (tombol ➕ tambah ada di kanan), panel jadi lembar penuh */
+  .ai-fab { left: 16px; right: auto; bottom: calc(76px + env(safe-area-inset-bottom)); height: 46px; }
+  .ai-panel {
+    left: 10px; right: 10px; width: auto;
+    bottom: calc(132px + env(safe-area-inset-bottom)); max-height: min(64vh, 560px);
+  }
+  .ai-input textarea { font-size: 16px; }
+}
+
+/* ---------- Tombol & kotak usulan AI di formulir (kegiatan / keuangan) ---------- */
+.ai-saran-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.ai-saran-bar .btn .lucide { color: var(--p2); }
+.ai-saran-bar select { margin-top: 0; padding: 6px 10px; font-size: 0.76rem; border-radius: 10px; width: auto; }
+.ai-usul {
+  margin-top: 10px; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(79, 70, 229, 0.05));
+}
+.ai-usul-judul { display: flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 800; color: var(--p2); margin-bottom: 6px; }
+.ai-usul-judul .lucide { width: 14px; height: 14px; }
+.ai-usul-teks { font-size: 0.88rem; line-height: 1.55; white-space: pre-wrap; }
+.ai-usul-ket { font-size: 0.74rem; color: var(--muted); margin-top: 6px; }
+.ai-usul-ket ul { margin: 4px 0 0 16px; }
+.ai-usul-aksi { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
