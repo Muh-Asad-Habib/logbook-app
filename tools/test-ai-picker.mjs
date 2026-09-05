@@ -27,7 +27,8 @@ const names = ['smollm2:135m', 'llama3.2:latest', 'translategemma:latest', bawaa
   'qwen2.5vl:latest', 'gemma4:latest', 'gemma4-16k:latest',
   'hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0',
   'phi4-reasoning:plus', 'gpt-oss:latest', 'gemma3:27b', 'qwen3-coder:30b'];
-const daftar = names.map(nama => ({ nama, label: nama, parameter: '7.6B', ukuran: 4e9 }));
+const parameters = ['135M', '3.2B', '4.3B', '7.6B', '8.3B', '8B', '8B', '9.24B', '14.7B', '20.9B', '27B', '30B'];
+const daftar = names.map((nama, i) => ({ nama, label: nama, parameter: parameters[i], ukuran: 4e9 }));
 const user = { id: 'ui-test', username: 'Tim Uji', role: 'tim' };
 try {
   for (const [width, height] of [[280,653],[320,568],[390,844],[568,320],[844,390],[768,1024],[1366,768],[1920,1080]]) {
@@ -78,6 +79,10 @@ try {
       assert(box.height <= 233, 'dropdown must stay compact');
       assert(box.y + box.height <= inputBox.y, 'menu must not cover input');
       assert(!/berukuran|Model ringan|Model besar/.test(await menu.innerText()), 'descriptions must explain purpose');
+      assert.equal(await menu.locator('[title^="llama3.2:latest"]').locator('.ket b').innerText(), 'Perkiraan: cepat');
+      assert.equal(await menu.locator('[title^="qwen2.5:7b-instruct"]').locator('.ket b').innerText(), 'Perkiraan: sedang');
+      assert.equal(await menu.locator('[title^="gemma3:27b"]').locator('.ket b').innerText(), 'Perkiraan: lebih lama');
+      assert.equal(await menu.locator('[title^="gpt-oss:latest"]').locator('.ket b').innerText(), 'Belum ada perkiraan');
       assert(panel.x >= 0 && panel.y >= 0 && panel.x + panel.width <= width + 1 && panel.y + panel.height <= height + 1, `panel outside ${width}x${height}`);
       assert(box.x >= panel.x && box.y >= panel.y && box.x + box.width <= panel.x + panel.width + 1 && box.y + box.height <= panel.y + panel.height + 1, 'menu outside panel');
       assert(box.height > 50, 'menu needs usable scroll area');

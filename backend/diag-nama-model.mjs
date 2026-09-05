@@ -14,6 +14,7 @@
  */
 import {
   namaCantik, namaSingkat, sifatModel, rincianTeknis, fmtUkuran, miliarParam,
+  kecepatanModel, CATATAN_KECEPATAN,
 } from "../frontend/lib/namaModel.js";
 
 let lulus = 0, gagal = 0;
@@ -90,6 +91,20 @@ try {
   cek("keterangan tidak menjanjikan kecepatan atau akurasi",
     Object.keys(contohSifat).map(sifat).every((s) => !/teliti|akurat|cepat|berukuran|ringan/.test(s)));
 
+  console.log("\n== Perkiraan kecepatan (bukan benchmark) ==");
+  const cepat = (parameter, extra = {}) => kecepatanModel({ nama: "llama3.2", parameter, ...extra });
+  for (const p of ["135M", "3.2B", "4.99B", "700K"]) cek(`${p}: perkiraan cepat`, cepat(p) === "Perkiraan: cepat");
+  for (const p of ["5B", "7.6B", "10B"]) cek(`${p}: perkiraan sedang`, cepat(p) === "Perkiraan: sedang");
+  for (const p of ["10.01B", "27B", "32B"]) cek(`${p}: perkiraan lebih lama`, cepat(p) === "Perkiraan: lebih lama");
+  for (const p of ["", "?", "1.2.3B", "7.6", "-3B", "0B", "InfinityB"]) cek(`${p || '(kosong)'}: jangan menebak`, cepat(p) === "Belum ada perkiraan");
+  cek("reasoning tidak diasumsikan cepat", cepat("3B", { nama: "phi4-reasoning:plus" }) === "Perkiraan: lebih lama");
+  cek("MoE total parameter bukan komputasi aktif", cepat("30B", { keluarga: "qwen3moe" }) === "Belum ada perkiraan");
+  cek("GPT OSS tanpa metadata keluarga tetap konservatif", cepat("20B", { nama: "gpt-oss:latest" }) === "Belum ada perkiraan");
+  cek("Qwen Coder 30B sparse tidak disebut lambat", cepat("30B", { nama: "qwen3-coder:30b" }) === "Belum ada perkiraan");
+  cek("cloud tidak diperkirakan dari ukuran lokal", cepat("355B", { nama: "glm-4.6:cloud" }) === "Belum ada perkiraan");
+  cek("ukuran berkas saja tidak dipakai menebak", kecepatanModel({ ukuran: 1e9 }) === "Belum ada perkiraan");
+  cek("catatan menjelaskan keterbatasan", /bukan hasil uji/.test(CATATAN_KECEPATAN) && /beban server/.test(CATATAN_KECEPATAN));
+
   console.log("\n== Rincian teknis pindah ke tooltip ==");
   const contoh = { nama: "llama3.2:latest", parameter: "3.2B", ukuran: 1.9 * 1024 ** 3 };
   cek("tooltip memuat nama asli, parameter & ukuran",
@@ -123,7 +138,7 @@ try {
           cantik.split(" ").some((w) => /^[a-z]{2,}$/.test(w))) {
         buruk.push(`${m.label} → "${cantik}" / "${ket}"`);
       }
-      console.log(`    ${cantik.padEnd(38)} ${ket}`);
+      console.log(`    ${cantik.padEnd(38)} ${kecepatanModel(m)} · ${ket}`);
     }
     cek(`${daftar.length} model tampil rapi & punya keterangan awam`, buruk.length === 0, buruk.join(" | "));
   }

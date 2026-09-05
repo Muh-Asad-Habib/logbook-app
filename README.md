@@ -267,6 +267,14 @@ paling ringan. Keterangan menjelaskan kegunaan: **Menerjemahkan teks antarbahasa
 (TranslateGemma), **Membantu menulis & memahami kode** (Qwen Coder), atau
 **Tanya jawab & merapikan tulisan** (Qwen). Bukan peringkat kecepatan/akurasi;
 angka teknis tetap tersedia di tooltip.
+Petunjuk **Perkiraan: cepat / sedang / lebih lama** ditampilkan sebelum
+kegunaan. Ini heuristik kasar, **bukan hasil benchmark**: model dense di bawah
+5B diberi label cepat, 5–10B sedang, di atas 10B lebih lama; model reasoning
+dapat memerlukan waktu lebih lama. Waktu nyata dipengaruhi server serta
+panjang percakapan/jawaban, bukan ukuran saja. Data tidak valid/tidak lengkap,
+model cloud dan arsitektur sparse/MoE yang dikenali diberi **Belum ada perkiraan**
+karena total parameter bukan jumlah komputasi aktif. Tidak ada klaim bahwa
+model yang lebih lama menjawab pasti lebih akurat.
 Namanya dirapikan agar enak dibaca — `qwen2.5:7b-instruct` tampil
 sebagai **Qwen 2.5 7B Instruct**, `gpt-oss` jadi **GPT OSS**, dan
 `hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0` jadi **Gemma 2
