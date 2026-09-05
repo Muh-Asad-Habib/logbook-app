@@ -70,16 +70,16 @@ try {
 
   const sifat = (p) => sifatModel({ parameter: p });
   const SIFAT_SEMUA = ["135M", "3.2B", "7.6B", "14.7B", "36.0B"].map(sifat);
-  cek("model mungil → sangat cepat", sifat("135M").startsWith("Sangat cepat"), sifat("135M"));
-  cek("3.2B → cepat (bukan '3.2B · 1,9 GB')", sifat("3.2B") === "Cepat · untuk pertanyaan ringan", sifat("3.2B"));
-  cek("7.6B → seimbang", sifat("7.6B").startsWith("Seimbang"), sifat("7.6B"));
-  cek("14.7B → lebih teliti", sifat("14.7B").startsWith("Lebih teliti"), sifat("14.7B"));
-  cek("36B → paling teliti", sifat("36.0B").startsWith("Paling teliti"), sifat("36.0B"));
+  cek("model mungil → sangat ringan", sifat("135M") === "Model sangat ringan");
+  cek("3.2B → model ringan", sifat("3.2B") === "Model ringan");
+  cek("7.6B → sedang", sifat("7.6B") === "Model berukuran sedang");
+  cek("14.7B → besar", sifat("14.7B") === "Model besar · dapat lebih lama");
+  cek("36B → sangat besar", sifat("36.0B") === "Model sangat besar · dapat lebih lama");
   cek("tanpa parameter, ukuran berkas jadi petunjuk",
-    sifatModel({ ukuran: 0.3 * 1024 ** 3 }).startsWith("Cepat"), sifatModel({ ukuran: 0.3 * 1024 ** 3 }));
+    sifatModel({ ukuran: 0.3 * 1024 ** 3 }) === "Model ringan");
   cek("tanpa data apa pun → kosong", sifatModel({}) === "");
-  cek("keterangan cukup pendek untuk satu baris",
-    SIFAT_SEMUA.every((s) => s.length <= 34), JSON.stringify(SIFAT_SEMUA.map((s) => s.length)));
+  cek("keterangan tidak menjanjikan kecepatan atau akurasi",
+    SIFAT_SEMUA.every((s) => !/teliti|akurat|cepat/.test(s)));
 
   console.log("\n== Rincian teknis pindah ke tooltip ==");
   const contoh = { nama: "llama3.2:latest", parameter: "3.2B", ukuran: 1.9 * 1024 ** 3 };

@@ -68,24 +68,24 @@ export function miliarParam(m) {
 }
 
 /**
- * Ambang jumlah parameter → sifat yang BENAR-BENAR dirasakan pengguna.
- * Makin besar modelnya makin teliti jawabannya, tetapi makin lama menunggunya.
+ * Petunjuk ukuran saja, bukan hasil pengukuran kecepatan atau akurasi.
+ * Model besar belum tentu lebih akurat; beban server ikut menentukan waktu.
  */
 const SIFAT = [
-  [1, "Sangat cepat · paling sederhana"],
-  [5, "Cepat · untuk pertanyaan ringan"],
-  [10, "Seimbang · cepat & cukup teliti"],
-  [25, "Lebih teliti · agak lambat"],
-  [Infinity, "Paling teliti · paling lambat"],
+  [1, "Model sangat ringan"],
+  [5, "Model ringan"],
+  [10, "Model berukuran sedang"],
+  [25, "Model besar · dapat lebih lama"],
+  [Infinity, "Model sangat besar · dapat lebih lama"],
 ];
 
 /**
  * Keterangan model dalam bahasa sehari-hari.
  *
  * Angka "3.2B · 1,9 GB" tidak berarti apa-apa bagi kebanyakan orang — yang
- * ingin mereka tahu hanyalah "cepat atau teliti?". Rinciannya tidak hilang,
+ * diberikan petunjuk ukuran tanpa mengklaim lebih teliti. Rinciannya tidak hilang,
  * hanya dipindah ke tooltip lewat rincianTeknis().
- * @example sifatModel({ parameter: "3.2B" }) // "Cepat · untuk pertanyaan ringan"
+ * @example sifatModel({ parameter: "3.2B" }) // "Model ringan"
  */
 export function sifatModel(m) {
   const b = miliarParam(m);
