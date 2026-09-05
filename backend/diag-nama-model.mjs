@@ -4,14 +4,17 @@
  *  - nama mentah Ollama diubah jadi bentuk yang enak dibaca
  *  - penanda teknis (repo Hugging Face, GGUF, kuantisasi, tag :latest) dibuang
  *  - singkatan resmi tetap benar (GPT, OSS, VL, SmolLM, SahabatAI, …)
- *  - ukuran parameter tidak diulang bila sudah tampak di nama
+ *  - angka teknis ("3.2B · 1,9 GB") diterjemahkan ke bahasa sehari-hari
+ *    ("Cepat · untuk pertanyaan ringan"); angkanya pindah ke tooltip
  *  - hasilnya cukup pendek untuk baris daftar (dicek pada nama TERPANJANG)
  *  - bila server AI terjangkau, SELURUH model yang benar-benar ada di sana
- *    ikut diuji supaya tidak ada nama yang tampil aneh di layar
+ *    ikut diuji supaya tidak ada nama/keterangan yang tampil aneh di layar
  *
  * Jalankan dari folder backend:  node diag-nama-model.mjs
  */
-import { namaCantik, namaSingkat, metaModel, fmtUkuran } from "../frontend/lib/namaModel.js";
+import {
+  namaCantik, namaSingkat, sifatModel, rincianTeknis, fmtUkuran, miliarParam,
+} from "../frontend/lib/namaModel.js";
 
 let lulus = 0, gagal = 0;
 const cek = (nama, kondisi, info = "") => {
@@ -60,17 +63,30 @@ try {
   cek("nama panjang dipangkas 2 kata",
     namaSingkat("hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0") === "Gemma 2");
 
-  console.log("\n== Keterangan kanan (tanpa pengulangan) ==");
+  console.log("\n== Keterangan untuk orang awam ==");
+  cek("134.52M dibaca 0,13 miliar", Math.abs(miliarParam({ parameter: "134.52M" }) - 0.13452) < 1e-6);
+  cek("7.6B dibaca 7,6 miliar", miliarParam({ parameter: "7.6B" }) === 7.6);
+  cek("tanpa data parameter → 0", miliarParam({}) === 0 && miliarParam({ parameter: "?" }) === 0);
+
+  const sifat = (p) => sifatModel({ parameter: p });
+  const SIFAT_SEMUA = ["135M", "3.2B", "7.6B", "14.7B", "36.0B"].map(sifat);
+  cek("model mungil → sangat cepat", sifat("135M").startsWith("Sangat cepat"), sifat("135M"));
+  cek("3.2B → cepat (bukan '3.2B · 1,9 GB')", sifat("3.2B") === "Cepat · untuk pertanyaan ringan", sifat("3.2B"));
+  cek("7.6B → seimbang", sifat("7.6B").startsWith("Seimbang"), sifat("7.6B"));
+  cek("14.7B → lebih teliti", sifat("14.7B").startsWith("Lebih teliti"), sifat("14.7B"));
+  cek("36B → paling teliti", sifat("36.0B").startsWith("Paling teliti"), sifat("36.0B"));
+  cek("tanpa parameter, ukuran berkas jadi petunjuk",
+    sifatModel({ ukuran: 0.3 * 1024 ** 3 }).startsWith("Cepat"), sifatModel({ ukuran: 0.3 * 1024 ** 3 }));
+  cek("tanpa data apa pun → kosong", sifatModel({}) === "");
+  cek("keterangan cukup pendek untuk satu baris",
+    SIFAT_SEMUA.every((s) => s.length <= 34), JSON.stringify(SIFAT_SEMUA.map((s) => s.length)));
+
+  console.log("\n== Rincian teknis pindah ke tooltip ==");
+  const contoh = { nama: "llama3.2:latest", parameter: "3.2B", ukuran: 1.9 * 1024 ** 3 };
+  cek("tooltip memuat nama asli, parameter & ukuran",
+    rincianTeknis(contoh) === "llama3.2:latest · 3.2B parameter · 1,9 GB", rincianTeknis(contoh));
   cek("ukuran dibaca gaya Indonesia", fmtUkuran(4.4 * 1024 ** 3) === "4,4 GB", fmtUkuran(4.4 * 1024 ** 3));
-  cek("tanpa ukuran → kosong", fmtUkuran(0) === "");
-  const m1 = { parameter: "7.6B", ukuran: 4.4 * 1024 ** 3 };
-  cek("parameter DILEWATI bila sudah ada di nama",
-    metaModel(m1, "Qwen 2.5 7B Instruct") === "4,4 GB", metaModel(m1, "Qwen 2.5 7B Instruct"));
-  const m2 = { parameter: "8.0B", ukuran: 8.9 * 1024 ** 3 };
-  cek("parameter DITAMPILKAN bila nama tidak menyebutnya",
-    metaModel(m2, "Gemma 4") === "8.0B · 8,9 GB", metaModel(m2, "Gemma 4"));
-  cek("'16K' bukan jumlah parameter → parameter tetap tampil",
-    metaModel(m2, "Gemma 4 16K") === "8.0B · 8,9 GB", metaModel(m2, "Gemma 4 16K"));
+  cek("tanpa ukuran → tidak disebut", !rincianTeknis({ nama: "x" }).includes("GB"));
 
   console.log("\n== Panjang tampilan ==");
   const panjang = namaCantik("hf.co/gmonsoon/gemma2-9b-cpt-sahabatai-v1-instruct-GGUF:Q8_0");
@@ -90,16 +106,17 @@ try {
     const buruk = [];
     for (const m of daftar) {
       const cantik = namaCantik(m.label);
-      // Tidak boleh kosong, tidak boleh menyisakan penanda teknis, dan tidak
-      // boleh ada penggal yang masih huruf kecil semua (tanda belum dirapikan).
-      if (!cantik ||
+      const ket = sifatModel(m);
+      // Nama tidak boleh kosong / menyisakan penanda teknis / menyisakan
+      // penggal huruf kecil, dan tiap model WAJIB punya keterangan awam.
+      if (!cantik || !ket ||
           /hf\.co|gguf|:latest|_/i.test(cantik) ||
           cantik.split(" ").some((w) => /^[a-z]{2,}$/.test(w))) {
-        buruk.push(`${m.label} → "${cantik}"`);
+        buruk.push(`${m.label} → "${cantik}" / "${ket}"`);
       }
-      console.log(`    ${m.label.padEnd(52)} → ${cantik}  [${metaModel(m, cantik) || "-"}]`);
+      console.log(`    ${cantik.padEnd(38)} ${ket}`);
     }
-    cek(`${daftar.length} nama model tampil rapi`, buruk.length === 0, buruk.join(" | "));
+    cek(`${daftar.length} model tampil rapi & punya keterangan awam`, buruk.length === 0, buruk.join(" | "));
   }
 
   console.log(`\n== HASIL: ${lulus} lulus, ${gagal} gagal ==`);

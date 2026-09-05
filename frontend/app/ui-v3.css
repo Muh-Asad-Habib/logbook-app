@@ -296,19 +296,30 @@
   background: var(--card-solid); box-shadow: var(--shadow-hover);
 }
 .ai-model-opsi {
-  display: flex; align-items: center; gap: 7px; width: 100%; padding: 7px 8px;
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px;
   border: 0; border-radius: 8px; background: none; color: var(--ink);
   font: inherit; font-size: 0.75rem; font-weight: 600; text-align: left; cursor: pointer;
 }
 .ai-model-opsi:hover, .ai-model-opsi:focus-visible { background: var(--soft-2); }
 .ai-model-opsi[aria-checked="true"] { background: var(--soft); color: var(--p1); }
-.ai-model-opsi .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Keterangan kanan tidak boleh menggusur nama: lebarnya dibatasi & ikut
-   dipotong bila perlu (mis. nama model bawaan pada baris "Otomatis"). */
-.ai-model-opsi .mt {
-  flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 0.66rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums;
+.ai-model-opsi .teks { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ai-model-opsi .nm {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Keterangan sifat model dalam bahasa sehari-hari ("Cepat · untuk pertanyaan
+   ringan") — menggantikan angka teknis yang tak berarti bagi kebanyakan orang. */
+.ai-model-opsi .ket {
+  font-size: 0.66rem; font-weight: 600; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ai-model-opsi[aria-checked="true"] .ket { color: var(--p2); }
+.ai-model-opsi .tanda {
+  flex: 0 0 auto; padding: 1px 6px; border-radius: 999px;
+  background: var(--soft); color: var(--p1);
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.02em;
+}
+.ai-model-opsi[aria-checked="true"] .tanda { background: var(--card-solid); }
 .ai-model-opsi .tik { flex: 0 0 auto; width: 13px; height: 13px; }
 /* Centang hanya tampak pada model yang sedang dipakai — ruangnya tetap
    dipesan supaya teks semua baris tetap sejajar. */
@@ -323,7 +334,7 @@
    karena keterangan ukuran memang hanya ada di dalam daftar. */
 @media (max-width: 430px) {
   .ai-model-bar { gap: 6px; padding: 8px 12px; }
-  .ai-model-opsi .mt { font-size: 0.62rem; max-width: 40%; }
+  .ai-model-opsi .ket { font-size: 0.62rem; }
 }
 
 /* HP sangat sempit (≤ 340 px): label "Model" dilepas — tombolnya sudah
