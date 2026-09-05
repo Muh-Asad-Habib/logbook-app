@@ -89,12 +89,12 @@ function ItemKomentar({ k, milikku, roleTim, onBalas, onUbah, onHapus, onSelesai
       </div>
 
       {editMode ? (
-        <div className="row" style={{ gap: 6, marginTop: 6, flexWrap: "nowrap" }}>
+        <div className="row" style={{ gap: 6, marginTop: 6 }}>
           <input value={isi} onChange={(e) => setIsi(e.target.value)} maxLength={2000}
-                 style={{ flex: 1, marginTop: 0 }}
+                 aria-label="Edit isi komentar" style={{ flex: "1 1 180px", marginTop: 0 }}
                  onKeyDown={(e) => { if (e.key === "Enter") simpan(); }} autoFocus />
-          <button className="btn sm primary" onClick={simpan}><Check className="lucide" /></button>
-          <button className="btn sm" onClick={() => { setEditMode(false); setIsi(k.isi); }}>
+          <button className="btn sm primary" aria-label="Simpan komentar" onClick={simpan}><Check className="lucide" /></button>
+          <button className="btn sm" aria-label="Batal edit komentar" onClick={() => { setEditMode(false); setIsi(k.isi); }}>
             <X className="lucide" />
           </button>
         </div>
@@ -212,6 +212,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
         type="button"
         className={`btn sm ${buka ? "primary" : ""}`}
         onClick={() => setBuka((v) => !v)}
+        aria-expanded={buka}
         title="Komentar pendamping & tim"
       >
         <MessageCircle className="lucide" /> {jumlah > 0 ? `${jumlah} komentar` : "Komentar"}
@@ -267,6 +268,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
               )}
               <div className="row" style={{ gap: 6, flexWrap: "nowrap", marginTop: 0 }}>
                 <input
+                  aria-label={balasKe ? "Tulis balasan" : "Tulis komentar untuk tim"}
                   placeholder={balasKe ? "Tulis balasan…" : "Tulis komentar untuk tim…"}
                   value={isi}
                   onChange={(e) => setIsi(e.target.value)}
@@ -274,7 +276,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
                   style={{ flex: 1, marginTop: 0 }}
                   onKeyDown={(e) => { if (e.key === "Enter" && !busy) kirim(); }}
                 />
-                <button className="btn sm primary" onClick={kirim} disabled={busy || !isi.trim()}>
+                <button className="btn sm primary" aria-label="Kirim komentar" onClick={kirim} disabled={busy || !isi.trim()}>
                   <Send className="lucide" />
                 </button>
               </div>

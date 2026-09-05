@@ -88,6 +88,21 @@ export default function AsistenAI() {
   const modelRef = useRef(null);
   const menuRef = useRef(null);
   const tombolRef = useRef(null);
+  const fabRef = useRef(null);
+
+  // Panel nonmodal: fokus boleh keluar lewat Tab, tanpa direbut saat jawaban tiba.
+  useEffect(() => {
+    if (!buka) return;
+    const panel = modelRef.current;
+    if (!panel) return;
+    const input = inputRef.current;
+    (input && !input.disabled ? input : panel.querySelector('button[aria-label="Tutup"]'))?.focus();
+    return () => {
+      if (panel.contains(document.activeElement) || document.activeElement === document.body) {
+        fabRef.current?.focus({ preventScroll: true });
+      }
+    };
+  }, [buka]);
 
   useEffect(() => {
     setPendamping(isPendamping());
@@ -120,7 +135,9 @@ export default function AsistenAI() {
   useEffect(() => {
     if (!buka) return;
     const esc = (e) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (!modelRef.current?.contains(e.target) && e.target !== fabRef.current) return;
+      e.preventDefault();
       if (bukaModel) {
         setBukaModel(false);
         tombolRef.current?.focus();
@@ -181,7 +198,12 @@ export default function AsistenAI() {
       setPesan((p) => [...p, { role: "assistant", content: e.message || "Gagal menghubungi asisten", gagal: true }]);
     } finally {
       setBusy(false);
-      setTimeout(() => inputRef.current?.focus(), 0);
+      setTimeout(() => {
+        const panel = modelRef.current;
+        if (panel && (panel.contains(document.activeElement) || document.activeElement === document.body)) {
+          inputRef.current?.focus({ preventScroll: true });
+        }
+      }, 0);
     }
   };
 
@@ -198,6 +220,7 @@ export default function AsistenAI() {
   };
 
   const onKey = (e) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); kirim(); }
   };
 
@@ -212,10 +235,13 @@ export default function AsistenAI() {
     <>
       <button
         type="button"
+        ref={fabRef}
         className={`ai-fab${buka ? " on" : ""}`}
         onClick={() => { setBuka((v) => !v); setBukaModel(false); }}
         aria-label={buka ? "Tutup asisten AI" : "Buka asisten AI"}
         aria-expanded={buka}
+        aria-controls="asisten-ai-panel"
+        aria-haspopup="dialog"
         title="Tanya asisten AI tentang logbook"
       >
         {buka ? <X className="lucide" /> : <Sparkles className="lucide" />}
@@ -223,7 +249,7 @@ export default function AsistenAI() {
       </button>
 
       {buka && (
-        <section ref={modelRef} className={`ai-panel${bukaModel ? " pilih-model" : ""}`} role="dialog"
+        <section id="asisten-ai-panel" ref={modelRef} className={`ai-panel${bukaModel ? " pilih-model" : ""}`} role="dialog"
                  aria-label="Asisten AI logbook">
           <header className="ai-head">
             <div className="ai-head-ic"><Sparkles className="lucide" /></div>
@@ -328,7 +354,7 @@ export default function AsistenAI() {
                 </div>
             )}
 
-          <div className="ai-list" ref={listRef} inert={bukaModel}>
+          <div className="ai-list" ref={listRef} inert={bukaModel} role="log" aria-label="Percakapan asisten AI" aria-live="polite" aria-busy={busy}>
             {pesan.length === 0 && (
               <div className="ai-kosong">
                 <p>

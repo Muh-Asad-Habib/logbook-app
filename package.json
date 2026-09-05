@@ -14,10 +14,23 @@
     "start": "npm run start --workspace backend",
     "migrate": "node tools/migrate-to-cloud.mjs",
     "deploy": "npx --yes vercel --prod --yes",
-    "cek:online": "node tools/cek-online.mjs"
+    "cek:online": "node tools/cek-online.mjs",
+    "audit:desain": "node tools/audit-desain.mjs",
+    "test:pradeploy": "node --test tools/test-dependensi.mjs tools/test-pradeploy.mjs && npm run diag:panel --workspace backend && npm run diag:panel-ui --workspace backend"
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "express": {
+      "qs": "6.16.0"
+    },
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }
-

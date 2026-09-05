@@ -186,7 +186,7 @@ export default function EksporPage() {
       <div className="card mt">
         <div className="eks-head" style={{ marginBottom: 10 }}>
           <div className="metric-ic v3"><Upload className="lucide" /></div>
-          <div className="eks-judul">
+          <div id="impor-word-label" className="eks-judul">
             Impor dari Word
             <span className="eks-tag">DOCX</span>
           </div>
@@ -197,6 +197,7 @@ export default function EksporPage() {
         <div className="row">
           <input
             type="file" accept=".docx" style={{ flex: "1 1 260px", marginTop: 0 }}
+            aria-labelledby="impor-word-label"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           <button className="btn primary" onClick={impor} disabled={busyImpor}>

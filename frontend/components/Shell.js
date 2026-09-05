@@ -15,7 +15,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, CalendarDays, Wallet, Images, FileOutput,
   FileText, Settings, LogOut, Sun, Moon, Plus, ChevronUp, ChevronDown,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, MoreHorizontal,
   Trophy, Flame, Banknote, Users,
   Link as LinkIcon, Copy, Check, Presentation,
 } from "lucide-react";
@@ -176,6 +176,57 @@ const badgeUntuk = (badges, href) =>
   href === "/laporan" ? badges.laporan :
   href === "/presentasi" ? badges.presentasi : 0;
 
+/* Menu nonmodal: panah/Home/End di item, Tab tetap alami (termasuk form tim). */
+function useMenuKeyboard(ref, open, setOpen, ready) {
+  const lastOnOpen = useRef(false);
+  useEffect(() => {
+    if (!ready) return;
+    const box = ref.current;
+    if (!box) return;
+    const trigger = () => box.querySelector('[aria-haspopup="menu"]');
+    const items = () => [...box.querySelectorAll('[role="menuitem"]')]
+      .filter((el) => !el.disabled && el.getClientRects().length > 0);
+    if (open) {
+      const all = items();
+      (lastOnOpen.current ? all.at(-1) : all[0])?.focus();
+      lastOnOpen.current = false;
+    }
+    const key = (e) => {
+      if (e.target === trigger() && ["ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        lastOnOpen.current = e.key === "ArrowUp";
+        if (!open) setOpen(true);
+        else (e.key === "ArrowUp" ? items().at(-1) : items()[0])?.focus();
+        return;
+      }
+      if (!open) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        trigger()?.focus();
+        return;
+      }
+      const all = items();
+      const i = all.indexOf(e.target);
+      if (i < 0 || !all.length) return;
+      const next = { ArrowDown: (i + 1) % all.length, ArrowUp: (i - 1 + all.length) % all.length, Home: 0, End: all.length - 1 }[e.key];
+      if (next !== undefined) { e.preventDefault(); all[next].focus(); }
+    };
+    const outside = (e) => { if (!box.contains(e.target)) setOpen(false); };
+    box.addEventListener("keydown", key);
+    if (open) {
+      document.addEventListener("pointerdown", outside);
+      document.addEventListener("focusin", outside);
+    }
+    return () => {
+      box.removeEventListener("keydown", key);
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("focusin", outside);
+    };
+  }, [ref, open, setOpen, ready]);
+}
+
 /* ---------- Pemilih tim aktif (topbar pendamping, dukung multi-tim) ----------
  * Satu dropdown untuk semua: berganti tim yang dilihat DAN menambah tim baru
  * memakai kode yang dibagikan tim (fasilitator & dosen pendamping). */
@@ -188,6 +239,7 @@ function TimSwitcher({ role }) {
   const [buka, setBuka] = useState(false);
   const [tambah, setTambah] = useState(false);
   const boxRef = useRef(null);
+  useMenuKeyboard(boxRef, buka, setBuka, tim.length > 0);
 
   useEffect(() => {
     if (Array.isArray(timData)) setTim(timData);
@@ -209,24 +261,8 @@ function TimSwitcher({ role }) {
     }
   }, [tim, aktif]);
 
-  // Klik di luar / tombol Esc → tutup dropdown
   useEffect(() => {
-    if (!buka) return;
-    const tutup = (e) => {
-      if (!boxRef.current?.contains(e.target)) {
-        setBuka(false);
-        setTambah(false);
-      }
-    };
-    const esc = (e) => {
-      if (e.key === "Escape") { setBuka(false); setTambah(false); }
-    };
-    document.addEventListener("pointerdown", tutup);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", tutup);
-      document.removeEventListener("keydown", esc);
-    };
+    if (!buka) setTambah(false);
   }, [buka]);
 
   const info = INFO_PERAN[role] || INFO_PERAN.fasilitator;
@@ -243,6 +279,7 @@ function TimSwitcher({ role }) {
     setTimAktif(t.id);
     setBuka(false);
     setTambah(false);
+    boxRef.current?.querySelector('[aria-haspopup="menu"]')?.focus();
   };
 
   return (
@@ -266,7 +303,7 @@ function TimSwitcher({ role }) {
       <span className="chip chip-role" title="Peran akun">{info.emoji} {info.nama}</span>
 
       {buka && (
-        <div className="user-menu tim-menu" role="menu">
+        <div className="user-menu tim-menu" role="menu" aria-label="Tim yang didampingi">
           <div className="menu-judul">TIM YANG KAMU DAMPINGI</div>
           {tim.map((t) => (
             <button
@@ -327,7 +364,7 @@ function UserMenu({ onClose }) {
     location.href = "/login";
   };
   return (
-    <div className="user-menu" role="menu">
+    <div className="user-menu" role="menu" aria-label="Menu akun">
       <Link href="/profil" role="menuitem" className="user-menu-item" onClick={onClose}>
         <Settings className="lucide" />
         <span>
@@ -353,6 +390,9 @@ export default function Shell({ children }) {
   const [theme, toggleTheme] = useTheme();
   const menuRef = useRef(null);
   const menuMobRef = useRef(null);
+  const navMoreRef = useRef(null);
+  useMenuKeyboard(menuRef, menuBuka, setMenuBuka, siap && !isLogin);
+  useMenuKeyboard(menuMobRef, menuMob, setMenuMob, siap && !isLogin);
 
   // Ingat pilihan sidebar diperkecil (dibaca sebelum kerangka dirender)
   useEffect(() => {
@@ -426,32 +466,9 @@ export default function Shell({ children }) {
   }, [siap, isLogin]);
 
   useEffect(() => {
-    if (!menuBuka && !menuMob) return;
-    const tutup = (e) => {
-      if (!menuRef.current?.contains(e.target) && !menuMobRef.current?.contains(e.target)) {
-        setMenuBuka(false);
-        setMenuMob(false);
-      }
-    };
-    // Escape → tutup menu & kembalikan fokus ke tombol pembukanya (aksesibilitas keyboard)
-    const esc = (e) => {
-      if (e.key !== "Escape") return;
-      setMenuBuka(false);
-      setMenuMob(false);
-      const wadah = menuBuka ? menuRef.current : menuMobRef.current;
-      wadah?.querySelector("[aria-haspopup='menu']")?.focus();
-    };
-    document.addEventListener("pointerdown", tutup);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", tutup);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [menuBuka, menuMob]);
-
-  useEffect(() => {
     setMenuBuka(false);
     setMenuMob(false);
+    navMoreRef.current?.close();
   }, [path]);
 
   // Hook dipanggil TANPA syarat (Rules of Hooks) — fetch di dalamnya
@@ -479,6 +496,8 @@ export default function Shell({ children }) {
   const role = user?.role || "tim";
   const fasilitator = role === "fasilitator" || role === "dosen"; // pendamping
   const menuAktif = fasilitator ? MENU_FAS : MENU;
+  const menuMobile = menuAktif.length > 5 ? menuAktif.slice(0, 4) : menuAktif;
+  const menuLain = menuAktif.length > 5 ? menuAktif.slice(4) : [];
   const judul =
     fasilitator && ((path || "/").replace(/\/$/, "") || "/") === "/"
       ? "Dashboard Tim"
@@ -509,11 +528,12 @@ export default function Shell({ children }) {
             {sbMini ? <PanelLeftOpen className="lucide" /> : <PanelLeftClose className="lucide" />}
           </button>
         </div>
-        <nav className="sb-menu">
+        <nav className="sb-menu" aria-label="Menu utama desktop">
           {menuAktif.map(({ href, label, Ic }) => {
             const nBadge = badgeUntuk(badges, href);
             return (
               <Link key={href} href={href} className={path === href ? "active" : ""}
+                    aria-label={label} aria-current={path === href ? "page" : undefined}
                     title={sbMini ? label : undefined}>
                 <Ic className="lucide" /> <span className="sb-txt">{label}</span>
                 <BadgeNotif n={nBadge} />
@@ -530,6 +550,7 @@ export default function Shell({ children }) {
           </button>
           {user && (
             <button type="button" className="sb-user" onClick={() => setMenuBuka((v) => !v)}
+                    aria-label={`Menu akun ${user.username}`}
                     aria-haspopup="menu" aria-expanded={menuBuka}
                     title={sbMini ? `${user.username} — kelola akun` : undefined}>
               <span className="ava">{inisial}</span>
@@ -549,7 +570,7 @@ export default function Shell({ children }) {
           <div className="topbar-inner">
             <div className="mob-head">
               <div className="mob-logo"><LogoMark /></div>
-              <b>{judul}</b>
+              <h1>{judul}</h1>
             </div>
             <h1 className="pg-title">{judul}</h1>
             {fasilitator ? <TimSwitcher role={role} /> : <TopChips />}
@@ -560,6 +581,7 @@ export default function Shell({ children }) {
               </button>
               {user && (
                 <button type="button" className="mob-ava" onClick={() => setMenuMob((v) => !v)}
+                        aria-label={`Menu akun ${user.username}`}
                         aria-haspopup="menu" aria-expanded={menuMob}>
                   {inisial}
                 </button>
@@ -569,22 +591,48 @@ export default function Shell({ children }) {
           </div>
         </header>
 
-        <main id="konten" className="container">{children}</main>
+        <main id="konten" className="container" tabIndex={-1}>{children}</main>
       </div>
 
       {/* ===== Bottom-nav (mobile) ===== */}
       <nav className="bottom-nav" aria-label="Menu utama">
-        {menuAktif.map(({ href, label, pendek, Ic }) => {
+        {menuMobile.map(({ href, label, pendek, Ic }) => {
           const nBadge = badgeUntuk(badges, href);
           return (
             <Link key={href} href={href} className={path === href ? "active" : ""}
-                  aria-label={label} style={{ position: "relative" }}>
-              <Ic className="lucide" /> {pendek || label}
+                  aria-label={label} aria-current={path === href ? "page" : undefined}>
+              <Ic className="lucide" /> {href === "/" ? "Beranda" : pendek || label}
               <BadgeNotif n={nBadge} varian="nav" />
             </Link>
           );
         })}
+        {menuLain.length > 0 && (
+          <button type="button" className={menuLain.some((m) => m.href === path) ? "active" : ""}
+                  aria-haspopup="dialog" aria-controls="nav-lainnya"
+                  onClick={() => navMoreRef.current?.showModal()}>
+            <MoreHorizontal className="lucide" /> Lainnya
+          </button>
+        )}
       </nav>
+
+      {menuLain.length > 0 && (
+        <dialog id="nav-lainnya" ref={navMoreRef} aria-labelledby="nav-lainnya-judul">
+          <div className="dlg-head"><h3 id="nav-lainnya-judul">Menu lainnya</h3></div>
+          <div className="dlg-body">
+            <nav aria-label="Menu tambahan" className="nav-more-links">
+              {menuLain.map(({ href, label, Ic }) => (
+                <Link key={href} href={href} className="user-menu-item"
+                      aria-current={path === href ? "page" : undefined}
+                      onClick={() => navMoreRef.current?.close()}>
+                  <Ic className="lucide" /> {label}
+                  <BadgeNotif n={badgeUntuk(badges, href)} />
+                </Link>
+              ))}
+            </nav>
+            <button type="button" className="btn mt" onClick={() => navMoreRef.current?.close()}>Tutup</button>
+          </div>
+        </dialog>
+      )}
 
       {/* ===== FAB tambah entri (mobile) ===== */}
       {fabAda && (

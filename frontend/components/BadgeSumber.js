@@ -39,21 +39,14 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
   // Sumber yang SEDANG ditampilkan di menu — dipakai agar panel kategori
   // langsung muncul begitu chip "Belmawa" diklik, tanpa menunggu data segar.
   const [sumberTampil, setSumberTampil] = useState(e.sumber || "");
-  const boxRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => { setSumberTampil(e.sumber || ""); }, [e.sumber]);
 
-  // Klik di luar / Esc → tutup menu
+  // Dialog native berada di top layer: tidak terpotong overflow tabel/kartu.
   useEffect(() => {
-    if (!buka) return;
-    const tutup = (ev) => { if (!boxRef.current?.contains(ev.target)) setBuka(false); };
-    const esc = (ev) => { if (ev.key === "Escape") setBuka(false); };
-    document.addEventListener("pointerdown", tutup);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", tutup);
-      document.removeEventListener("keydown", esc);
-    };
+    if (buka) menuRef.current?.showModal();
+    else menuRef.current?.close();
   }, [buka]);
 
   if (!bisaUbah) return <span className="badge-sumber"><IsiBadge e={e} /></span>;
@@ -78,13 +71,13 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
   };
 
   return (
-    <span className="badge-sumber" ref={boxRef}>
+    <span className="badge-sumber">
       <button
         type="button"
         className={`sumber-btn${e.sumber ? "" : " kosong"}`}
         onClick={() => setBuka((v) => !v)}
         disabled={sibuk}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={buka}
         title="Ubah sumber dana (tidak membatalkan ACC)"
       >
@@ -92,9 +85,14 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
         <ChevronDown className="lucide sumber-caret" />
       </button>
 
-      {buka && (
-        <div className="sumber-menu" role="menu">
-          <div className="menu-judul">SUMBER DANA</div>
+      <dialog ref={menuRef} aria-label="Ubah sumber dana" onClose={() => setBuka(false)}
+              style={{ maxWidth: 420 }}>
+        <div className="dlg-head">
+          <h3>Sumber dana</h3>
+          <button type="button" className="btn sm" style={{ marginLeft: "auto" }}
+                  onClick={() => setBuka(false)}>Tutup</button>
+        </div>
+        <div className="dlg-body">
           <div className="dana-chips">
             {SUMBER_DANA.map((s) => (
               <ChipDana
@@ -120,7 +118,7 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
 
           {sumberTampil === "belmawa" && (
             <>
-              <div className="menu-judul">KATEGORI PKM</div>
+              <h4 className="mt" style={{ marginBottom: 8 }}>Kategori PKM</h4>
               <ChipsKategori
                 kategori={e.kategori || ""}
                 onPilih={(id) => simpan("belmawa", id)}
@@ -128,7 +126,7 @@ export default function BadgeSumber({ e, bisaUbah = false, onUbah }) {
             </>
           )}
         </div>
-      )}
+      </dialog>
     </span>
   );
 }

@@ -387,7 +387,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   .stat b{font-size:1.55rem;letter-spacing:-.03em;display:block;line-height:1.1;
     font-variant-numeric:tabular-nums}
   .stat .lbl{color:var(--mut);font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
-  /* rincian kecil di bawah label (mis. "👥 2 · 🎓 1 · 👨‍🏫 1") */
+  /* rincian kecil di bawah label (mis. " 2 ·  1 · ‍ 1") */
   .stat .sub{display:block;color:var(--mut);font-size:.7rem;margin-top:3px;font-variant-numeric:tabular-nums;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* kartu "Sedang membuka": titik hijau berdenyut di sudut */
@@ -824,6 +824,28 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   }
   @media(prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none!important;transition:none!important}
+    html{scroll-behavior:auto}
+  }
+  /* Audit desain: konten panjang tidak boleh memperlebar viewport. */
+  .main,.card,.tile,.grid2>*{min-width:0;overflow-wrap:anywhere}
+  input,select,textarea{min-width:0;max-width:100%}
+  :where(button,a[href],input,select,textarea,summary):focus-visible{
+    outline:2px solid var(--cy);outline-offset:3px;
+  }
+  @media(min-width:1081px){
+    .side-nav{min-height:0;overflow-y:auto;flex:1;padding:3px;margin:-3px;overscroll-behavior:contain}
+    .side-top,.side-foot{flex-shrink:0}
+  }
+  @media(max-width:1080px){
+    .side{left:calc(8px + env(safe-area-inset-left));right:calc(8px + env(safe-area-inset-right))}
+    .wrap{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+    .top-in{padding-top:calc(10px + env(safe-area-inset-top))}
+    .dlg-b{padding-bottom:calc(17px + env(safe-area-inset-bottom))}
+  }
+  @media(pointer:coarse){
+    input,select,textarea{font-size:16px}
+    .btn,.btn.sm,.fchip,.seg button,.tabs button,.side-nav a,.side-out{min-height:44px}
+    .btn.ic{min-width:44px}
   }
 </style>
 </head>
@@ -899,12 +921,12 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <div class="side-logo" aria-hidden="true"><svg class="i"><use href="#i-shield"/></svg></div>
       <div class="side-brand"><b>Pusat Kendali</b><span>kelola akun &amp; data</span></div>
     </div>
-    <nav class="side-nav">
-      <a href="#" data-page="ringkas" class="on" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
-      <a href="#" data-page="akun" data-tip="Akun pengguna" data-m="Akun"><svg class="i"><use href="#i-users"/></svg><span>Akun pengguna</span></a>
-      <a href="#" data-page="sesi" data-tip="Perangkat &amp; sesi" data-m="Sesi"><svg class="i"><use href="#i-device"/></svg><span>Perangkat &amp; sesi</span></a>
-      <a href="#" data-page="audit" data-tip="Jejak audit" data-m="Audit"><svg class="i"><use href="#i-scroll"/></svg><span>Jejak audit</span></a>
-      <a href="#" data-page="pengaturan" data-tip="Pengaturan" data-m="Setelan"><svg class="i"><use href="#i-cog"/></svg><span>Pengaturan</span></a>
+    <nav class="side-nav" aria-label="Halaman pusat kendali">
+      <a href="#" data-page="ringkas" class="on" aria-label="Ringkasan" data-tip="Ringkasan" data-m="Ringkas"><svg class="i"><use href="#i-gauge"/></svg><span>Ringkasan</span></a>
+      <a href="#" data-page="akun" aria-label="Akun pengguna" data-tip="Akun pengguna" data-m="Akun"><svg class="i"><use href="#i-users"/></svg><span>Akun pengguna</span></a>
+      <a href="#" data-page="sesi" aria-label="Perangkat dan sesi" data-tip="Perangkat &amp; sesi" data-m="Sesi"><svg class="i"><use href="#i-device"/></svg><span>Perangkat &amp; sesi</span></a>
+      <a href="#" data-page="audit" aria-label="Jejak audit" data-tip="Jejak audit" data-m="Audit"><svg class="i"><use href="#i-scroll"/></svg><span>Jejak audit</span></a>
+      <a href="#" data-page="pengaturan" aria-label="Pengaturan" data-tip="Pengaturan" data-m="Setelan"><svg class="i"><use href="#i-cog"/></svg><span>Pengaturan</span></a>
     </nav>
     <div class="side-foot">
       <div class="side-note">tekan / untuk cari</div>
@@ -982,9 +1004,9 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 
         <div class="card" id="sec-akun">
           <div class="tabs">
-            <button class="on" data-role-tab="tim">👥 Tim</button>
-            <button data-role-tab="fasilitator">🎓 Fasilitator</button>
-            <button data-role-tab="dosen">👨‍🏫 Dosen Pendamping</button>
+            <button class="on" data-role-tab="tim"> Tim</button>
+            <button data-role-tab="fasilitator"> Fasilitator</button>
+            <button data-role-tab="dosen">‍ Dosen Pendamping</button>
           </div>
           <div class="tbl">
             <table>
@@ -1096,7 +1118,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
         <div class="grid2">
           <div>
             <div class="card">
-              <h2>🎓 Kode pendaftaran fasilitator <span class="tag" id="kode-status">—</span></h2>
+              <h2> Kode pendaftaran fasilitator <span class="tag" id="kode-status">—</span></h2>
               <p class="mut" style="margin-top:8px">Kode ini wajib dimasukkan saat seseorang mendaftar
               sebagai fasilitator. Disimpan sebagai hash — tidak bisa dilihat lagi, hanya bisa diganti.</p>
               <form id="f-kode">
@@ -1108,7 +1130,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
               </form>
             </div>
             <div class="card">
-              <h2>👨‍🏫 Kode pendaftaran dosen pendamping <span class="tag" id="kode-status-dosen">—</span></h2>
+              <h2>‍ Kode pendaftaran dosen pendamping <span class="tag" id="kode-status-dosen">—</span></h2>
               <p class="mut" style="margin-top:8px">Dosen pendamping bisa melihat &amp; mengomentari seperti
               fasilitator, <b>plus memberi ACC / meminta revisi</b> pada kegiatan, belanja, dan laporan tim
               yang ditugaskan. Kode disimpan sebagai hash — hanya bisa diganti.</p>
@@ -1123,7 +1145,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           </div>
           <div>
             <div class="card">
-              <h2>👥 Pendaftaran akun Tim <span class="tag" id="daftar-status">—</span></h2>
+              <h2> Pendaftaran akun Tim <span class="tag" id="daftar-status">—</span></h2>
               <p class="mut" style="margin-top:8px" id="daftar-ket">Memuat status…</p>
               <p class="mut" style="margin-top:6px">Tutup bila semua tim sudah terdaftar supaya tidak ada akun
               liar. Pendaftaran fasilitator &amp; dosen tidak terpengaruh (tetap memakai kode di samping).
@@ -1175,12 +1197,12 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <div class="dlg-b">
     <div class="chips" id="dt-chips"></div>
     <div class="tabs">
-      <button class="on" data-tab="keg">🗓️ Kegiatan</button>
-      <button data-tab="keu">💰 Keuangan</button>
-      <button data-tab="lap">📄 Laporan</button>
-      <button data-tab="pre">📽️ Presentasi</button>
-      <button data-tab="ses">🖥️ Perangkat</button>
-      <button data-tab="akt">📜 Aktivitas</button>
+      <button class="on" data-tab="keg">️ Kegiatan</button>
+      <button data-tab="keu"> Keuangan</button>
+      <button data-tab="lap"> Laporan</button>
+      <button data-tab="pre">️ Presentasi</button>
+      <button data-tab="ses">️ Perangkat</button>
+      <button data-tab="akt"> Aktivitas</button>
     </div>
     <div id="dt-isi"></div>
   </div>
@@ -1188,7 +1210,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 
 <!-- ===== DIALOG ASSIGN TIM FASILITATOR ===== -->
 <dialog id="d-tim" class="mini">
-  <div class="dlg-h"><h3>🔗 Tim yang diampu</h3></div>
+  <div class="dlg-h"><h3> Tim yang diampu</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-tim-sub"></p>
     <form method="dialog" id="f-tim">
@@ -1203,7 +1225,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 
 <!-- ===== DIALOG ASSIGN PENDAMPING KE TIM ===== -->
 <dialog id="d-fas" class="mini">
-  <div class="dlg-h"><h3>🎓 Pendamping tim</h3></div>
+  <div class="dlg-h"><h3> Pendamping tim</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-fas-sub"></p>
     <form method="dialog" id="f-fas">
@@ -1236,7 +1258,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 
 <!-- ===== DIALOG RESET PASSWORD ===== -->
 <dialog id="d-pw" class="mini">
-  <div class="dlg-h"><h3>🔑 Setel ulang password</h3></div>
+  <div class="dlg-h"><h3> Setel ulang password</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-pw-sub"></p>
     <form method="dialog" id="f-pw">
@@ -1271,9 +1293,9 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       </label>
       <label>Peran
         <select id="d-baru-r">
-          <option value="tim">👥 Tim (default)</option>
-          <option value="fasilitator">🎓 Fasilitator</option>
-          <option value="dosen">👨‍🏫 Dosen Pendamping</option>
+          <option value="tim"> Tim (default)</option>
+          <option value="fasilitator"> Fasilitator</option>
+          <option value="dosen">‍ Dosen Pendamping</option>
         </select>
       </label>
       <div class="row" style="justify-content:flex-end;margin-top:16px">
@@ -1499,6 +1521,8 @@ function keHalaman(id, dorong){
   });
   document.querySelectorAll(".side-nav a").forEach(function(a){
     a.classList.toggle("on", a.dataset.page === id);
+    if (a.dataset.page === id) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
   });
   var info = JUDUL[id] || JUDUL.ringkas;
   var jd = $("#judul-hal");   if (jd) jd.textContent = info[0];
@@ -1709,7 +1733,7 @@ function renderAudit(){
       '" data-fil-audit="' + f[0] + '">' + esc(f[1]) + "</button>";
   }).join(""), "fil-audit");
   setHTML($("#audit"), AUDIT.map(barisAudit).join("") ||
-    '<div class="kosong"><div class="big">📜</div>Belum ada catatan untuk saringan ini.</div>', "audit");
+    '<div class="kosong"><div class="big"></div>Belum ada catatan untuk saringan ini.</div>', "audit");
 }
 function renderAuditMini(){
   setHTML($("#audit-mini"), AUDIT.slice(0, 10).map(barisAudit).join("") ||
@@ -1756,7 +1780,7 @@ function namaTarget(r){
 /* Peran pendamping (punya tabel & aksi yang sama, beda wewenang ACC). */
 function isPendamping(role){ return role === "fasilitator" || role === "dosen"; }
 function labelPeran(role){
-  return role === "dosen" ? "👨‍🏫 dosen" : role === "fasilitator" ? "🎓 fasilitator" : "tim";
+  return role === "dosen" ? "‍ dosen" : role === "fasilitator" ? " fasilitator" : "tim";
 }
 
 function renderUsers(){
@@ -1777,7 +1801,7 @@ function renderUsers(){
   var kolom = lihatPendamping ? 5 : 7;
   setHTML($("#t-users"), rows.map(lihatPendamping ? barisPendamping : barisUser).join("") ||
     '<tr><td colspan="' + kolom + '"><div class="kosong"><div class="big">' +
-    (VIEW_ROLE === "dosen" ? "👨‍🏫" : VIEW_ROLE === "fasilitator" ? "🎓" : "🔍") + '</div>' +
+    (VIEW_ROLE === "dosen" ? "‍" : VIEW_ROLE === "fasilitator" ? "" : "") + '</div>' +
     (lihatPendamping && !q
       ? "Belum ada akun " + (VIEW_ROLE === "dosen" ? "dosen pendamping" : "fasilitator") +
         ".<div class='mut' style='margin-top:6px'>Set kode pendaftaran di kartu bawah, lalu bagikan kodenya.</div>"
@@ -1789,10 +1813,10 @@ function barisUser(u){
     '<td class="sel-utama"><div class="u-cell"><span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + '</span><div>' +
       "<b>" + esc(u.username) + "</b>" +
       (u.pemilikTemplate ? ' <span class="badge b">arsip</span>' : "") +
-      (u.punya_laporan ? ' <span class="badge c">📄 laporan</span>' : "") +
-      (u.punya_presentasi ? ' <span class="badge b">📽️ presentasi</span>' : "") +
-      (u.n_fasilitator ? ' <span class="badge y">🎓 ' + u.n_fasilitator + '</span>' : "") +
-      (u.n_dosen ? ' <span class="badge c">👨‍🏫 ' + u.n_dosen + '</span>' : "") +
+      (u.punya_laporan ? ' <span class="badge c"> laporan</span>' : "") +
+      (u.punya_presentasi ? ' <span class="badge b">️ presentasi</span>' : "") +
+      (u.n_fasilitator ? ' <span class="badge y"> ' + u.n_fasilitator + '</span>' : "") +
+      (u.n_dosen ? ' <span class="badge c">‍ ' + u.n_dosen + '</span>' : "") +
       (u.n_acc ? ' <span class="badge g">✔ ' + u.n_acc + ' ACC</span>' : "") +
       (u.n_revisi ? ' <span class="badge r">↺ ' + u.n_revisi + ' revisi</span>' : "") +
       '<div class="mut">dibuat ' + tgl(u.createdAt) +
@@ -1806,7 +1830,7 @@ function barisUser(u){
     '<td data-l="Aktivitas" style="white-space:nowrap">' + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
-      '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '">🎓</button>' +
+      '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '"></button>' +
       '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
@@ -1832,7 +1856,7 @@ function barisPendamping(u){
     '<td data-l="Sesi">' + (u.sesi ? '<span class="badge g">' + u.sesi + " aktif</span>" : '<span class="mut">—</span>') + "</td>" +
     '<td data-l="Dibuat" style="white-space:nowrap">' + tgl(u.createdAt) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
-      '<button class="btn sm p" data-act="tim" data-id="' + u.id + '">🔗 Tim</button>' +
+      '<button class="btn sm p" data-act="tim" data-id="' + u.id + '"> Tim</button>' +
       '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
@@ -1860,9 +1884,9 @@ function sejak(iso){
 /** Ikon kasar sesuai jenis perangkat yang terbaca dari labelnya. */
 function ikonSesi(label){
   var s = String(label || "").toLowerCase();
-  if (s.indexOf("android") >= 0 || s.indexOf("iphone") >= 0) return "📱";
-  if (s.indexOf("ipad") >= 0) return "📲";
-  if (s) return "🖥️";
+  if (s.indexOf("android") >= 0 || s.indexOf("iphone") >= 0) return "";
+  if (s.indexOf("ipad") >= 0) return "";
+  if (s) return "️";
   return "❔";
 }
 /** Peramban yang sengaja menyamar sebagai Chrome → beri catatan. */
@@ -1961,12 +1985,12 @@ function renderStatSesi(){
       perangkatMembuka + " tab terbuka" + (perangkatLatar ? " · " + perangkatLatar + " di latar" : ""),
       membuka ? "hidup" : "") +
     stat("users","Akun login", total, "s1",
-      "👥 " + online.tim + " · 🎓 " + online.fasilitator + " · 👨‍🏫 " + online.dosen) +
+      " " + online.tim + " ·  " + online.fasilitator + " · ‍ " + online.dosen) +
     stat("device","Perangkat login", SESI.length, "s2",
       Math.max(0, SESI.length - perangkatMembuka) + " tidak sedang membuka") +
     stat("user","Tim login", online.tim, "s5") +
     stat("user","Pendamping login", online.fasilitator + online.dosen, "s3",
-      "🎓 " + online.fasilitator + " · 👨‍🏫 " + online.dosen) +
+      " " + online.fasilitator + " · ‍ " + online.dosen) +
     stat("power","Akun offline", Math.max(0, USERS.length - total), "s6",
       "dari " + USERS.length + " akun");
   if (setHTML($("#stat-sesi"), html, "stat-sesi")) {
@@ -1984,8 +2008,8 @@ function renderFilterPeran(){
     if (n[r] == null) r = "tim";
     n[r]++;
   });
-  var daftar = [["", "Semua peran"], ["tim", "👥 Tim"],
-    ["fasilitator", "🎓 Fasilitator"], ["dosen", "👨‍🏫 Dosen"]];
+  var daftar = [["", "Semua peran"], ["tim", " Tim"],
+    ["fasilitator", " Fasilitator"], ["dosen", "‍ Dosen"]];
   setHTML($("#fil-peran"), daftar.map(function(f){
     return '<button class="fchip' + (PERAN_SESI === f[0] ? " on" : "") +
       '" data-peran-sesi="' + f[0] + '">' + esc(f[1]) +
@@ -2004,7 +2028,7 @@ function renderTabelSesi(){
     return rb - ra;
   });
   setHTML(el, rows.map(barisSesi).join("") ||
-    '<tr><td colspan="7"><div class="kosong"><div class="big">🖥️</div>' +
+    '<tr><td colspan="7"><div class="kosong"><div class="big">️</div>' +
     (cariSesi() || PERAN_SESI ? "Tidak ada sesi yang cocok dengan saringan ini."
                               : "Belum ada perangkat yang sedang login.") +
     "</div></td></tr>", "t-sesi");
@@ -2034,7 +2058,7 @@ function renderAkunSesi(){
   setHTML($("#daftar-akun-sesi"), rows.map(function(u){
     return kartuAkunSesi(u, peta[u.id] || []);
   }).join("") ||
-    '<div class="kosong"><div class="big">👥</div>Tidak ada akun yang cocok dengan saringan ini.</div>',
+    '<div class="kosong"><div class="big"></div>Tidak ada akun yang cocok dengan saringan ini.</div>',
     "akun-sesi");
 }
 
@@ -2095,8 +2119,8 @@ function kartuAkunSesi(u, list){
         statusKepala +
         '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + " Data</button>" +
         (isPendamping(role)
-          ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '">🔗</button>'
-          : '<button class="btn sm ic" title="Pendamping tim ini" data-act="fas" data-id="' + u.id + '">🎓</button>') +
+          ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '"></button>'
+          : '<button class="btn sm ic" title="Pendamping tim ini" data-act="fas" data-id="' + u.id + '"></button>') +
         (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
           u.id + '">' + sv("power") + "</button>" : "") +
         '<button class="asx-tgl" data-act="lipat" data-id="' + u.id +
@@ -2148,7 +2172,7 @@ function barisSesi(s){
 /** Tabel sesi di dalam dialog detail satu akun. */
 function tabelSesiUser(list){
   if (!list.length) {
-    return '<div class="kosong"><div class="big">🖥️</div>Akun ini sedang tidak login di perangkat mana pun.</div>';
+    return '<div class="kosong"><div class="big">️</div>Akun ini sedang tidak login di perangkat mana pun.</div>';
   }
   var out = '<div class="tbl" style="margin-top:14px"><table><thead><tr>' +
     "<th>Perangkat</th><th>Alamat IP</th><th>Terakhir aktif</th><th>Mulai login</th>" +
@@ -2240,11 +2264,11 @@ function ukur(b){
 }
 function tabelLaporan(d){
   var l = d.laporan || { ada: false };
-  if (!l.ada) return '<div class="kosong"><div class="big">📄</div>Tim ini belum mengunggah laporan kemajuan.</div>';
+  if (!l.ada) return '<div class="kosong"><div class="big"></div>Tim ini belum mengunggah laporan kemajuan.</div>';
   var url = B + "/data/pengguna/" + d.user.id + "/laporan-file";
   return '<div class="card" style="margin-top:14px">' +
     '<div class="row spread">' +
-      '<div><b style="font-size:.95rem">📄 ' + esc(l.nama) + '</b>' +
+      '<div><b style="font-size:.95rem"> ' + esc(l.nama) + '</b>' +
       '<div class="mut" style="margin-top:4px">' + ukur(l.ukuran) +
       ' · diunggah ' + esc(tglJam(l.updated_at)) + '</div></div>' +
       '<div class="row" style="gap:8px">' +
@@ -2255,13 +2279,13 @@ function tabelLaporan(d){
 }
 function tabelPresentasi(d){
   var p = d.presentasi || { ada: false, file: { ada: false }, canva: { ada: false } };
-  if (!p.ada) return '<div class="kosong"><div class="big">📽️</div>Tim ini belum mengunggah presentasi (.pptx) maupun menautkan Canva.</div>';
+  if (!p.ada) return '<div class="kosong"><div class="big">️</div>Tim ini belum mengunggah presentasi (.pptx) maupun menautkan Canva.</div>';
   var out = "";
   if (p.file && p.file.ada) {
     var url = B + "/data/pengguna/" + d.user.id + "/presentasi-file";
     out += '<div class="card" style="margin-top:14px">' +
       '<div class="row spread">' +
-        '<div><b style="font-size:.95rem">📽️ ' + esc(p.file.nama) + '</b>' +
+        '<div><b style="font-size:.95rem">️ ' + esc(p.file.nama) + '</b>' +
         '<div class="mut" style="margin-top:4px">' + ukur(p.file.ukuran) +
         ' · diunggah ' + esc(tglJam(p.file.updated_at)) + '</div></div>' +
         '<div class="row" style="gap:8px">' +
@@ -2273,7 +2297,7 @@ function tabelPresentasi(d){
   if (p.canva && p.canva.ada) {
     out += '<div class="card" style="margin-top:14px">' +
       '<div class="row spread">' +
-        '<div><b style="font-size:.95rem">🎨 Tautan presentasi Canva</b>' +
+        '<div><b style="font-size:.95rem"> Tautan presentasi Canva</b>' +
         '<div class="mut" style="margin-top:4px;word-break:break-all">' + esc(p.canva.url) +
         '<br>ditautkan ' + esc(tglJam(p.canva.updated_at)) + '</div></div>' +
         '<a class="btn sm p" href="' + esc(p.canva.url) + '" target="_blank" rel="noopener">' +
@@ -2331,7 +2355,7 @@ var AKSI_INFO = {
   "pendaftaran.tim.ubah": ["key","y","Pendaftaran akun tim dibuka/ditutup"]
 };
 function tabelAktivitas(list){
-  if (!list.length) return '<div class="kosong"><div class="big">📜</div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
+  if (!list.length) return '<div class="kosong"><div class="big"></div>Belum ada aktivitas tercatat.<div class="mut" style="margin-top:6px">Aktivitas mulai terekam sejak fitur ini aktif — login, tambah/ubah/hapus data, dan aksi panel.</div></div>';
   var out = '<div class="tline">';
   list.forEach(function(r){
     var info = AKSI_INFO[r.aksi] || ["zap","b", r.aksi || "aktivitas"];
@@ -2362,7 +2386,7 @@ function tabelAktivitas(list){
   return out + "</div>";
 }
 function tabelKegiatan(list){
-  if (!list.length) return '<div class="kosong"><div class="big">🗓️</div>Belum ada kegiatan.</div>';
+  if (!list.length) return '<div class="kosong"><div class="big">️</div>Belum ada kegiatan.</div>';
   var out = '<div class="tbl"><table><thead><tr>' +
     '<th style="width:34px">#</th><th>Tanggal</th><th>Kegiatan</th>' +
     '<th>Capaian</th><th class="num">Waktu</th><th>Foto</th></tr></thead><tbody>';
@@ -2385,7 +2409,7 @@ function tabelKegiatan(list){
   return out + "</tbody></table></div>";
 }
 function tabelKeuangan(list){
-  if (!list.length) return '<div class="kosong"><div class="big">💰</div>Belum ada belanja.</div>';
+  if (!list.length) return '<div class="kosong"><div class="big"></div>Belum ada belanja.</div>';
   var total = 0;
   var out = '<div class="tbl"><table><thead><tr>' +
     '<th style="width:34px">#</th><th>Tanggal</th><th>Item</th>' +
@@ -2449,7 +2473,7 @@ function resetPassword(id){
 function cabutSesi(id){
   var u = findU(id); if (!u) return;
   konfirmasiDialog({
-    judul: "🚪 Keluarkan dari semua perangkat?",
+    judul: " Keluarkan dari semua perangkat?",
     isi: "Semua sesi akun " + u.username + " akan dicabut — pemiliknya harus login ulang di setiap perangkat.",
     tombol: "Keluarkan semua", bahaya: true
   }).then(function(ok){
@@ -2463,7 +2487,7 @@ function cabutSesi(id){
 function cabutSesiSatu(sid, nama){
   if (!sid) return;
   konfirmasiDialog({
-    judul: "🚪 Keluarkan perangkat ini?",
+    judul: " Keluarkan perangkat ini?",
     isi: "Perangkat ini akan keluar dari akun " + (nama || "") + " dan harus login ulang. " +
       "Bila kamu tidak mengenalinya, setel ulang juga password akun itu setelah ini.",
     tombol: "Keluarkan perangkat", bahaya: true
@@ -2477,7 +2501,7 @@ function cabutSesiSatu(sid, nama){
 function hapusUser(id){
   var u = findU(id); if (!u) return;
   konfirmasiDialog({
-    judul: "🗑️ Hapus permanen akun " + u.username + "?",
+    judul: "️ Hapus permanen akun " + u.username + "?",
     isi: "Beserta " + u.kegiatan + " kegiatan, " + u.keuangan + " belanja, laporan, presentasi, " +
       "komentar, dan semua fotonya. Tindakan ini TIDAK bisa dibatalkan.",
     tombol: "Hapus permanen", bahaya: true,
@@ -2829,7 +2853,7 @@ $("#btn-daftar").addEventListener("click", function(){
   var sedangBuka = this.dataset.buka !== "0";
   var tombol = this;
   konfirmasiDialog({
-    judul: sedangBuka ? "🔒 Tutup pendaftaran tim?" : "🔓 Buka pendaftaran tim?",
+    judul: sedangBuka ? " Tutup pendaftaran tim?" : " Buka pendaftaran tim?",
     isi: sedangBuka
       ? "Setelah ditutup, halaman Daftar menolak akun tim baru. Akun masih bisa dibuat dari panel ini."
       : "Setelah dibuka, siapa pun yang mengetahui alamat aplikasi dapat membuat akun tim.",

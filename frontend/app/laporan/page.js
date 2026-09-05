@@ -569,7 +569,7 @@ function LaporanTim() {
         <div className="metric" style={{ marginBottom: 10 }}>
           <div className="metric-ic v1"><FileText className="lucide" /></div>
           <div>
-            <div className="metric-value" style={{ fontSize: "1.02rem" }}>
+            <div id="unggah-laporan-label" className="metric-value" style={{ fontSize: "1.02rem" }}>
               Unggah laporan kemajuan (.docx)
             </div>
             <div className="muted">
@@ -581,6 +581,7 @@ function LaporanTim() {
         <div className="row">
           <input
             ref={inputRef} type="file" accept=".docx"
+            aria-labelledby="unggah-laporan-label"
             style={{ flex: "1 1 260px", marginTop: 0 }}
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />

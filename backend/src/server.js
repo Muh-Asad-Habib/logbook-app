@@ -8,6 +8,7 @@ import path from "node:path";
 import swaggerUi from "swagger-ui-express";
 
 import { config } from "./config.js";
+import { buatCsp } from "./security-headers.js";
 import { load } from "./storage.js";
 import { swaggerSpec } from "./swagger.js";
 import authRouter from "./routes/auth.js";
@@ -44,29 +45,7 @@ const app = express();
  *  - frame-ancestors 'none' : aplikasi tidak boleh dibingkai situs lain
  *                             (anti clickjacking)
  */
-const CSP = {
-  useDefaults: false,
-  directives: {
-    defaultSrc: ["'self'"],
-    baseUri: ["'self'"],
-    objectSrc: ["'none'"],
-    frameAncestors: ["'none'"],
-    formAction: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-    fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-    imgSrc: ["'self'", "data:", "blob:", "https:"],
-    connectSrc: ["'self'"],
-    mediaSrc: ["'self'", "blob:"],
-    workerSrc: ["'self'", "blob:"],
-    frameSrc: ["'self'", "https://www.canva.com", "https://view.officeapps.live.com"],
-    upgradeInsecureRequests: process.env.VERCEL ? [] : null,
-  },
-};
-// Hapus direktif bernilai null (upgrade-insecure-requests hanya di produksi)
-for (const [k, v] of Object.entries(CSP.directives)) {
-  if (v === null) delete CSP.directives[k];
-}
+const CSP = buatCsp();
 
 app.use(
   helmet({

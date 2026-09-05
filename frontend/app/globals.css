@@ -209,7 +209,8 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 }
 .sb-brand b { font-size: 0.95rem; letter-spacing: -0.01em; line-height: 1.2; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-brand small { color: var(--muted); font-size: 0.68rem; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-menu { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.sb-menu { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow-y: auto; padding: 3px; margin: -3px; overscroll-behavior: contain; }
+.sb-brand, .sb-foot { flex-shrink: 0; }
 .sb-menu a {
   display: flex; align-items: center; gap: 11px;
   padding: 11px 13px; border-radius: 12px; text-decoration: none;
@@ -286,7 +287,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 
 .main { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; transition: margin-left 0.22s ease; }
 /* Batasi lebar baris di monitor sangat lebar agar teks tetap nyaman dibaca */
-.container { width: 100%; max-width: 1440px; margin: 0 auto; padding: 20px 22px 70px; }
+.container { width: 100%; max-width: 1440px; margin: 0 auto; padding: 20px 22px 70px; overflow-wrap: anywhere; }
 
 .topbar {
   position: sticky; top: 0; z-index: 60;
@@ -319,12 +320,12 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
  * Untuk baris tim, overflow harus visible — kalau tidak, popover ikut
  * terpotong kotak scroll sehingga dropdown terlihat "tidak berfungsi". */
 .topbar .top-chips.tim-chips { position: relative; overflow: visible; }
-.tim-chips button.chip { cursor: pointer; font-family: inherit; }
+.tim-chips button.chip { cursor: pointer; font-family: inherit; flex: 0 1 auto; min-width: 0; }
 .tim-chips button.chip b { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tim-chips button.chip[aria-expanded="true"] { border-color: var(--line-hover); color: var(--p1); }
 .tim-chips button.chip:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.4); outline-offset: 2px; }
-.tim-chips .user-menu { max-height: 68vh; overflow-y: auto; z-index: 95; }
-.tim-chips .user-menu.tim-menu { top: calc(100% + 8px); right: 0; left: auto; min-width: 268px; }
+.tim-chips .user-menu { max-height: 68vh; max-height: min(68vh, calc(100dvh - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 95; }
+.tim-chips .user-menu.tim-menu { top: calc(100% + 8px); right: 0; left: auto; min-width: 268px; width: min(360px, calc(100vw - 28px)); }
 .tim-chips .user-menu input { font-size: 0.8rem; }
 .tim-chips .menu-judul {
   padding: 6px 12px 2px; font-size: 0.68rem; font-weight: 800;
@@ -339,7 +340,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   background: var(--grad); color: #fff; font-size: 0.95rem;
   box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3);
 }
-.mob-head b { font-size: 0.92rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .mob-head h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 0.92rem; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .mob-actions { display: none; align-items: center; gap: 7px; margin-left: auto; position: relative; }
 .icon-btn {
   width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--line);
@@ -367,18 +368,19 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   grid-auto-columns: 1fr;
   box-shadow: 0 -8px 28px -10px rgba(18, 20, 46, 0.18);
 }
-.bottom-nav a {
+.bottom-nav :is(a, button) {
   position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 6px 1px 5px; border-radius: 12px; text-decoration: none;
   color: var(--muted); font-size: 0.66rem; font-weight: 700; letter-spacing: 0;
   transition: color 0.15s ease, transform 0.15s ease; min-height: 48px; justify-content: center;
   min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 0; background: transparent; font-family: inherit; cursor: pointer;
 }
-.bottom-nav a svg.lucide { font-size: 1.3rem; }
-.bottom-nav a:active { transform: scale(0.94); }
-.bottom-nav a.active { color: var(--p1); }
-.bottom-nav a.active::before {
+.bottom-nav :is(a, button) svg.lucide { font-size: 1.3rem; }
+.bottom-nav :is(a, button):active { transform: scale(0.94); }
+.bottom-nav :is(a, button).active { color: var(--p1); }
+.bottom-nav :is(a, button).active::before {
   content: ""; position: absolute; top: 0; width: 18px; height: 3px;
   border-radius: 99px; background: var(--grad);
 }
@@ -410,18 +412,18 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
   .topbar .top-chips .chip-desk { display: none; }
   /* Pemilih tim fasilitator TETAP tampil di HP — baris kedua topbar */
   .topbar .top-chips.tim-chips { display: flex; flex-basis: 100%; order: 9; margin-left: 0; }
-  .tim-chips .chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
+  .tim-chips .chip, .tim-chips button.chip { flex: 1 1 auto; min-height: 40px; justify-content: flex-start; font-size: 0.8rem; }
   .tim-chips .chip.chip-role { display: none; }
-  .tim-chips .user-menu.tim-menu { left: 0; right: 0; min-width: 0; max-height: 54vh; }
+  .tim-chips .user-menu.tim-menu { left: 0; right: 0; width: auto; min-width: 0; max-height: 54vh; max-height: min(54vh, calc(100dvh - 200px - env(safe-area-inset-bottom))); }
   .tim-chips .user-menu input { font-size: 16px; }
 }
 
 /* ================= Kartu & metrik ================= */
 .grid { display: grid; gap: 14px; }
 .grid.metrics { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); }
-.grid.two { grid-template-columns: 1.1fr 2fr; }
-.grid.half { grid-template-columns: 1fr 1fr; }
-.grid.side { grid-template-columns: 1fr 1.7fr; }
+.grid.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr); }
+.grid.half { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.side { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); }
 /* Tablet (680–1024px): kolom asimetris (two/side) runtuh lebih awal supaya
    grafik tidak terjepit, tapi grid.half tetap 2 kolom agar ruang tak terbuang. */
 @media (max-width: 1024px) { .grid.two, .grid.side { grid-template-columns: 1fr; } }
@@ -808,10 +810,12 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 }
 
 /* ================= Form & dialog ================= */
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 12px; }
+.form-grid > *, .row > *, .tb-baris > * { min-width: 0; }
 label.field { display: block; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
 input, textarea, select {
   width: 100%; margin-top: 5px; padding: 10px 13px;
+  min-width: 0; max-width: 100%;
   border: 1.5px solid var(--line); border-radius: 11px;
   font-family: inherit; font-size: 0.9rem; background: var(--input-bg); color: var(--ink);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.25s ease;
@@ -843,7 +847,8 @@ dialog {
   border: none; border-radius: 22px; padding: 0;
   max-width: 580px; width: calc(100% - 40px);
   margin: auto;
-  max-height: calc(100vh - 48px); overflow: auto;
+  max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 30px 90px rgba(15, 21, 51, 0.35);
   background: var(--card-solid); color: var(--ink);
 }
@@ -862,7 +867,7 @@ dialog::backdrop { background: rgba(10, 12, 30, 0.6); backdrop-filter: blur(5px)
 .dlg-body { padding: 20px 22px 22px; }
 
 @media (max-width: 640px) {
-  .form-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   dialog {
     margin: auto auto 0;
     width: 100%; max-width: 100%;
@@ -1652,7 +1657,7 @@ input[type="file"]::file-selector-button:hover { transform: translateY(-1px); }
 
   /* Dialog di HP: kepala menempel saat digulir supaya judul selalu terlihat */
   .dlg-head { position: sticky; top: 0; z-index: 6; }
-  .dlg-body { padding: 16px 16px 20px; }
+  .dlg-body { padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
   .dlg-body .form-note { font-size: 0.72rem; }
   .dlg-body .row.mt { gap: 10px; }
   .dlg-body input[type="file"] { font-size: 0.82rem; }
@@ -1661,10 +1666,70 @@ input[type="file"]::file-selector-button:hover { transform: translateY(-1px); }
   }
 }
 
-/* Bottom-nav 7 menu — label mengecil di layar sangat sempit agar utuh */
-@media (max-width: 420px) {
-  .bottom-nav a { font-size: 0.6rem; gap: 2px; }
-  .bottom-nav a svg.lucide { width: 19px; height: 19px; }
+/* Audit responsif: lima tujuan utama; sisanya tersedia di dialog Lainnya. */
+.nav-more-links { display: grid; gap: 8px; }
+.nav-more-links a { min-height: 48px; border: 1px solid var(--line); }
+.nav-more-links a[aria-current="page"] { background: var(--soft); color: var(--p1); }
+.user-menu-item > span { min-width: 0; overflow-wrap: anywhere; }
+.topbar-inner, .top-chips { min-width: 0; }
+.rekap-sumber { grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); }
+.table-wrap, .heat-scroll { max-width: 100%; min-width: 0; }
+.login-card, .error-box, .ok-note { overflow-wrap: anywhere; }
+.g-item { font: inherit; text-align: left; color: inherit; }
+.g-cap { overflow-wrap: anywhere; }
+
+/* Pisahkan warna teks dari warna gradien: indigo asli terlalu gelap di tema gelap. */
+:root { --link-ink: #4338ca; }
+[data-theme="dark"] { --link-ink: #a5b4fc; }
+a { color: var(--link-ink); }
+[data-theme="dark"] :is(
+  .linklike, .login-note a, .login-tabs button.on, .date-tile .d, .tl-date,
+  .total-form b, .dana-mini-link, .eks-tag, .card h3 .lucide, .chip svg.lucide,
+  .bottom-nav a.active, .bottom-nav button.active, .nav-more-links a[aria-current="page"],
+  .mini-chip.belmawa, .seg-btn.on.belmawa, .seg-sumber .seg-btn:first-child.on,
+  .kat-chip.on, .dana-chip.belmawa.on .dana-chip-cek,
+  .user-menu-item:hover:not(.danger), .icon-btn:hover, .theme-btn:hover,
+  .sb-menu a:hover:not(.active), .ai-model-opsi[aria-checked="true"]
+) { color: var(--link-ink); }
+[data-theme="dark"] :is(.ai-usul-judul, .ai-model-opsi[aria-checked="true"] .ket) { color: #c4b5fd; }
+[data-theme="dark"] :is(.mini-chip.pt, .seg-btn.on.pt) { color: #5eead4; }
+[data-theme="dark"] input[type="file"]::file-selector-button { color: var(--link-ink); }
+[data-theme="dark"] .login-head h1 .grad-text {
+  background-image: linear-gradient(120deg, #a5b4fc, #c4b5fd, #f9a8d4, #a5b4fc);
+}
+
+@media (max-width: 900px) {
+  .container { padding-bottom: calc(152px + env(safe-area-inset-bottom)); }
+  .topbar-inner {
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  .container, .bottom-nav {
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+  .container { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  .bottom-nav :is(a, button) { font-size: 0.68rem; }
+}
+
+@media (max-width: 400px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .tb-tgl-grp { flex-wrap: wrap; }
+  .tb-tgl-box { flex-basis: 130px; }
+  .metric-label { letter-spacing: 0.02em; }
+}
+
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea,
+  .toolbar .tb-sel, .tb-sel-wrap .tb-sel, .tb-tgl-box input { font-size: 16px; }
+  .btn.sm, .icon-btn, .mob-ava, .pill, .kat-chip, .dana-chip, .login-tabs button { min-height: 44px; }
+  .icon-btn, .mob-ava { min-width: 44px; }
+  .login-pass .eye { min-width: 44px; min-height: 44px; justify-content: center; right: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 

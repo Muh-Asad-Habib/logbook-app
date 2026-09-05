@@ -68,17 +68,16 @@ export default function GaleriPage() {
 
       <div className="galeri mt stagger">
         {view.map((it, idx) => (
-          <div key={it.key} className="g-item" onClick={() => bukaLb(idx)}
-               role="button" tabIndex={0}
-               onKeyDown={(e) => e.key === "Enter" && bukaLb(idx)}>
+          <button type="button" key={it.key} className="g-item" onClick={() => bukaLb(idx)}
+                  aria-label={`Lihat foto ${fmtTgl(it.tanggal)}: ${it.ket}`}>
             {/* Petak galeri hanya butuh gambar kecil — pakai thumbnail (±320px).
                 Versi resolusi penuh baru dimuat saat foto dibuka di Lightbox. */}
             <img src={thumbUrl(it.key, 320)} alt={it.ket} loading="lazy" onError={retryFoto} />
-            <div className="g-cap">
+            <span className="g-cap">
               <b>{fmtTgl(it.tanggal)} · {it.jenis}</b>
               {it.ket}
-            </div>
-          </div>
+            </span>
+          </button>
         ))}
       </div>
 
