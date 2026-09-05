@@ -539,6 +539,51 @@ export const api = {
   deleteCanva: () => aFetch("/api/presentasi/canva", { method: "DELETE" }),
 
 
+  // ---- Asisten AI (Ollama di server kampus — dipanggil lewat backend) ----
+  ai: {
+    /** { aktif, model, host, tersedia, modelAda } — dipakai untuk menampilkan/menyembunyikan tombol. */
+    status: () => aFetch("/api/ai/status", { cache: "no-store" }),
+    /**
+     * Model yang bisa dipilih pengguna:
+     * { bawaan, pilihan, daftar: [{ nama, label, ukuran, keluarga, parameter }] }.
+     * `pilihan` kosong = "Otomatis" (memakai `bawaan`).
+     */
+    model: () => aFetch("/api/ai/model", { cache: "no-store" }),
+    /** Simpan pilihan model akun ini; "" atau "auto" → kembali ke bawaan. */
+    setModel: (model) =>
+      aFetch("/api/ai/model", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+      }),
+    /**
+     * Tanya-jawab tentang logbook. `riwayat` = pesan sebelumnya
+     * ([{role:"user"|"assistant", content}]) agar pertanyaan lanjutan dipahami;
+     * `tim` hanya untuk pembimbing (id tim yang sedang dilihat);
+     * `model` = model pilihan pengguna ("" = ikuti pilihan tersimpan/bawaan).
+     */
+    tanya: (pesan, riwayat = [], tim = "", model = "") =>
+      aFetch("/api/ai/tanya", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pesan, riwayat, ...(tim ? { tim } : {}), ...(model ? { model } : {}) }),
+      }),
+    /** Usulan deskripsi kegiatan yang lebih rapi: { hasil, catatan, pertanyaan[] }. */
+    perbaikiKegiatan: (teks, { tanggal = "", gaya = "formal", model = "" } = {}) =>
+      aFetch("/api/ai/perbaiki-kegiatan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teks, tanggal, gaya, ...(model ? { model } : {}) }),
+      }),
+    /** Usulan sumber dana & kategori PKM: { sumber, kategori, label, alasan }. */
+    saranBelanja: (item, harga = 0, model = "") =>
+      aFetch("/api/ai/saran-belanja", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item, harga, ...(model ? { model } : {}) }),
+      }),
+  },
+
   // ---- Kode tim (akun tim) — hubungkan pendamping tanpa bantuan admin ----
   tim: {
     /** Kode milik tim yang login: { kode, kode_tampil }. */

@@ -23,6 +23,7 @@ import LogoMark from "./Logo";
 import Prefetch from "./Prefetch";
 import ToastHost from "./Toast";
 import GabungTim from "./GabungTim";
+import AsistenAI from "./AsistenAI";
 import {
   api, clearAuth, getToken, getUser, fmtRupiah, useApi,
   setUser as simpanProfil, getTimAktif, setTimAktif,
@@ -598,6 +599,7 @@ export default function Shell({ children }) {
       )}
 
       <Prefetch />
+      <AsistenAI />
       <ToastHost />
     </div>
   );

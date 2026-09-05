@@ -4,6 +4,9 @@
  *  - /api/fasilitator tidak punya route yang mengubah DATA tim; route tulis
  *    yang diizinkan hanya: tautan penampil laporan, gabung & keluar tim.
  *  - /api/komentar & /api/persetujuan lengkap.
+ *  - /api/ai: seluruh router di balik `authRequired`; setiap endpoint yang
+ *    memanggil model wajib punya `wajibAktif` + pembatas laju, dan endpoint
+ *    penyunting data tim (perbaiki-kegiatan, saran-belanja) wajib `hanyaTim`.
  *
  * Jalankan: node backend/diag-rute.mjs
  */
@@ -21,7 +24,21 @@ const target = [
   ["/api/fasilitator", "./src/routes/fasilitator.js", "hanyaPendamping"],
   ["/api/komentar", "./src/routes/komentar.js", null],
   ["/api/persetujuan", "./src/routes/persetujuan.js", null],
+  ["/api/ai", "./src/routes/ai.js", "authRequired"],
 ];
+
+/**
+ * Endpoint AI yang benar-benar memanggil model bahasa — wajib punya sakelar
+ * mati (wajibAktif) dan pembatas laju. `/status` & `/model` hanya membaca
+ * metadata ringan yang sudah di-cache.
+ */
+const AI_PAKAI_MODEL = new Set(["/tanya", "/perbaiki-kegiatan", "/saran-belanja"]);
+
+/**
+ * Endpoint AI yang menyunting/menyusun data milik tim — pendamping tidak boleh
+ * memakainya (mereka hanya boleh bertanya lewat POST /tanya dengan `tim`).
+ */
+const AI_WAJIB_HANYA_TIM = new Set(["/perbaiki-kegiatan", "/saran-belanja"]);
 
 // Route tulis yang SAH di /api/fasilitator — tidak satu pun mengubah data tim
 const TULIS_DIIZINKAN = new Set([
@@ -55,6 +72,31 @@ for (const [mount, path, pagar] of target) {
     } else {
       gagal += 1;
       console.log(`   ❌ route tulis tak terduga: ${nakal.join(", ")}`);
+    }
+  }
+
+  // Setiap endpoint AI yang memanggil model harus punya sakelar mati (wajibAktif)
+  // + pembatas laju; yang menyentuh data tim harus lewat hanyaTim.
+  if (mount === "/api/ai") {
+    const masalah = [];
+    for (const l of router.stack.filter((x) => x.route)) {
+      const jalur = l.route.path;
+      const nama = l.route.stack.map((s) => s.name);
+      // Pembatas laju dibuat pabrik rateLimit() → fungsi anonim; penangan akhir
+      // juga anonim, jadi endpoint yang terbatasi laju punya ≥ 2 lapis anonim.
+      const adaLaju = nama.filter((n) => !n || n === "<anonymous>").length >= 2;
+      const perluModel = AI_PAKAI_MODEL.has(jalur);
+      if (!nama.includes("wajibAktif") && jalur !== "/status") masalah.push(`${jalur}: wajibAktif hilang`);
+      if (perluModel && !adaLaju) masalah.push(`${jalur}: pembatas laju hilang`);
+      if (AI_WAJIB_HANYA_TIM.has(jalur) && !nama.includes("hanyaTim")) {
+        masalah.push(`${jalur}: hanyaTim hilang`);
+      }
+    }
+    if (!masalah.length) {
+      console.log("   ✅ wajibAktif di semua endpoint; pembatas laju di endpoint pemanggil model; hanyaTim di perbaiki-kegiatan & saran-belanja");
+    } else {
+      gagal += 1;
+      console.log(`   ❌ ${masalah.join(", ")}`);
     }
   }
 }

@@ -59,6 +59,70 @@ export const pakaiCloud = () => !!(IK.privateKey && IK.urlEndpoint);
 const authHeader = () =>
   "Basic " + Buffer.from(`${IK.privateKey}:`).toString("base64");
 
+/**
+ * SATU jalur unggah ke ImageKit untuk semua jenis berkas (foto, dokumen,
+ * potongan, hasil ekspor). Sebelumnya logika ini disalin di 4 fungsi dan
+ * semuanya mengirim `buffer.toString("base64")` — 33 % lebih besar dari
+ * binernya dan menyalin seluruh isi berkas ke string di RAM. Kini byte
+ * dikirim apa adanya sebagai bagian multipart (Blob), lalu pemetaan
+ * key → fileId dicatat ke tabel `files` supaya berkas bisa dihapus nanti.
+ *
+ * @param {string} key      nama berkas di ImageKit (unik; jadi kunci kita)
+ * @param {Buffer} buffer   isi berkas
+ * @param {{overwrite?: boolean, label?: string}} [opt]
+ */
+async function unggahIK(key, buffer, { overwrite = false, label = "Upload" } = {}) {
+  const form = new FormData();
+  form.append("file", new Blob([buffer]), key);
+  form.append("fileName", key);
+  form.append("folder", IK.folder);
+  form.append("useUniqueFileName", "false");
+  if (overwrite) form.append("overwriteFile", "true");
+  const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+    method: "POST",
+    headers: { Authorization: authHeader() },
+    body: form,
+    signal: AbortSignal.timeout(UNGGAH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const pesan = await res.text().catch(() => "");
+    throw new Error(`${label} ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
+  }
+  const info = await res.json(); // { fileId, url, filePath, ... }
+  await q(
+    `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
+     ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
+    [key, info.fileId || "", info.url || ""]
+  );
+  return key;
+}
+const UNGGAH_TIMEOUT_MS = 60_000;
+
+/**
+ * Jalankan `fn` untuk tiap item dengan paralelisme terbatas — dipakai saat
+ * ekspor/impor menyentuh puluhan-ratusan foto sekaligus. Promise.all tanpa
+ * batas membuka ratusan koneksi CDN serentak (banyak yang timeout di
+ * serverless) dan memuat semua buffer sekaligus ke RAM.
+ * @template T,R
+ * @param {T[]} items
+ * @param {number} n  jumlah pekerja paralel
+ * @param {(item: T, idx: number) => Promise<R>} fn
+ * @returns {Promise<R[]>} hasil dalam urutan `items` (gagal → undefined)
+ */
+export async function jalankanTerbatas(items, n, fn) {
+  const hasil = new Array(items.length);
+  let i = 0;
+  const pekerja = Array.from({ length: Math.min(Math.max(1, n), items.length) }, async () => {
+    for (;;) {
+      const idx = i++;
+      if (idx >= items.length) return;
+      try { hasil[idx] = await fn(items[idx], idx); } catch { hasil[idx] = undefined; }
+    }
+  });
+  await Promise.all(pekerja);
+  return hasil;
+}
+
 /* ---------------- util kompresi ---------------- */
 
 /**
@@ -76,8 +140,10 @@ const JPEG_QUALITY = 85;
  * Kompres buffer gambar (resize + JPEG progresif).
  * GIF dilewatkan apa adanya (bisa animasi); gambar lain → JPEG.
  * Bila sharp gagal (berkas rusak/format aneh) → kembalikan buffer asli.
+ * Diekspor agar impor DOCX bisa mengompres SEKALI per media lalu mengunggah
+ * hasilnya ke banyak entri (putFile dengan `kompres: false`).
  */
-async function compressImage(buffer, ext) {
+export async function compressImage(buffer, ext) {
   if (ext === ".gif") return { buffer, ext };
   try {
     const out = await sharp(buffer, { failOn: "none" })
@@ -241,36 +307,16 @@ export function safePath(key) {
  * Simpan buffer gambar (dikompresi), kembalikan key (nama berkas unik).
  * Cloud: upload ke ImageKit + catat fileId di tabel `files`.
  * Lokal: tulis ke folder uploads/.
+ * `kompres: false` → buffer dianggap SUDAH hasil compressImage() (impor
+ * DOCX mengompres tiap media sekali, lalu mengunggahnya ke beberapa entri).
  */
-export async function putFile(originalName, buffer, prefix = "img") {
+export async function putFile(originalName, buffer, prefix = "img", { kompres = true } = {}) {
   let ext = path.extname(originalName || "").toLowerCase();
   if (!ALLOWED_EXT.has(ext)) ext = ".jpg"; // normalisasi ekstensi asing
-  const hasil = await compressImage(buffer, ext);
+  const hasil = kompres ? await compressImage(buffer, ext) : { buffer, ext };
   const key = buatKey(prefix, hasil.ext);
 
-  if (pakaiCloud()) {
-    const form = new FormData();
-    form.append("file", hasil.buffer.toString("base64"));
-    form.append("fileName", key);
-    form.append("folder", IK.folder);
-    form.append("useUniqueFileName", "false");
-    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: authHeader() },
-      body: form,
-    });
-    if (!res.ok) {
-      const pesan = await res.text().catch(() => "");
-      throw new Error(`Upload ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
-    }
-    const info = await res.json(); // { fileId, url, filePath, ... }
-    await q(
-      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
-       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
-      [key, info.fileId || "", info.url || ""]
-    );
-    return key;
-  }
+  if (pakaiCloud()) return unggahIK(key, hasil.buffer);
 
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   fs.writeFileSync(safePath(key), hasil.buffer);
@@ -288,30 +334,7 @@ export async function putFile(originalName, buffer, prefix = "img") {
  * berkas di path yang sama digantikan dan cache CDN-nya dibersihkan otomatis.
  */
 export async function timpaFile(key, buffer) {
-  if (pakaiCloud()) {
-    const form = new FormData();
-    form.append("file", buffer.toString("base64"));
-    form.append("fileName", key);
-    form.append("folder", IK.folder);
-    form.append("useUniqueFileName", "false");
-    form.append("overwriteFile", "true");
-    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: authHeader() },
-      body: form,
-    });
-    if (!res.ok) {
-      const pesan = await res.text().catch(() => "");
-      throw new Error(`Timpa berkas di ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
-    }
-    const info = await res.json();
-    await q(
-      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
-       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
-      [key, info.fileId || "", info.url || ""]
-    );
-    return key;
-  }
+  if (pakaiCloud()) return unggahIK(key, buffer, { overwrite: true, label: "Timpa berkas" });
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   fs.writeFileSync(safePath(key), buffer);
   return key;
@@ -347,37 +370,28 @@ export async function putFileEkspor(originalName, buffer, prefix = "eksp") {
   return key;
 }
 
+/** Apakah kunci berkas masih tercatat (cloud: tabel files; lokal: ada di disk)? */
+export async function adaFile(key) {
+  const k = String(key || "");
+  if (!k) return false;
+  try {
+    if (pakaiCloud()) {
+      const rows = await q("SELECT 1 FROM files WHERE key = $1", [k]);
+      return rows.length > 0;
+    }
+    return fs.existsSync(safePath(k));
+  } catch {
+    return false;
+  }
+}
+
 export async function putFileRaw(originalName, buffer, prefix = "lap") {
   const ext = path.extname(originalName || "").toLowerCase();
   if (!EXT_DOKUMEN.has(ext)) {
     throw new Error("Hanya berkas .docx atau .pptx yang diizinkan");
   }
   const key = buatKey(prefix, ext);
-
-  if (pakaiCloud()) {
-    const form = new FormData();
-    form.append("file", buffer.toString("base64"));
-    form.append("fileName", key);
-    form.append("folder", IK.folder);
-    form.append("useUniqueFileName", "false");
-    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: authHeader() },
-      body: form,
-    });
-    if (!res.ok) {
-      const pesan = await res.text().catch(() => "");
-      throw new Error(`Upload ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
-    }
-    const info = await res.json(); // { fileId, url, filePath, ... }
-    await q(
-      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
-       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
-      [key, info.fileId || "", info.url || ""]
-    );
-    return key;
-  }
-
+  if (pakaiCloud()) return unggahIK(key, buffer);
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   fs.writeFileSync(safePath(key), buffer);
   return key;
@@ -392,29 +406,7 @@ export async function putFileRaw(originalName, buffer, prefix = "lap") {
  * sama menimpa berkas lama (idempoten, tanpa sampah).
  */
 export async function putBlob(key, buffer) {
-  if (pakaiCloud()) {
-    const form = new FormData();
-    form.append("file", buffer.toString("base64"));
-    form.append("fileName", key);
-    form.append("folder", IK.folder);
-    form.append("useUniqueFileName", "false");
-    const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      headers: { Authorization: authHeader() },
-      body: form,
-    });
-    if (!res.ok) {
-      const pesan = await res.text().catch(() => "");
-      throw new Error(`Upload potongan ke ImageKit gagal (${res.status}): ${pesan.slice(0, 200)}`);
-    }
-    const info = await res.json();
-    await q(
-      `INSERT INTO files (key, file_id, url) VALUES ($1, $2, $3)
-       ON CONFLICT (key) DO UPDATE SET file_id = EXCLUDED.file_id, url = EXCLUDED.url`,
-      [key, info.fileId || "", info.url || ""]
-    );
-    return key;
-  }
+  if (pakaiCloud()) return unggahIK(key, buffer, { label: "Upload potongan" });
   fs.mkdirSync(config.uploadsDir, { recursive: true });
   fs.writeFileSync(safePath(key), buffer);
   return key;
@@ -605,11 +597,22 @@ export async function removeFiles(keys) {
  * akan menolak tautan saat "Restrict unsigned URLs" aktif.
  */
 export function signedUrl(key, detik = 3600, lebar = 0) {
-  const relatif = `${IK.folder}/${key}`.replace(/^\/+/, "");
-  const dasar = `${IK.urlEndpoint}/${relatif}`;
   // q-70: kualitas sedikit diturunkan khusus thumbnail (mata tidak melihat
   // bedanya pada ukuran kecil, tapi ukurannya jauh lebih ringan).
-  const url = lebar ? `${dasar}?tr=w-${lebar},q-70` : dasar;
+  return signedUrlTr(key, detik, lebar ? `w-${lebar},q-70` : "");
+}
+
+/**
+ * Signed URL dengan string transformasi ImageKit BEBAS (mis.
+ * `w-1000,h-1000,c-at_max,q-85,f-jpg`). Dipakai ekspor: foto diambil dari
+ * CDN SUDAH dalam ukuran sematan, sehingga serverless tidak perlu mengunduh
+ * berkas 2000px lalu mengecilkannya sendiri dengan sharp (hemat ±70 % trafik
+ * & CPU per foto). Parameter `tr` ikut ditandatangani.
+ */
+export function signedUrlTr(key, detik = 3600, tr = "") {
+  const relatif = `${IK.folder}/${key}`.replace(/^\/+/, "");
+  const dasar = `${IK.urlEndpoint}/${relatif}`;
+  const url = tr ? `${dasar}?tr=${tr}` : dasar;
   const kedaluwarsa = Math.floor(Date.now() / 1000) + detik;
   const signature = crypto
     .createHmac("sha1", IK.privateKey)
@@ -617,6 +620,25 @@ export function signedUrl(key, detik = 3600, lebar = 0) {
     .digest("hex");
   const pemisah = url.includes("?") ? "&" : "?";
   return `${url}${pemisah}ik-t=${kedaluwarsa}&ik-s=${signature}`;
+}
+
+/**
+ * Ambil isi berkas dari CDN dengan transformasi (mode cloud saja).
+ * Retry ringan seperti getFileBufferRetry; null bila gagal/bukan cloud.
+ */
+export async function getFileBufferTr(key, tr, percobaan = 3, jedaMs = 800) {
+  if (!pakaiCloud()) return null;
+  for (let i = 0; i < percobaan; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, jedaMs));
+    try {
+      const res = await fetch(signedUrlTr(key, 300, tr), {
+        signal: AbortSignal.timeout(AMBIL_TIMEOUT_MS),
+      });
+      if (res.ok) return Buffer.from(await res.arrayBuffer());
+      if (res.status === 404 && i === percobaan - 1) return null;
+    } catch {}
+  }
+  return null;
 }
 
 /**

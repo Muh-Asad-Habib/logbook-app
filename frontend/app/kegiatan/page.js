@@ -16,6 +16,7 @@ import { useMuatBertahap, TombolMuatLagi } from "@/lib/muatBertahap";
 import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
+import { PerbaikiDeskripsiAI } from "@/components/SaranAI";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -550,6 +551,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
                     onChange={(e) => setUraian(e.target.value)}
                     placeholder="Apa yang dikerjakan…" />
         </label>
+        {/* Usulan AI: hanya mengisi textarea bila pengguna menekan "Gunakan" */}
+        <PerbaikiDeskripsiAI teks={uraian} tanggal={tanggal} onGunakan={(t) => setUraian(t)} />
 
         {entri?.foto_keys?.length > 0 && (
           <>

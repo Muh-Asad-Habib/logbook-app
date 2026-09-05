@@ -20,6 +20,7 @@ import AccPanel, { AccBadge, useAcc } from "@/components/Acc";
 import RekapDana from "@/components/RekapDana";
 import BadgeSumber from "@/components/BadgeSumber";
 import PilihSumberDana from "@/components/PilihSumberDana";
+import { SaranSumberAI } from "@/components/SaranAI";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -838,6 +839,12 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
               sumber={sumber}
               kategori={kategori}
               onChange={(s, k) => { setSumber(s); setKategori(k); }}
+            />
+            {/* Saran AI dari nama item — dipakai hanya bila tombol "Pakai" ditekan */}
+            <SaranSumberAI
+              item={item}
+              harga={(parseFloat(harga) || 0) * (parseFloat(jumlah) || 0)}
+              onGunakan={(s, k) => { setSumber(s); setKategori(k); }}
             />
           </div>
         </div>

@@ -32,6 +32,7 @@ export const swaggerSpec = swaggerJsdoc({
       { name: "Komentar", description: "Komentar 2 arah pendamping ↔ tim pada kegiatan/keuangan/laporan" },
       { name: "Persetujuan", description: "ACC / minta revisi entri logbook oleh dosen pendamping" },
       { name: "Tim", description: "Kode gabung tim & daftar pendamping (khusus akun tim)" },
+      { name: "AI", description: "Asisten AI (Ollama server kampus): tanya-jawab dana/kegiatan, perbaikan deskripsi, saran kategori PKM" },
     ],
     security: [{ bearerAuth: [] }],
     components: {

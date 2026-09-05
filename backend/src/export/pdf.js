@@ -1,8 +1,7 @@
 /** Ekspor PDF — rekap logbook siap cetak (pdfkit, tanpa dependensi native). */
-import path from "node:path";
 import PDFDocument from "pdfkit";
 import * as store from "../storage.js";
-import { getFileBufferRetry, compressForEmbed } from "../files.js";
+import { ambilFotoEmbed, bolehDiPdf } from "./foto.js";
 import { teksSumber, rekapDana, BATAS_DANA_PT } from "./pkm.js";
 
 const BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -42,16 +41,12 @@ export async function buildPdf(userId, namaTim = "") {
     ...kegiatan.flatMap((e) => (e.foto_keys || []).slice(0, 8)),
     ...keuangan.flatMap((e) => e.bukti_keys || []),
   ];
+  // Foto di PDF tampil kecil (≤88 pt) — 640 px sudah lebih dari cukup untuk
+  // cetak 300 dpi; diambil dari CDN sudah dalam ukuran itu (lihat foto.js).
+  // pdfkit hanya menerima JPEG/PNG → format lain disaring.
+  const fotoMap = await ambilFotoEmbed(semuaKey, { dim: 640, mutu: 80 });
   const bufferMap = new Map();
-  await Promise.all(
-    [...new Set(semuaKey)].map(async (k) => {
-      const ext = path.extname(k).toLowerCase();
-      if (![".jpg", ".jpeg", ".png"].includes(ext)) return; // pdfkit hanya JPEG/PNG
-      const buf = await getFileBufferRetry(k, 3, 800);
-      // disiapkan utk sematan dokumen — foto kecil di-upscale, rasio asli terjaga
-      if (buf) bufferMap.set(k, await compressForEmbed(buf));
-    })
-  );
+  for (const [k, r] of fotoMap) if (bolehDiPdf(r.buffer)) bufferMap.set(k, r.buffer);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 46, bufferPages: true });

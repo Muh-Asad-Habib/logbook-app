@@ -18,7 +18,7 @@
  */
 import JSZip from "jszip";
 import * as store from "../storage.js";
-import { getFileBufferRetry, siapkanEmbed } from "../files.js";
+import { ambilFotoEmbed } from "./foto.js";
 import {
   KATEGORI_PKM, LABEL_KATEGORI, LABEL_SUMBER, rekapDana, BATAS_DANA_PT,
 } from "./pkm.js";
@@ -287,24 +287,16 @@ function bikinMedia() {
 /**
  * Unduh & siapkan seluruh nota milik daftar entri.
  * Ukuran sedang (1000 px, mutu 80): tajam saat dicetak selebar ±7,4 cm namun
- * dokumen tetap ringan walau notanya puluhan.
+ * dokumen tetap ringan walau notanya puluhan. Foto ditarik dari CDN sudah
+ * berukuran itu dengan paralel terbatas (lihat foto.js).
  */
 async function siapkanNota(entri) {
   const media = bikinMedia();
   const keys = [...new Set(entri.flatMap((e) => buktiKeys(e)))];
-  const hasil = await Promise.all(keys.map(async (k) => {
-    try {
-      const buf = await getFileBufferRetry(k, 3, 800);
-      if (!buf) return null;
-      const r = await siapkanEmbed(buf, 1000, 80);
-      return r.ok ? { key: k, ...r } : null;
-    } catch {
-      return null; // satu nota gagal diambil → dokumen tetap dibuat
-    }
-  }));
+  const hasil = await ambilFotoEmbed(keys, { dim: 1000, mutu: 80 });
   // urutan pendaftaran dijaga stabil supaya penomoran media mudah dilacak
   for (const k of keys) {
-    const r = hasil.find((x) => x?.key === k);
+    const r = hasil.get(k);
     if (r) media.tambah(k, r.buffer, r.w, r.h);
   }
   return media;
