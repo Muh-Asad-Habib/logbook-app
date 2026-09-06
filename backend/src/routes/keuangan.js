@@ -31,10 +31,11 @@ const bersihkanKategori = (v, sumber) =>
   sumber === "belmawa" && KATEGORI.has(String(v || "").trim()) ? String(v).trim() : "";
 
 /**
- * Kode unik transfer — OPSIONAL.
- * Nominal kecil yang membuat angka di nota tidak bulat (mis. sewa GPU
- * Rp90.000/jam tetapi terbayar Rp90.123). Nilai negatif/bukan angka dianggap 0
- * supaya total tidak pernah lebih kecil dari harga × jumlah.
+ * Biaya tambahan di luar harga × jumlah — OPSIONAL.
+ * Mencakup kode unik transfer, biaya admin, dan pajak: nominal kecil yang
+ * membuat angka di nota tidak bulat (mis. sewa GPU Rp90.000/jam tetapi
+ * terbayar Rp90.123). Nilai negatif/bukan angka dianggap 0 supaya total tidak
+ * pernah lebih kecil dari harga × jumlah.
  */
 const bersihkanKodeUnik = (v) => Math.max(0, Number(v) || 0);
 
@@ -70,7 +71,7 @@ const bersihkanKodeUnik = (v) => Math.max(0, Number(v) || 0);
  *               jumlah: { type: number, example: 1 }
  *               kode_unik:
  *                 type: number
- *                 description: "Opsional — kode unik transfer, ikut ditambahkan ke total (mis. 123)"
+ *                 description: "Opsional — kode unik transfer, biaya admin, atau pajak; ikut ditambahkan ke total (mis. 123)"
  *                 example: 123
  *               sumber:
  *                 type: string
@@ -151,7 +152,7 @@ router.post("/", upload.array("bukti"), async (req, res, next) => {
  *               harga_satuan: { type: number }
  *               satuan_suffix: { type: string }
  *               jumlah: { type: number }
- *               kode_unik: { type: number, description: "Kode unik transfer, ikut ditambahkan ke total (opsional)" }
+ *               kode_unik: { type: number, description: "Kode unik transfer, biaya admin, atau pajak; ikut ditambahkan ke total (opsional)" }
  *               sumber: { type: string, description: "belmawa | pt | '' (opsional)" }
  *               kategori: { type: string, description: "bahan | sewa | transport | lain (opsional)" }
  *               keep_keys: { type: string, description: "JSON array key bukti lama yang dipertahankan" }

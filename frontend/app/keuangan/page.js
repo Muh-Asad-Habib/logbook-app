@@ -21,6 +21,7 @@ import RekapDana from "@/components/RekapDana";
 import BadgeSumber from "@/components/BadgeSumber";
 import PilihSumberDana from "@/components/PilihSumberDana";
 import { SaranSumberAI } from "@/components/SaranAI";
+import { Isian, IsianBerkas, GrupIsian } from "@/components/Isian";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -41,11 +42,12 @@ const buktiKeys = (e) =>
   e.bukti_keys?.length ? e.bukti_keys : e.bukti_key ? [e.bukti_key] : [];
 
 /**
- * Rincian "Harga × jml" sebuah entri, plus kode unik transfer bila ada.
+ * Rincian "Harga × jml" sebuah entri, plus biaya tambahan bila ada.
  *
- * Kode unik TIDAK ditampilkan sebagai kolom/total terpisah — ia sudah menyatu
- * di kolom Total (seperti angka pada nota), di sini hanya diberi keterangan
- * kecil supaya jelas dari mana selisihnya berasal.
+ * Biaya tambahan (kode unik transfer, biaya admin, atau pajak) TIDAK
+ * ditampilkan sebagai kolom/total terpisah — ia sudah menyatu di kolom Total
+ * (seperti angka pada nota), di sini hanya diberi keterangan kecil supaya
+ * jelas dari mana selisihnya berasal.
  */
 function RincianHarga({ e }) {
   const kode = Number(e.kode_unik) || 0;
@@ -54,8 +56,8 @@ function RincianHarga({ e }) {
       {fmtRupiah(e.harga_satuan)}{e.satuan_suffix}
       <small className="muted"> × {e.jumlah}</small>
       {kode > 0 && (
-        <small className="muted" title="Kode unik transfer — sudah termasuk di total">
-          {" "}+ {fmtRupiah(kode)} kode unik
+        <small className="muted" title="Kode unik, biaya admin, atau pajak — sudah termasuk di total">
+          {" "}+ {fmtRupiah(kode)} tambahan
         </small>
       )}
     </>
@@ -447,7 +449,7 @@ function KeuanganFasilitator() {
                   <b>{fmtTgl(e.tanggal)}</b> — {e.item}
                   <p className="muted mts">
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah}
-                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} kode unik</>} ={" "}
+                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} tambahan</>} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
                   <div className="mts"><BadgeSumber e={e} /></div>
@@ -683,7 +685,7 @@ function KeuanganTim() {
                   <b>{fmtTgl(e.tanggal)}</b> — {e.item}
                   <p className="muted mts">
                     {fmtRupiah(e.harga_satuan)}{e.satuan_suffix} × {e.jumlah}
-                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} kode unik</>} ={" "}
+                    {(Number(e.kode_unik) || 0) > 0 && <> + {fmtRupiah(e.kode_unik)} tambahan</>} ={" "}
                     <b style={{ color: "var(--ink)" }}>{fmtRupiah(e.total)}</b>
                   </p>
                   <div className="mts">
@@ -748,7 +750,8 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
   const [harga, setHarga] = useState(entri?.harga_satuan ?? draf?.harga ?? 0);
   const [satuan, setSatuan] = useState(entri?.satuan_suffix ?? draf?.satuan ?? "");
   const [jumlah, setJumlah] = useState(entri?.jumlah ?? draf?.jumlah ?? 1);
-  // Kode unik transfer — opsional; ditambahkan ke total (mis. 90.000 → 90.123)
+  // Biaya tambahan di luar harga × jumlah — opsional; ikut ditambahkan ke total
+  // (kode unik transfer, biaya admin, atau pajak; mis. 90.000 → 90.123)
   const [kodeUnik, setKodeUnik] = useState(entri?.kode_unik ?? draf?.kodeUnik ?? 0);
   // Sumber dana & kategori PKM — opsional, boleh dibiarkan kosong
   const [sumber, setSumber] = useState(entri?.sumber ?? draf?.sumber ?? "");
@@ -806,38 +809,58 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             ✏️ Isian terakhir yang belum tersimpan dipulihkan.
           </p>
         )}
-        <div className="form-grid">
-          <label className="field" style={{ gridColumn: "1 / -1" }}>
-            Item belanja
-            <input name="item" required value={item} onChange={(e) => setItem(e.target.value)}
-                   placeholder="mis. Sewa Canva Pro" />
-          </label>
-          <label className="field field-wide">
-            Tanggal
-            <input type="date" name="tanggal" required value={tanggal}
-                   onChange={(e) => setTanggal(e.target.value)} />
-          </label>
-          <label className="field field-wide">
-            Harga satuan (Rp)
-            <input type="number" inputMode="decimal" name="harga_satuan" min="0" step="any" value={harga}
-                   onChange={(e) => setHarga(e.target.value)} />
-          </label>
-          <label className="field">
-            Satuan
-            <input name="satuan_suffix" required value={satuan}
-                   onChange={(e) => setSatuan(e.target.value)} placeholder="mis. /bulan" />
-          </label>
-          <label className="field">
-            Jumlah
-            <input type="number" inputMode="decimal" name="jumlah" min="0" step="any" value={jumlah}
-                   onChange={(e) => setJumlah(e.target.value)} />
-          </label>
-          <label className="field field-wide">
-            Kode unik (Rp) <span className="muted">(opsional)</span>
-            <input type="number" inputMode="decimal" name="kode_unik" min="0" step="any" value={kodeUnik}
-                   onChange={(e) => setKodeUnik(e.target.value)} placeholder="mis. 123" />
-          </label>
-          <div className="field-blok">
+        <GrupIsian judul="Rincian belanja">
+          <Isian
+            label="Item belanja" lebar={2}
+            name="item" required value={item}
+            onChange={(e) => setItem(e.target.value)}
+            placeholder="mis. Sewa Canva Pro"
+          />
+          <Isian
+            label="Tanggal" lebar={2}
+            type="date" name="tanggal" required value={tanggal}
+            onChange={(e) => setTanggal(e.target.value)}
+          />
+          <Isian
+            label="Harga satuan" awalan="Rp"
+            type="number" inputMode="decimal" name="harga_satuan" min="0" step="any"
+            value={harga} onChange={(e) => setHarga(e.target.value)}
+          />
+          <Isian
+            label="Jumlah"
+            type="number" inputMode="decimal" name="jumlah" min="0" step="any"
+            value={jumlah} onChange={(e) => setJumlah(e.target.value)}
+          />
+          <Isian
+            label="Satuan" lebar={2}
+            ket="Satuan harga di atas, mis. /bulan, /pcs, /liter."
+            name="satuan_suffix" required value={satuan}
+            onChange={(e) => setSatuan(e.target.value)} placeholder="mis. /bulan"
+          />
+          <Isian
+            label="Kode unik, admin, atau pajak" awalan="Rp" opsional lebar={2}
+            ket="Selisih kecil di luar harga × jumlah — kode unik transfer, biaya admin, atau pajak. Ikut dijumlahkan ke total."
+            type="number" inputMode="decimal" name="kode_unik" min="0" step="any"
+            value={kodeUnik} onChange={(e) => setKodeUnik(e.target.value)}
+            placeholder="mis. 123"
+          />
+          <p className="isian-penuh total-form" aria-live="polite">
+            Total:{" "}
+            <b>
+              {fmtRupiah(
+                (parseFloat(harga) || 0) * (parseFloat(jumlah) || 0) + (parseFloat(kodeUnik) || 0)
+              )}
+            </b>
+            {(parseFloat(kodeUnik) || 0) > 0 && (
+              <small className="muted">
+                {" "}termasuk {fmtRupiah(parseFloat(kodeUnik) || 0)} kode unik/admin/pajak
+              </small>
+            )}
+          </p>
+        </GrupIsian>
+
+        <GrupIsian judul="Sumber dana" ket="opsional — boleh dilengkapi nanti">
+          <div className="isian-penuh">
             <PilihSumberDana
               sumber={sumber}
               kategori={kategori}
@@ -850,45 +873,38 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
               onGunakan={(s, k) => { setSumber(s); setKategori(k); }}
             />
           </div>
-        </div>
-        <p className="mt total-form">
-          Total:{" "}
-          <b>
-            {fmtRupiah(
-              (parseFloat(harga) || 0) * (parseFloat(jumlah) || 0) + (parseFloat(kodeUnik) || 0)
-            )}
-          </b>
-          {(parseFloat(kodeUnik) || 0) > 0 && (
-            <small className="muted"> (termasuk kode unik {fmtRupiah(parseFloat(kodeUnik) || 0)})</small>
-          )}
-        </p>
+        </GrupIsian>
 
-        {lama.length > 0 && (
-          <>
-            <p className="muted mt">Hilangkan centang untuk menghapus bukti lama:</p>
-            <div className="foto-row">
-              {lama.map((k) => (
-                <label key={k} style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600 }}>
-                  <img src={thumbUrl(k, 240)} alt="bukti" onError={retryFoto} style={{ cursor: "default" }} />
-                  <br />
-                  <input
-                    type="checkbox" checked={keep.includes(k)}
-                    onChange={(ev) =>
-                      setKeep((old) => ev.target.checked ? [...old, k] : old.filter((x) => x !== k))
-                    }
-                  /> simpan
-                </label>
-              ))}
+        <GrupIsian judul="Bukti & nota">
+          {lama.length > 0 && (
+            <div className="isian-penuh">
+              <p className="isian-ket">Hilangkan centang untuk menghapus bukti lama:</p>
+              <div className="foto-row">
+                {lama.map((k) => (
+                  <label key={k} className="foto-simpan">
+                    <img src={thumbUrl(k, 240)} alt="bukti" onError={retryFoto} style={{ cursor: "default" }} />
+                    <span>
+                      <input
+                        type="checkbox" checked={keep.includes(k)}
+                        onChange={(ev) =>
+                          setKeep((old) => ev.target.checked ? [...old, k] : old.filter((x) => x !== k))
+                        }
+                      /> simpan
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </>
-        )}
-        <label className="field mt">
-          {entri ? "Tambah bukti baru" : "Bukti/nota (boleh lebih dari satu)"}
-          <input type="file" name="bukti" accept="image/png,image/jpeg,image/webp" multiple />
-        </label>
+          )}
+          <IsianBerkas
+            label={entri ? "Tambah bukti baru" : "Bukti/nota"}
+            ket="Boleh lebih dari satu. Format PNG, JPG, atau WebP."
+            name="bukti" accept="image/png,image/jpeg,image/webp" multiple
+          />
+        </GrupIsian>
 
-        {err && <div className="error-box mt">{err}</div>}
-        <div className="row mt entry-actions" style={{ justifyContent: "flex-end" }}>
+        {err && <div className="error-box mt" role="alert">{err}</div>}
+        <div className="dlg-aksi">
           <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}

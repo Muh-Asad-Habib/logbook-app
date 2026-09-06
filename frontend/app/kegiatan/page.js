@@ -17,6 +17,7 @@ import Lightbox from "@/components/Lightbox";
 import KomentarPanel from "@/components/Komentar";
 import AccPanel, { useAcc } from "@/components/Acc";
 import { PerbaikiDeskripsiAI } from "@/components/SaranAI";
+import { Isian, IsianArea, IsianBerkas, GrupIsian } from "@/components/Isian";
 import { toast, confirmDialog } from "@/components/Toast";
 
 const todayIso = () => {
@@ -518,71 +519,79 @@ const FormDialog = forwardRef(function FormDialog({ entri, onClose, onSaved }, r
             ✏️ Isian terakhir yang belum tersimpan dipulihkan.
           </p>
         )}
-        <div className="form-grid">
-          <label className="field field-wide">
-            Tanggal
-            <input type="date" name="tanggal" required value={tanggal}
-                   onChange={(e) => setTanggal(e.target.value)} />
-          </label>
-          <label className="field field-wide">
-            Capaian entri ini (%)
-            <input type="number" inputMode="decimal" name="capaian_delta" min="0" max="100"
-                   value={capaian} onChange={(e) => setCapaian(e.target.value)} />
-          </label>
-          <label className="field">
-            Waktu — jam
-            <input type="number" inputMode="decimal" name="waktu_jam_input" min="0" step="any"
-                   value={jam} onChange={(e) => setJam(e.target.value)}
-                   placeholder="0" />
-          </label>
-          <label className="field">
-            Waktu — menit
-            <input type="number" inputMode="decimal" name="waktu_menit_input" min="0" step="any"
-                   value={menit} onChange={(e) => setMenit(e.target.value)}
-                   placeholder="0" />
-          </label>
-        </div>
-        <p className="muted mts form-note">
-          Boleh diisi salah satu atau keduanya (mis. 1 jam 22 menit, 82 menit, atau 2 jam) —
-          tersimpan &amp; diekspor sebagai <b>{Math.max(0, totalMenit)} menit</b>
-          {totalMenit >= 60 ? ` (${fmtDurasi(Math.max(0, totalMenit))})` : ""}.
-        </p>
-        <label className="field mt">
-          Deskripsi kegiatan
-          <textarea name="kegiatan" required value={uraian}
-                    onChange={(e) => setUraian(e.target.value)}
-                    placeholder="Apa yang dikerjakan…" />
-        </label>
-        {/* Usulan AI: hanya mengisi textarea bila pengguna menekan "Gunakan" */}
-        <PerbaikiDeskripsiAI teks={uraian} tanggal={tanggal} onGunakan={(t) => setUraian(t)} />
+        <GrupIsian judul="Kapan & seberapa jauh">
+          <Isian
+            label="Tanggal" lebar={2}
+            type="date" name="tanggal" required value={tanggal}
+            onChange={(e) => setTanggal(e.target.value)}
+          />
+          <Isian
+            label="Capaian entri ini" akhiran="%" lebar={2}
+            ket="Tambahan capaian dari entri ini saja, bukan total keseluruhan."
+            type="number" inputMode="decimal" name="capaian_delta" min="0" max="100"
+            value={capaian} onChange={(e) => setCapaian(e.target.value)}
+          />
+          <Isian
+            label="Waktu" akhiran="jam"
+            type="number" inputMode="decimal" name="waktu_jam_input" min="0" step="any"
+            value={jam} onChange={(e) => setJam(e.target.value)} placeholder="0"
+          />
+          <Isian
+            label="Waktu" akhiran="menit"
+            type="number" inputMode="decimal" name="waktu_menit_input" min="0" step="any"
+            value={menit} onChange={(e) => setMenit(e.target.value)} placeholder="0"
+          />
+          <p className="isian-penuh form-note" aria-live="polite">
+            Boleh diisi salah satu atau keduanya (mis. 1 jam 22 menit, 82 menit, atau 2 jam) —
+            tersimpan &amp; diekspor sebagai <b>{Math.max(0, totalMenit)} menit</b>
+            {totalMenit >= 60 ? ` (${fmtDurasi(Math.max(0, totalMenit))})` : ""}.
+          </p>
+        </GrupIsian>
 
-        {entri?.foto_keys?.length > 0 && (
-          <>
-            <p className="muted mt">Hilangkan centang untuk menghapus foto lama:</p>
-            <div className="foto-row">
-              {entri.foto_keys.map((k) => (
-                <label key={k} style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600 }}>
-                  <img src={thumbUrl(k, 240)} alt="foto" onError={retryFoto} style={{ cursor: "default" }} />
-                  <br />
-                  <input
-                    type="checkbox" checked={keep.includes(k)}
-                    onChange={(ev) =>
-                      setKeep((old) => ev.target.checked ? [...old, k] : old.filter((x) => x !== k))
-                    }
-                  /> simpan
-                </label>
-              ))}
+        <GrupIsian judul="Uraian kegiatan">
+          <IsianArea
+            label="Deskripsi kegiatan"
+            ket="Jelaskan apa yang dikerjakan, oleh siapa, dan hasilnya."
+            name="kegiatan" required value={uraian}
+            onChange={(e) => setUraian(e.target.value)}
+            placeholder="Apa yang dikerjakan…"
+          />
+          <div className="isian-penuh">
+            {/* Usulan AI: hanya mengisi textarea bila pengguna menekan "Gunakan" */}
+            <PerbaikiDeskripsiAI teks={uraian} tanggal={tanggal} onGunakan={(t) => setUraian(t)} />
+          </div>
+        </GrupIsian>
+
+        <GrupIsian judul="Dokumentasi foto">
+          {entri?.foto_keys?.length > 0 && (
+            <div className="isian-penuh">
+              <p className="isian-ket">Hilangkan centang untuk menghapus foto lama:</p>
+              <div className="foto-row">
+                {entri.foto_keys.map((k) => (
+                  <label key={k} className="foto-simpan">
+                    <img src={thumbUrl(k, 240)} alt="foto" onError={retryFoto} style={{ cursor: "default" }} />
+                    <span>
+                      <input
+                        type="checkbox" checked={keep.includes(k)}
+                        onChange={(ev) =>
+                          setKeep((old) => ev.target.checked ? [...old, k] : old.filter((x) => x !== k))
+                        }
+                      /> simpan
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </>
-        )}
+          )}
+          <IsianBerkas
+            label={entri ? "Tambah foto baru" : "Foto kegiatan"}
+            ket="Boleh lebih dari satu. Format PNG, JPG, atau WebP."
+            name="foto" accept="image/png,image/jpeg,image/webp" multiple
+          />
+        </GrupIsian>
 
-        <label className="field mt">
-          {entri ? "Tambah foto baru" : "Foto kegiatan (boleh lebih dari satu)"}
-          <input type="file" name="foto" accept="image/png,image/jpeg,image/webp" multiple />
-        </label>
-
-        {err && <div className="error-box mt">{err}</div>}
-        <div className="row mt entry-actions" style={{ justifyContent: "flex-end" }}>
+        {err && <div className="error-box mt" role="alert">{err}</div>}
+        <div className="dlg-aksi">
           <button type="button" className="btn" onClick={batal}>Batal</button>
           <button type="submit" className="btn primary" disabled={busy}>
             {busy ? "Menyimpan…" : <><Save className="lucide" /> Simpan</>}

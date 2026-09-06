@@ -207,7 +207,7 @@ export default function KomentarPanel({ jenis, targetId, timId, n = 0, onCountCh
   const bolehTulis = fas || balasKe != null;
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <div className="komentar-panel" style={{ marginTop: 10 }}>
       <button
         type="button"
         className={`btn sm ${buka ? "primary" : ""}`}

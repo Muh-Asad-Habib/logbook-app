@@ -1231,10 +1231,22 @@ tr.subtotal td {
 th.num, td.num {
   text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-/* Kolom aksi (ACC/komentar/edit): isinya bertumpuk rapi, tidak melebar liar */
-td.aksi { white-space: nowrap; }
+/* Kolom aksi (ACC/komentar/edit): isinya bertumpuk rapi, tidak melebar liar.
+ * Dulu sel ini memakai `white-space: nowrap`, sehingga panel komentar yang
+ * terbuka (teks bebas + kotak tulis) ikut dipaksa satu baris. Lebar minimum
+ * sel jadi ikut melar dan tabel meluap — muncul gulir mendatar di desktop
+ * hanya karena tombol Komentar ditekan.
+ * Sekarang teksnya boleh membungkus, jadi lebar minimum sel tidak berubah
+ * saat panel dibuka. `nowrap` disisakan khusus untuk deretan tombol. */
+td.aksi { white-space: normal; width: 230px; vertical-align: top; }
 td.aksi > * { display: block; }
 td.aksi > * + * { margin-top: 6px; }
+td.aksi .aksi-btn, td.aksi .acc-aksi { white-space: nowrap; }
+td.aksi .komentar-panel, td.aksi .acc-panel {
+  width: 100%; min-inline-size: 0; overflow-wrap: anywhere;
+}
+/* Lencana status tetap utuh satu baris (label pendek & terprediksi). */
+.badge { white-space: nowrap; }
 .aksi-btn { display: flex; gap: 6px; flex-wrap: wrap; }
 /* Kolom item: beri ruang bernapas agar uraian panjang membungkus wajar */
 td.item-col { min-width: 180px; max-width: 340px; overflow-wrap: break-word; }
@@ -1785,24 +1797,156 @@ a { color: var(--link-ink); }
   .progress > div::before, .bd-bar > div::before { animation: none; }
 }
 
-/* Form entri: satu area gulir, kepala dan aksi tetap mudah dijangkau. */
+/* ================= Form entri (dialog Kegiatan & Keuangan) =================
+ * Kepala dan baris aksi tetap terlihat, hanya isian yang menggulir — berlaku
+ * di semua ukuran layar, bukan hanya ponsel, supaya jendela laptop yang
+ * pendek pun tidak menyembunyikan tombol Simpan. */
 .entry-dialog .btn { min-height: 44px; }
+.entry-dialog[open] {
+  display: flex; flex-direction: column; overflow: hidden;
+  max-height: calc(100dvh - 48px);
+}
+.entry-dialog .dlg-head { flex-shrink: 0; }
+.entry-dialog .dlg-body {
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 20px 22px 0; scroll-padding-block: 20px 96px;
+}
+/* Footer dialog: Batal & Simpan sebaris di pojok kanan bawah, menempel saat
+ * isian digulir. Kelasnya sengaja BUKAN `.entry-actions` — kelas itu milik
+ * tumpukan tombol edit/hapus/unduh pada kartu daftar entri (arah kolom), dan
+ * tidak boleh ikut berubah. */
+.dlg-aksi {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; flex-direction: row; align-items: center;
+  justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+  margin: 20px -22px 0; padding: 14px 22px;
+  background: var(--card-solid); border-top: 1px solid var(--line);
+}
+
 @media (max-width: 640px) {
-  .entry-dialog[open] { display: flex; flex-direction: column; overflow: hidden; max-height: calc(100dvh - 16px); }
-  .entry-dialog .dlg-head { flex-shrink: 0; padding: 18px 16px 14px; gap: 10px; }
+  .entry-dialog[open] { max-height: calc(100dvh - 16px); }
+  .entry-dialog .dlg-head { padding: 18px 16px 14px; gap: 10px; }
   .entry-dialog .dlg-head h3 { flex: 1; min-width: 0; font-size: 1rem; }
   .entry-dialog .dlg-head .btn { min-height: 44px; }
-  .entry-dialog .dlg-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px 0; scroll-padding-block: 16px 90px; }
-  .entry-dialog .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
-  .entry-dialog .field { font-size: 0.82rem; line-height: 1.45; }
-  .entry-dialog .field-wide { grid-column: 1 / -1; }
-  .entry-dialog input:not([type="checkbox"]), .entry-dialog select { min-height: 48px; font-size: 16px; border-radius: 12px; }
-  .entry-dialog textarea { min-height: 112px; font-size: 16px; line-height: 1.5; border-radius: 12px; }
-  .entry-dialog input[type="file"] { font-size: 0.8rem; padding: 10px; background: var(--soft-2); border-style: dashed; }
-  .entry-dialog .entry-actions { position: sticky; bottom: 0; z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; margin: 18px -16px 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--card-solid); border-top: 1px solid var(--line); }
-  .entry-dialog .entry-actions .btn { width: 100%; min-height: 48px; justify-content: center; }
+  .entry-dialog .dlg-body { padding: 16px 16px 0; scroll-padding-block: 16px 90px; }
+  .dlg-aksi {
+    margin: 18px -16px 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+  /* Layar sempit: tetap SATU baris, Simpan diberi porsi lebih besar. */
+  .dlg-aksi .btn { flex: 1 1 0; min-height: 48px; justify-content: center; }
+  .dlg-aksi .btn.primary { flex-grow: 1.6; }
   .entry-dialog .total-form { padding: 12px; border-radius: 12px; background: var(--soft-2); }
 }
+
+/* ---------- Isian bersama (components/Isian.js) ----------
+ * Dua kolom yang dapat diprediksi, bukan auto-fit: jumlah kolom tidak lagi
+ * berubah-ubah mengikuti lebar dialog, sehingga pasangan isian yang memang
+ * berhubungan (jam/menit, harga/jumlah) selalu bersebelahan. */
+.isian-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px;
+}
+.isian-grid > .isian-penuh { grid-column: 1 / -1; }
+@media (max-width: 430px) { .isian-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.isian { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.isian-lbl {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 0.79rem; font-weight: 700; color: var(--ink); line-height: 1.35;
+}
+.isian-teks { min-width: 0; }
+.isian-opsional {
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted); background: var(--soft-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 7px;
+}
+.isian-ket { font-size: 0.73rem; font-weight: 600; color: var(--muted); line-height: 1.45; }
+
+/* Garis tepi dipasang di WADAH, bukan di input, supaya satuan "Rp"/"%" duduk
+   di dalam kotak yang sama dan tidak pernah menambah lebar baris. */
+.isian-kotak {
+  display: flex; align-items: stretch; min-width: 0;
+  border: 1.5px solid var(--line); border-radius: 12px; background: var(--input-bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.isian-kotak:focus-within { border-color: var(--p1); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14); }
+.entry-dialog .isian-kotak > input {
+  flex: 1 1 auto; width: 100%; min-width: 0; margin: 0;
+  border: none; background: transparent; border-radius: inherit;
+  min-height: 44px; padding: 10px 13px;
+}
+.entry-dialog .isian-kotak > input:focus { box-shadow: none; }
+.entry-dialog .isian-kotak.ada-awalan > input { padding-left: 3px; }
+.entry-dialog .isian-kotak.ada-akhiran > input { padding-right: 3px; }
+.isian-afiks {
+  display: flex; align-items: center; padding: 0 3px 0 13px; white-space: nowrap;
+  font-size: 0.82rem; font-weight: 700; color: var(--muted); user-select: none;
+}
+.isian-afiks.kanan { padding: 0 13px 0 3px; }
+
+.entry-dialog .isian-area {
+  margin: 0; min-height: 116px; border-radius: 12px; line-height: 1.55;
+}
+
+.isian-berkas {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 10px 12px; min-height: 44px;
+  border: 1.5px dashed var(--line); border-radius: 12px; background: var(--soft-2);
+  transition: border-color 0.15s ease;
+}
+.isian-berkas:hover, .isian-berkas:focus-within { border-color: var(--p1); }
+.isian-berkas > .lucide { width: 17px; height: 17px; flex: 0 0 17px; color: var(--muted); }
+.entry-dialog .isian-berkas > input {
+  margin: 0; padding: 0; min-width: 0; border: none; background: transparent;
+  font-size: 0.8rem; min-height: 0;
+}
+
+/* Kelompok isian — legend dibiarkan block agar tata letaknya konsisten
+   antar peramban (legend berperilaku khusus pada fieldset). */
+.isian-grup { border: none; margin: 0; padding: 0; min-width: 0; }
+.isian-grup + .isian-grup { margin-top: 20px; }
+.isian-grup-judul {
+  display: block; width: 100%; padding: 0 0 10px;
+  font-size: 0.69rem; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted);
+}
+.isian-grup-ket {
+  margin-left: 8px; text-transform: none; letter-spacing: 0;
+  font-size: 0.72rem; font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  /* 16px mencegah peramban ponsel ikut memperbesar halaman saat input difokus */
+  .entry-dialog .isian-kotak > input,
+  .entry-dialog .isian-area { font-size: 16px; }
+  .entry-dialog .isian-kotak > input { min-height: 48px; }
+  .isian-grid { gap: 14px 10px; }
+}
+
+/* Catatan bantu di bawah sekelompok isian (mis. ringkasan durasi). */
+.form-note {
+  margin: 0; padding: 10px 12px; border-radius: 12px;
+  background: var(--soft-2); border: 1px solid var(--line);
+  font-size: 0.75rem; font-weight: 600; color: var(--muted); line-height: 1.5;
+}
+.form-note b { color: var(--ink); }
+.entry-dialog .total-form {
+  margin: 0; padding: 12px 14px; border-radius: 12px;
+  background: var(--soft-2); border: 1px solid var(--line);
+}
+
+/* Kartu "simpan foto lama": gambar + centang jadi satu target yang jelas. */
+.foto-simpan {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 0.72rem; font-weight: 700; color: var(--muted);
+  padding: 6px; border-radius: 12px; cursor: pointer;
+  border: 1px solid transparent; transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.foto-simpan:hover { border-color: var(--line-hover); background: var(--soft); }
+.foto-simpan:focus-within { border-color: var(--p1); }
+.foto-simpan > span { display: inline-flex; align-items: center; gap: 5px; }
+.foto-simpan input[type="checkbox"] { margin: 0; width: 17px; height: 17px; }
+
 
 
 

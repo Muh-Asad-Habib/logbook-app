@@ -88,8 +88,8 @@ export default function AccPanel({ jenis, targetId, timId, acc, onChange }) {
   };
 
   return (
-    <div style={{ marginTop: 8 }}>
-      <div className="row" style={{ gap: 6, alignItems: "center", marginTop: 0 }}>
+    <div className="acc-panel" style={{ marginTop: 8 }}>
+      <div className="row acc-aksi" style={{ gap: 6, alignItems: "center", marginTop: 0 }}>
         <AccBadge acc={acc} />
         {acc?.dosen_username && (
           <span className="muted" style={{ fontSize: ".7rem" }}>
