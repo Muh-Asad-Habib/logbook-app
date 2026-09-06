@@ -1,16 +1,25 @@
 # Vercel CLI upload rules are separate from Git ignore rules.
 .git/
 .vercel/
+.githooks/
+.idea/
+.vscode/
 node_modules/
 **/node_modules/
 frontend/.next/
 frontend/out/
 
 # Credentials and private local data never belong in deployment source.
-.env
-.env.*
-**/.env
-**/.env.*
+.env*
+**/.env*
+*.pem
+*.key
+*.p12
+*.pfx
+*.db
+*.sqlite
+*.sqlite3
+*.pid
 data/
 uploads/
 artifacts/
@@ -33,6 +42,8 @@ Referensi Desain UI/
 /*.xlsx
 /*.pdf
 /*.zip
+/*.7z
+/*.rar
 tools/*.docx
 tools/*.pdf
 tools/*.xlsx

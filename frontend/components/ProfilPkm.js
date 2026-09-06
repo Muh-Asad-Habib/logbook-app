@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { BookOpen, Save } from "lucide-react";
+import { BookOpen, Save, ExternalLink, CheckCircle2 } from "lucide-react";
 import { api, getTimAktif } from "@/lib/api";
 
 export default function ProfilPkm({ pendamping = false }) {
@@ -44,7 +44,7 @@ export default function ProfilPkm({ pendamping = false }) {
     finally { setBusy(false); }
   };
   return (
-    <section className="card mt" aria-labelledby="profil-pkm-title">
+    <section className="card mt pkm-profile" aria-labelledby="profil-pkm-title">
       <h3 id="profil-pkm-title"><BookOpen className="lucide" /> Profil & rujukan PKM</h3>
       <p className="sub">AI memakai rujukan sesuai tahun dan skema, bukan menebaknya dari nama tim.</p>
       {pendamping && <label className="field">Tim yang diperiksa
@@ -56,7 +56,7 @@ export default function ProfilPkm({ pendamping = false }) {
       {err && <p className="error-box mt" role="alert">{err}</p>}
       {!data && !err && (!pendamping || timId) && <div className="skel mt" style={{ height: 120 }} />}
       {data && <>
-        <p className="muted mt">{data.profil.status === "dikonfirmasi_tim"
+        <p className={`pkm-status ${data.profil.status === "dikonfirmasi_tim" ? "confirmed" : "pending"}`}><CheckCircle2 className="lucide" aria-hidden="true" />{data.profil.status === "dikonfirmasi_tim"
           ? `Ditetapkan oleh tim: ${data.profil.skema}, tahun ${data.profil.tahun}.`
           : `Belum dikonfirmasi.${data.profil.indikasi?.length ? ` Kode yang disebut dalam catatan: ${data.profil.indikasi.join(", ")}.` : " Belum ada kode skema eksplisit dalam catatan."}`}</p>
         <form onSubmit={submit}>
@@ -75,14 +75,14 @@ export default function ProfilPkm({ pendamping = false }) {
             </label>
           </div>
           <label className="field mt">Judul proposal (sesuai dokumen)
-            <input value={form.judul} maxLength={240} disabled={!data.bisaUbah || busy} onChange={(e) => set("judul", e.target.value)} />
+            <textarea rows={3} value={form.judul} maxLength={240} disabled={!data.bisaUbah || busy} onChange={(e) => set("judul", e.target.value)} aria-describedby="pkm-title-help" />
           </label>
-          <p className="muted mts">Konfirmasikan dengan proposal/surat pendanaan. Penetapan ini bukan verifikasi dokumen otomatis. {pendamping && "Perubahan dilakukan oleh akun tim pemilik logbook."}</p>
+          <div className="pkm-help"><p id="pkm-title-help">Sesuai proposal/surat pendanaan; bukan verifikasi dokumen otomatis. {pendamping && "Perubahan dilakukan oleh pemilik tim atau Pusat Kendali."}</p><span>{form.judul.length}/240</span></div>
           {data.bisaUbah && <button className="btn primary mt" disabled={busy}><Save className="lucide" /> {busy ? "Menyimpan…" : "Simpan profil PKM"}</button>}
           {saved && <p className="ok-note mt" role="status">Profil PKM tersimpan. Jawaban AI berikutnya memakai pilihan ini.</p>}
         </form>
-        <details className="mt"><summary>Rujukan resmi 2022–2026</summary>
-          <ul>{data.sumber.map((s) => <li key={s.tahun}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.judul}</a></li>)}</ul>
+        <details className="pkm-references"><summary>Rujukan resmi 2022–2026 <span>{data.sumber.length} panduan</span></summary>
+          <ul>{data.sumber.map((s) => <li key={s.tahun}><a href={s.url} target="_blank" rel="noopener noreferrer"><span className="pkm-year">{s.tahun}</span><span>{s.judul}</span><ExternalLink className="lucide" aria-hidden="true" /></a></li>)}</ul>
           <p className="muted mts">Ringkasan terpilih, bukan seluruh juknis. Periksa revisi terbaru dan RAB yang disahkan.</p>
         </details>
       </>}

@@ -20,6 +20,7 @@ import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check }
 import { api, getTimAktif, isPendamping } from "@/lib/api";
 import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
 import { namaCantik, namaSingkat, sifatModel, rincianTeknis, kecepatanModel, CATATAN_KECEPATAN } from "@/lib/namaModel";
+import { markdownBlocks } from "@/lib/markdown";
 
 const PROMPT_CEPAT = [
   "Uang kami paling banyak terpakai untuk apa?",
@@ -42,31 +43,13 @@ function inline(teks, kunci) {
 }
 
 function Markdown({ teks }) {
-  const baris = String(teks || "").replace(/\r/g, "").split("\n");
-  const out = [];
-  let daftar = null; // { jenis: "ul"|"ol", items: [] }
-  const tutupDaftar = () => {
-    if (!daftar) return;
-    const Tag = daftar.jenis;
-    out.push(<Tag key={`l${out.length}`}>{daftar.items.map((t, i) => <li key={i}>{inline(t, `li${i}`)}</li>)}</Tag>);
-    daftar = null;
-  };
-  baris.forEach((b, i) => {
-    const ul = b.match(/^\s*[-*•]\s+(.*)$/);
-    const ol = b.match(/^\s*\d+[.)]\s+(.*)$/);
-    const h = b.match(/^\s*#{1,4}\s+(.*)$/);
-    if (ul || ol) {
-      const jenis = ul ? "ul" : "ol";
-      if (!daftar || daftar.jenis !== jenis) { tutupDaftar(); daftar = { jenis, items: [] }; }
-      daftar.items.push((ul || ol)[1]);
-      return;
+  return <div className="ai-md">{markdownBlocks(teks).map((block, i) => {
+    if (block.type === "ul" || block.type === "ol") {
+      const Tag = block.type;
+      return <Tag key={i} start={block.type === "ol" ? block.start : undefined}>{block.items.map((t, j) => <li key={j}>{inline(t, `li${i}-${j}`)}</li>)}</Tag>;
     }
-    tutupDaftar();
-    if (h) { out.push(<p key={i} className="ai-h">{inline(h[1], `h${i}`)}</p>); return; }
-    if (b.trim()) out.push(<p key={i}>{inline(b, `p${i}`)}</p>);
-  });
-  tutupDaftar();
-  return <div className="ai-md">{out}</div>;
+    return <p key={i} className={block.type === "heading" ? "ai-h" : undefined}>{inline(block.text, `p${i}`)}</p>;
+  })}</div>;
 }
 
 /* ---------- komponen utama ---------- */

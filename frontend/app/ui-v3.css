@@ -382,6 +382,9 @@
 .ai-md .ai-h { font-weight: 800; margin-top: 4px; }
 .ai-md ul, .ai-md ol { margin: 2px 0 8px 18px; }
 .ai-md li { margin: 2px 0; }
+.ai-md ol, .ai-md ul { padding-left: 1.25rem; margin-left: 0; }
+.ai-md li + li { margin-top: 8px; }
+.ai-md li::marker { font-weight: 700; }
 .ai-md code { background: rgba(79, 70, 229, 0.1); padding: 1px 5px; border-radius: 5px; font-size: 0.8em; }
 [data-theme="dark"] .ai-md code { background: rgba(129, 140, 248, 0.18); }
 
@@ -453,5 +456,30 @@
   .entry-dialog .ai-saran-bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .entry-dialog .ai-saran-bar .btn, .entry-dialog .ai-saran-bar select { width: 100%; min-height: 44px; margin: 0; }
   .entry-dialog .ai-usul-aksi .btn { flex: 1 1 120px; justify-content: center; min-height: 44px; }
+}
+
+.pkm-profile .pkm-status { display: flex; align-items: center; gap: 8px; padding: 11px 14px; margin: 18px 0 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-2); font-size: .84rem; line-height: 1.5; }
+.pkm-status .lucide { flex: 0 0 18px; width: 18px; height: 18px; color: var(--link-ink); }
+.pkm-profile .form-grid { grid-template-columns: minmax(0, 1fr) minmax(180px, .55fr); gap: 16px; }
+.pkm-profile :is(input, select, textarea) { font-size: 1rem; }
+.pkm-profile :is(input, select) { min-height: 48px; }
+.pkm-profile textarea { min-height: 96px; line-height: 1.55; resize: vertical; }
+.pkm-help { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: .76rem; line-height: 1.5; }
+.pkm-help p { margin: 0; }
+.pkm-help > span { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.pkm-references { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.pkm-references summary { cursor: pointer; font-size: .9rem; font-weight: 700; }
+.pkm-references summary > span { margin-left: 8px; font-size: .74rem; color: var(--muted); font-weight: 500; }
+.pkm-references ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 10px; margin: 14px 0 12px; padding: 0; list-style: none; }
+.pkm-references li { min-width: 0; }
+.pkm-references a { display: flex; align-items: center; gap: 10px; height: 100%; min-height: 66px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; background: var(--soft-2); font-size: .79rem; line-height: 1.45; }
+.pkm-references a:hover { border-color: var(--line-hover); }
+.pkm-references a > span:nth-child(2) { flex: 1; min-width: 0; }
+.pkm-references a > .lucide { flex: 0 0 16px; width: 16px; height: 16px; }
+.pkm-year { padding: 5px 7px; border-radius: 7px; background: var(--card-solid); font-weight: 800; }
+@media (max-width: 640px) {
+  .pkm-profile .form-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .pkm-profile form > .btn { width: 100%; justify-content: center; min-height: 48px; }
+  .pkm-profile textarea { min-height: 128px; }
 }
 

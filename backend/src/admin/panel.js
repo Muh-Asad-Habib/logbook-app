@@ -1201,6 +1201,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
       <button data-tab="keu"> Keuangan</button>
       <button data-tab="lap"> Laporan</button>
       <button data-tab="pre">️ Presentasi</button>
+      <button data-tab="pkm">Profil PKM</button>
       <button data-tab="ses">️ Perangkat</button>
       <button data-tab="akt"> Aktivitas</button>
     </div>
@@ -1574,6 +1575,7 @@ function jadwalMuat(){
 /* Bila dialog detail sedang terbuka, perbarui isinya diam-diam (tanpa audit). */
 function segarkanDetail(){
   if (!DETAIL || !$("#d-detail").open) return;
+  if (TAB === "pkm") return; // Jangan menimpa draft profil yang sedang diketik admin.
   var id = DETAIL.user.id;
   Promise.all([
     call("/data/pengguna/" + id + "?senyap=1"),
@@ -2249,12 +2251,27 @@ function renderTab(){
     TAB === "keu" ? tabelKeuangan(DETAIL.keuangan) :
     TAB === "lap" ? tabelLaporan(DETAIL) :
     TAB === "pre" ? tabelPresentasi(DETAIL) :
+    TAB === "pkm" ? profilPkmAdmin(DETAIL) :
     TAB === "ses" ? tabelSesiUser(SESI_USER) :
     tabelAktivitas(AKTIVITAS), "dt-isi");
   if (berubah && tlPos) {
     var tlBaru = box.querySelector(".tline");
     if (tlBaru) tlBaru.scrollTop = tlPos;
   }
+}
+function profilPkmAdmin(d){
+  if (!d.pkm) return '<div class="kosong">Profil PKM tersedia untuk akun tim.</div>';
+  var p = d.pkm.profil || {};
+  var schemes = Object.keys(d.pkm.skema || {}).map(function(k){ return '<option value="' + esc(k) + '"' + (p.skema === k ? ' selected' : '') + '>' + esc(k + ' — ' + d.pkm.skema[k]) + '</option>'; }).join('');
+  var years = (d.pkm.sumber || []).map(function(s){ return '<option value="' + s.tahun + '"' + (Number(p.tahun) === s.tahun ? ' selected' : '') + '>' + s.tahun + '</option>'; }).join('');
+  var refs = (d.pkm.sumber || []).map(function(s){ return '<a class="btn sm" style="white-space:normal;text-align:left" target="_blank" rel="noopener noreferrer" href="' + esc(s.url) + '">' + esc(s.judul) + '</a>'; }).join('');
+  return '<div class="card" style="margin-top:14px"><h3>Profil &amp; rujukan PKM</h3><p class="mut">Sesuaikan dengan proposal atau surat pendanaan. Perubahan admin dicatat dalam audit.</p>' +
+    '<form id="f-pkm-admin" style="display:grid;gap:14px;margin-top:16px">' +
+    '<label>Skema PKM<select name="skema"><option value="">Belum ditetapkan</option>' + schemes + '</select></label>' +
+    '<label>Tahun pelaksanaan<select name="tahun"><option value="">Belum ditetapkan</option>' + years + '</select></label>' +
+    '<label>Judul proposal<textarea name="judul" rows="3" maxlength="240" style="width:100%;box-sizing:border-box;line-height:1.5;padding:12px">' + esc(p.judul || '') + '</textarea></label>' +
+    '<button class="btn p" type="submit">Simpan profil PKM</button></form>' +
+    '<details style="margin-top:20px"><summary>Rujukan resmi 2022–2026</summary><div style="display:grid;gap:8px;margin-top:12px">' + refs + '</div></details></div>';
 }
 function ukur(b){
   b = Number(b || 0);
@@ -2335,6 +2352,7 @@ var AKSI_INFO = {
   "user.lihat":           ["search","c","Data dilihat lewat panel"],
   "user.buat":            ["user","g","Akun dibuat lewat panel"],
   "user.username":        ["edit","y","Username diganti lewat panel"],
+  "user.pkm.ubah":        ["edit","y","Profil PKM diperbarui admin"],
   "user.password.reset":  ["key","r","Password direset lewat panel"],
   "user.sesi.cabut":      ["power","r","Sesi dicabut lewat panel"],
   "user.hapus":           ["trash","r","Akun dihapus lewat panel"],
@@ -2716,6 +2734,21 @@ document.addEventListener("click", function(e){
 });
 
 /* ---------- event delegation ---------- */
+document.addEventListener("submit", function(ev){
+  var form = ev.target;
+  if (!form || form.id !== "f-pkm-admin" || !DETAIL || !DETAIL.pkm) return;
+  ev.preventDefault();
+  var id = DETAIL.user.id;
+  var button = form.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = "Menyimpan…";
+  call("/data/pengguna/" + encodeURIComponent(id) + "/profil-pkm", { method: "PUT", body: JSON.stringify({ skema: form.elements.skema.value, tahun: form.elements.tahun.value, judul: form.elements.judul.value }) })
+    .then(function(j){
+      if (DETAIL && DETAIL.user.id === id) { DETAIL.pkm.profil = j.profil; if (TAB === "pkm") renderTab(); }
+      toast("Profil PKM tersimpan");
+    }).catch(function(e){ toast(e.message, true); })
+    .finally(function(){ button.disabled = false; button.textContent = "Simpan profil PKM"; });
+});
 document.addEventListener("click", function(ev){
   var el = ev.target.closest(
     "[data-act],[data-tab],[data-role-tab],[data-page],[data-mode-sesi],[data-peran-sesi],[data-fil-audit]");

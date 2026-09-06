@@ -17,6 +17,7 @@ import { PANEL_HTML } from "./panel.js";
 import { bus } from "../bus.js";
 import { bacaAktivitas } from "../aktivitas.js";
 import { pasangCookiePanel, hapusCookiePanel } from "../cookies.js";
+import { bacaProfilPkm, validasiProfilPkm, KUNCI_PROFIL_PKM, SKEMA_PKM, SUMBER_PKM } from "../ai/pengetahuan-pkm.js";
 
 const router = Router();
 
@@ -131,6 +132,10 @@ router.get("/data/pengguna/:id", async (req, res, next) => {
   try {
     const detail = await store.getUserDetail(req.params.id);
     if (!detail) return res.status(404).json({ error: "Akun tidak ditemukan" });
+    if ((detail.user.role || "tim") === "tim") {
+      const raw = await store.getSetting(req.params.id, KUNCI_PROFIL_PKM, "");
+      detail.pkm = { profil: bacaProfilPkm(raw, { namaTim: detail.user.username, kegiatan: detail.kegiatan }), skema: SKEMA_PKM, sumber: Object.values(SUMBER_PKM) };
+    }
     // ?senyap=1 dipakai pembaruan berkala — tidak dicatat agar tidak berulang
     if (!req.query.senyap) adminStore.audit(req, "user.lihat", { target: req.params.id });
     res.json(detail);
@@ -140,6 +145,20 @@ router.get("/data/pengguna/:id", async (req, res, next) => {
 });
 
 /** Jejak gabungan per pengguna: aksi si pengguna sendiri + aksi panel terhadapnya. */
+router.put("/data/pengguna/:id/profil-pkm", async (req, res, next) => {
+  try {
+    const user = await store.getUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: "Akun tidak ditemukan" });
+    if ((user.role || "tim") !== "tim") return res.status(400).json({ error: "Profil PKM hanya untuk akun tim" });
+    let profil;
+    try { profil = validasiProfilPkm(req.body); }
+    catch (err) { return res.status(400).json({ error: err.message }); }
+    await store.setSetting(user.id, KUNCI_PROFIL_PKM, JSON.stringify(profil));
+    adminStore.audit(req, "user.pkm.ubah", { target: user.id, skema: profil.skema, tahun: profil.tahun });
+    res.json({ profil: bacaProfilPkm(profil) });
+  } catch (err) { next(err); }
+});
+
 router.get("/data/pengguna/:id/aktivitas", async (req, res, next) => {
   try {
     const user = await store.getUserById(req.params.id);

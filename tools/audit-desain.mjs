@@ -203,8 +203,11 @@ try {
   await outsideAI.focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('.ai-panel')).toBeVisible();
-  await pendingAI.fulfill({ json: { jawaban: 'Jawaban audit tiruan', model: 'audit-model' } });
+  await pendingAI.fulfill({ json: { jawaban: 'Jawaban audit tiruan\n\n1. Pertama\n\n1. Kedua\n\n1. Ketiga', model: 'audit-model' } });
   await expect(page.getByRole('log')).toContainText('Jawaban audit tiruan');
+  await expect(page.locator('.ai-md ol')).toHaveCount(1);
+  await expect(page.locator('.ai-md ol')).toHaveAttribute('start', '1');
+  await expect(page.locator('.ai-md ol > li')).toHaveText(['Pertama', 'Kedua', 'Ketiga']);
   await expect(question).toBeEnabled();
   await expect(outsideAI).toBeFocused();
   await page.locator('.ai-panel').getByRole('button', { name: 'Tutup', exact: true }).click();
@@ -233,6 +236,16 @@ try {
   await page.locator('.sb-menu a').first().focus();
   await expect(page.getByRole('menu', { name: 'Menu akun', exact: true })).toHaveCount(0);
   results.push({ name: 'keyboard-akun-desktop-mobile', status: 'passed' });
+  await page.goto(`${base}/profil`, { waitUntil: 'networkidle' });
+  const proposal = page.getByRole('textbox', { name: 'Judul proposal (sesuai dokumen)' });
+  await proposal.fill(text.repeat(4).slice(0, 240));
+  await expect(proposal).toHaveJSProperty('tagName', 'TEXTAREA');
+  await page.locator('.pkm-references summary').click();
+  await expect(page.locator('.pkm-references a')).toHaveCount(5);
+  for (const [width, height] of [[320, 740], [844, 390], [1440, 900]]) {
+    await page.setViewportSize({ width, height });
+    await measure(page, `profil-pkm-judul-panjang-rujukan-${width}x${height}`);
+  }
   await context.close();
   const pendamping = await contextFor('dosen');
   const pp = await pendamping.newPage();
@@ -305,6 +318,32 @@ try {
       await dialog.evaluate((el) => el.close());
     }
   }
+  const pkm = { profil: { skema: 'PKM-KC', tahun: 2026, judul: text.repeat(4).slice(0, 240) }, skema: SKEMA_PKM, sumber: Object.values(SUMBER_PKM) };
+  await ap.evaluate((detail) => {
+    window.DETAIL = detail;
+    window.TAB = 'pkm';
+    window.renderTab();
+    document.querySelector('#d-detail').showModal();
+  }, { user: tim, pkm });
+  await ap.locator('#f-pkm-admin textarea').fill('Draft profil PKM untuk audit');
+  await ap.evaluate(() => window.segarkanDetail());
+  await expect(ap.locator('#f-pkm-admin textarea')).toHaveValue('Draft profil PKM untuk audit');
+  await ap.locator('#dt-isi details summary').click();
+  for (const [width, height] of [[320, 740], [844, 390], [1440, 900]]) {
+    await ap.setViewportSize({ width, height });
+    await measure(ap, `admin-profil-pkm-${width}x${height}`);
+  }
+  let savedPkm;
+  await ap.route('**/data/pengguna/tim-audit/profil-pkm', async (route) => {
+    expect(route.request().method()).toBe('PUT');
+    savedPkm = route.request().postDataJSON();
+    await route.fulfill({ json: { profil: savedPkm } });
+  });
+  await ap.locator('#f-pkm-admin').getByRole('button', { name: 'Simpan profil PKM' }).click();
+  await expect.poll(() => savedPkm).toEqual({ skema: 'PKM-KC', tahun: '2026', judul: 'Draft profil PKM untuk audit' });
+  await expect(ap.locator('#f-pkm-admin button')).toBeEnabled();
+  await expect(ap.locator('#f-pkm-admin textarea')).toHaveValue(savedPkm.judul);
+  await ap.locator('#d-detail').evaluate((el) => el.close());
   await ap.evaluate(() => sessionStorage.removeItem('mx'));
   await ap.route('**/audit-panel-login', (route) => route.fulfill({ contentType: 'text/html', body: PANEL_HTML.replace('var TOK = sessionStorage.getItem("mx") || "";', 'var TOK = "";') }));
   await ap.goto(`${base}/audit-panel-login`, { waitUntil: 'networkidle' });

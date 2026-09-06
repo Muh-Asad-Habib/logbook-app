@@ -139,7 +139,17 @@ Audit penuh selesai pada **5 September 2026, `2026-09-05T13:04:55.724Z`**:
 
 Hasil akhir tersimpan di `artifacts/audit-desain/hasil.json`, `pkm-complete-full.log`, `pkm-complete-full.exit`, serta `hasil-final-ringkas.json`. Angka ini menggantikan hasil percobaan yang berhenti pada 404 segmen, pengukuran sidebar saat toggle, atau tombol landscape 38 px.
 
-Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepatan jawaban model Ollama nyata belum dibenchmark**, dan skema tim nyata tidak dinyatakan terverifikasi hanya dari nama/catatan. Konfirmasi per tim mengikuti proposal/surat pendanaan melalui Profil PKM. Perubahan lanjutan ini belum di-commit, di-push atau di-redeploy pada saat laporan diperbarui.
+Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepatan jawaban model Ollama nyata belum dibenchmark**, dan skema tim nyata tidak dinyatakan terverifikasi hanya dari nama/catatan. Konfirmasi per tim mengikuti proposal/surat pendanaan melalui Profil PKM. Status versi online diperiksa setiap rilis melalui `npm run cek:online -- https://logbook-pkm.vercel.app`.
+
+### Penyempurnaan profil, daftar AI, dan privasi repo — 6 September 2026
+
+- Judul proposal memakai textarea multiline dengan penghitung karakter; pilihan skema/tahun menyesuaikan layar dan rujukan resmi tampil sebagai kartu, bukan daftar tautan rapat.
+- Daftar bernomor AI tetap satu daftar saat dipisahkan baris kosong, termasuk notasi Markdown `1.` berulang. Nomor awal eksplisit dipertahankan dan teks tetap dirender aman melalui React.
+- Pusat Kendali menyediakan tab Profil PKM untuk akun tim, validasi penyimpanan, pencatatan audit, dan perlindungan draft dari penyegaran otomatis.
+- Audit browser ditambah pemeriksaan penomoran jawaban, judul panjang/rujukan pada tiga ukuran layar, serta tab admin dan penyimpanan profil memakai API tiruan. Log rilis ini: `artifacts/audit-desain/resume-full.log` beserta kode keluarnya.
+- **37 tes pradeploy dan 32 diagnostik UI admin lulus**; build produksi berhasil dengan sembilan alias segmen RSC.
+- **164 berkas index** lolos pemeriksaan path privat dan Gitleaks. **107 commit riwayat main** telah dipindai tanpa rahasia terdeteksi; tidak ada path privat yang dilarang pada riwayat tersebut. Angka ini adalah hasil sebelum commit rilis baru, bukan jaminan deteksi seluruh bentuk informasi pribadi.
+- Riwayat hanya menggunakan identitas Git pemilik tanpa atribusi Copilot. Cadangan riwayat disimpan di luar repo; sinkronisasi memakai lease agar tidak menimpa perubahan remote baru. Upload produksi menggunakan ekspor commit saja, bukan folder kerja yang mengandung data lokal. Lihat `docs/REPO-SECURITY.md`.
 
 ### Menjalankan ulang
 
