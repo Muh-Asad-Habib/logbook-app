@@ -86,8 +86,16 @@ async function paletteContrast(page) {
     const probe = document.createElement('span'); document.body.appendChild(probe);
     const rgb = name => { probe.style.color = `var(${name})`; return getComputedStyle(probe).color.match(/[\d.]+/g).slice(0,3).map(Number); };
     const lum = values => values.map(v => { v /= 255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; }).reduce((a,v,i) => a + v*[.2126,.7152,.0722][i], 0);
-    const pairs = [['--ink','--panel'],['--mut','--panel2'],['--p','--accent-soft'],['--ok','--ok-soft'],['--bad','--bad-soft'],['--warn','--warn-soft'],['--cy','--cy-soft']];
+    const pairs = [['--ink','--panel'],['--mut','--panel2'],['--p','--accent-soft'],['--ok','--ok-soft'],['--bad','--bad-soft'],['--warn','--warn-soft'],['--cy','--cy-soft'],['--on-primary','--primary-fill']];
     const values = pairs.map(([fg,bg]) => { const a=lum(rgb(fg)), b=lum(rgb(bg)); return { fg,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05) }; });
+    for (const selector of ['.side-nav a.on', '.top-act .btn', '#v-app .btn.p']) {
+      const el = document.querySelector(selector);
+      if (!el) continue;
+      const css = getComputedStyle(el);
+      const a = lum(css.color.match(/[\d.]+/g).slice(0,3).map(Number));
+      const b = lum(css.backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number));
+      values.push({ selector, ratio: (Math.max(a,b)+.05)/(Math.min(a,b)+.05) });
+    }
     probe.remove(); return values;
   });
   for (const pair of ratios) expect(pair.ratio, JSON.stringify(pair)).toBeGreaterThanOrEqual(4.5);
