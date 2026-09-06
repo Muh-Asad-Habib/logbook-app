@@ -12,13 +12,13 @@
  * - MODEL DIPILIH PENGGUNA lewat daftar di kepala panel ("Otomatis" = model
  *   bawaan server). Pilihan tersimpan di akun sehingga ikut dipakai tombol AI
  *   di formulir Kegiatan & Keuangan.
- * - Tombol disembunyikan bila server menjawab fitur nonaktif.
+ * - Tombol tetap terlihat; gangguan/nonaktif ditampilkan dengan tindakan retry.
  * - Markdown dirender ringan TANPA innerHTML (aman dari XSS).
  */
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, Trash2, Loader2, TriangleAlert, ChevronDown, Check } from "lucide-react";
 import { api, getTimAktif, isPendamping } from "@/lib/api";
-import { useStatusAI, useModelAI, pilihModelAI, modelPilihan } from "@/lib/ai";
+import { useStatusAI, useModelAI, pilihModelAI, modelPilihan, ambilStatusAI, ambilModelAI } from "@/lib/ai";
 import { namaCantik, namaSingkat, sifatModel, rincianTeknis, kecepatanModel, CATATAN_KECEPATAN } from "@/lib/namaModel";
 import { markdownBlocks } from "@/lib/markdown";
 
@@ -65,7 +65,9 @@ export default function AsistenAI() {
   const [pendamping, setPendamping] = useState(false);
   const [errModel, setErrModel] = useState("");
   const [bukaModel, setBukaModel] = useState(false);
-  const model = useModelAI(buka); // daftar model diunduh saat panel dibuka
+  const [cekBusy, setCekBusy] = useState(false);
+  const siapAI = status?.aktif === true && status.tersedia !== false;
+  const model = useModelAI(buka && siapAI);
   const listRef = useRef(null);
   const inputRef = useRef(null);
   const modelRef = useRef(null);
@@ -164,11 +166,23 @@ export default function AsistenAI() {
     else if (e.key === "End") ke(opsi.length - 1);
   };
 
-  if (!status?.aktif) return null;
+  const cekLagi = async () => {
+    if (cekBusy) return;
+    setCekBusy(true);
+    try {
+      const terbaru = await ambilStatusAI(true);
+      if (terbaru.aktif && terbaru.tersedia !== false) await ambilModelAI(true);
+    } finally { setCekBusy(false); }
+  };
+  const pesanStatus = !status ? 'Memeriksa layanan AI…'
+    : status.gagal ? 'Status AI belum dapat diperiksa. Periksa koneksi lalu coba lagi.'
+    : !status.aktif ? 'AI sedang dinonaktifkan oleh pengelola. Fitur logbook lainnya tetap dapat digunakan.'
+    : status.tersedia === false ? 'Layanan AI atau daftar model belum tersedia. Coba hubungkan kembali.'
+    : '';
 
   const kirim = async (teks) => {
     const t = String(teks ?? input).trim();
-    if (!t || busy) return;
+    if (!t || busy || !siapAI || (pendamping && !timId)) return;
     setInput("");
     const riwayat = pesan.filter((m) => !m.gagal).map(({ role, content }) => ({ role, content }));
     setPesan((p) => [...p, { role: "user", content: t }]);
@@ -243,9 +257,8 @@ export default function AsistenAI() {
             <div className="ai-head-txt">
               <b>Asisten Logbook</b>
               <small>
-                {namaSingkat(model?.pilihan || status.model) || "AI"}
+                {siapAI ? namaSingkat(model?.pilihan || status?.model) || "AI" : "Layanan AI belum siap"}
                 {model && !model.pilihan ? " · otomatis" : ""}
-                {status.tersedia === false ? " · server tidak terjangkau" : ""}
                 {pendamping && timId ? " · tim yang sedang dilihat" : ""}
               </small>
             </div>
@@ -275,7 +288,7 @@ export default function AsistenAI() {
                 aria-expanded={bukaModel}
                 aria-label={`Pilih model: ${model?.pilihan ? namaCantik(model.pilihan) : "Otomatis"}`}
                 aria-controls="ai-model-menu"
-                disabled={busy || !model || model.daftar.length === 0}
+                disabled={!siapAI || busy || !model || model.daftar.length === 0}
                 onClick={() => setBukaModel((v) => !v)}
                 title={
                   model?.pilihan
@@ -289,7 +302,7 @@ export default function AsistenAI() {
                 <ChevronDown className="lucide" />
               </button>
             </div>
-            {!model && <Loader2 className="lucide spin" aria-label="Memuat daftar model" />}
+            {siapAI && !model && <Loader2 className="lucide spin" aria-label="Memuat daftar model" />}
             {model && model.daftar.length === 0 && (
               <span className="ai-model-ket">Daftar model belum tersedia. Coba buka kembali nanti.</span>
             )}
@@ -342,6 +355,14 @@ export default function AsistenAI() {
             )}
 
           <div className="ai-list" ref={listRef} inert={bukaModel} role="log" aria-label="Percakapan asisten AI" aria-live="polite" aria-busy={busy}>
+            {(pesanStatus || (model && !model.daftar.length)) && (
+              <div className="ai-msg assistant" role="status">
+                <p>{pesanStatus || 'Daftar model belum termuat. Coba lagi tanpa memuat ulang halaman.'}</p>
+                <button type="button" className="btn sm" onClick={cekLagi} disabled={cekBusy}>
+                  {cekBusy ? 'Memeriksa…' : 'Coba lagi'}
+                </button>
+              </div>
+            )}
             {pesan.length === 0 && (
               <div className="ai-kosong">
                 <p>
@@ -350,7 +371,7 @@ export default function AsistenAI() {
                 </p>
                 <div className="ai-chips">
                   {PROMPT_CEPAT.map((p) => (
-                    <button key={p} type="button" className="ai-chip" onClick={() => kirim(p)} disabled={!bisaTanya}>
+                    <button key={p} type="button" className="ai-chip" onClick={() => kirim(p)} disabled={!bisaTanya || !siapAI || busy}>
                       {p}
                     </button>
                   ))}
@@ -399,10 +420,10 @@ export default function AsistenAI() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
               placeholder={bisaTanya ? "Tulis pertanyaan…" : "Pilih tim dulu"}
-              disabled={busy || !bisaTanya}
+              disabled={busy || !bisaTanya || !siapAI}
               aria-label="Pertanyaan untuk asisten AI"
             />
-            <button type="submit" className="btn primary" disabled={busy || !input.trim() || !bisaTanya}
+            <button type="submit" className="btn primary" disabled={busy || !input.trim() || !bisaTanya || !siapAI}
                     aria-label="Kirim">
               {busy ? <Loader2 className="lucide spin" /> : <Send className="lucide" />}
             </button>

@@ -151,6 +151,15 @@ Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepat
 - **164 berkas index** lolos pemeriksaan path privat dan Gitleaks. **107 commit riwayat main** telah dipindai tanpa rahasia terdeteksi; tidak ada path privat yang dilarang pada riwayat tersebut. Angka ini adalah hasil sebelum commit rilis baru, bukan jaminan deteksi seluruh bentuk informasi pribadi.
 - Riwayat hanya menggunakan identitas Git pemilik tanpa atribusi Copilot. Cadangan riwayat disimpan di luar repo; sinkronisasi memakai lease agar tidak menimpa perubahan remote baru. Upload produksi menggunakan ekspor commit saja, bukan folder kerja yang mengandung data lokal. Lihat `docs/REPO-SECURITY.md`.
 
+### Tombol AI tidak terlihat — 6 September 2026
+
+- Guard lama menghilangkan seluruh asisten ketika status belum dimuat atau permintaan status gagal. Kegagalan diperlakukan sebagai `aktif: false`, dan hook tidak mencoba ulang selama komponen tetap terpasang. Audit sebelumnya memakai fixture status AI sukses, sehingga kondisi ini belum tercakup.
+- Tombol Tanya AI sekarang tetap tersedia pada kondisi loading, error, nonaktif, dan provider tidak terjangkau. Panel menjelaskan status serta menyediakan **Coba lagi**; pengiriman tetap diblokir saat AI belum siap/nonaktif. Ini tidak melewati otorisasi atau mengaktifkan fitur yang sengaja dimatikan pengelola.
+- Pembaruan status dibagikan ke tombol AI dalam formulir, dengan pemulihan saat jaringan kembali dan pemeriksaan berkala terbatas saat halaman terlihat. Daftar model kosong/gagal dapat dimuat ulang; backend tidak mengunci status provider gagal selama lima menit.
+- **16 pemeriksaan browser desktop/mobile** untuk kondisi gagal, nonaktif, provider tidak tersedia, loading, dan pemulihan lulus pada build produksi lokal. **43 tes pradeploy** serta **32 diagnostik UI admin** juga lulus. Log: `ai-presence-browser.*`, `ai-presence-tests.*`, dan `ai-presence-build.*`.
+- Konfigurasi proyek Vercel saat diperiksa tidak memasang variabel AI yang menonaktifkan fitur, dan endpoint daftar model provider bawaan merespons 200 dari lingkungan pemeriksaan. Permintaan status produksi tanpa login tetap 401. Ini bukan pengujian jawaban AI dengan data akun pengguna, dan tidak membuktikan penyebab jaringan pada sesi pengguna yang sebelumnya gagal.
+- Mode uji terarah: set `AUDIT_AI_ONLY=1` bersama `AUDIT_URL` lokal, lalu jalankan `npm run audit:desain`.
+
 ### Menjalankan ulang
 
 1. Pasang dependensi melalui `npm ci`, lalu browser melalui `npx playwright install chromium`.

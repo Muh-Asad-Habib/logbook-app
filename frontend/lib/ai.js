@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Status asisten AI — diambil sekali per tab lalu dibagikan ke semua komponen
+ * Status asisten AI — cache singkat dan pemulihan koneksi dibagikan ke komponen
  * (tombol melayang, tombol "Perbaiki dengan AI" di form, chip saran kategori).
  */
 import { useEffect, useState } from "react";
@@ -9,14 +9,25 @@ import { api } from "@/lib/api";
 
 let _status = null;
 let _janji = null;
+let _statusAt = 0;
+const _statusListeners = new Set();
 
 /** Promise status AI ({ aktif, model, host, tersedia, modelAda }); di-cache. */
-export function ambilStatusAI() {
-  if (_status) return Promise.resolve(_status);
+export function ambilStatusAI(paksa = false) {
+  if (!paksa && _status && Date.now() - _statusAt < 30_000) return Promise.resolve(_status);
   if (!_janji) {
     _janji = api.ai.status()
-      .then((s) => { _status = s || { aktif: false }; return _status; })
-      .catch(() => ({ aktif: false }))
+      .then((s) => {
+        if (typeof s?.aktif !== 'boolean') throw new Error('Status AI tidak valid');
+        return s;
+      })
+      .catch(() => ({ aktif: null, tersedia: false, gagal: true }))
+      .then((s) => {
+        _status = s;
+        _statusAt = Date.now();
+        _statusListeners.forEach((f) => f(s));
+        return s;
+      })
       .finally(() => { _janji = null; });
   }
   return _janji;
@@ -26,9 +37,21 @@ export function ambilStatusAI() {
 export function useStatusAI() {
   const [s, setS] = useState(_status);
   useEffect(() => {
-    let hidup = true;
-    ambilStatusAI().then((r) => { if (hidup) setS(r); });
-    return () => { hidup = false; };
+    _statusListeners.add(setS);
+    ambilStatusAI().then((r) => { if (_statusListeners.has(setS)) setS(r); });
+    const pulih = () => { ambilStatusAI(true); };
+    const cek = () => {
+      if (document.visibilityState === 'visible' && (!_status?.aktif || _status.tersedia === false)) ambilStatusAI();
+    };
+    const timer = window.setInterval(cek, 30_000);
+    window.addEventListener('online', pulih);
+    window.addEventListener('focus', cek);
+    return () => {
+      _statusListeners.delete(setS);
+      window.clearInterval(timer);
+      window.removeEventListener('online', pulih);
+      window.removeEventListener('focus', cek);
+    };
   }, []);
   return s;
 }
@@ -53,8 +76,8 @@ const _pendengar = new Set();
 const kabari = () => _pendengar.forEach((f) => f(_model));
 
 /** Ambil daftar model + pilihan tersimpan (di-cache per tab). */
-export function ambilModelAI() {
-  if (_model) return Promise.resolve(_model);
+export function ambilModelAI(paksa = false) {
+  if (!paksa && _model?.daftar.length) return Promise.resolve(_model);
   if (!_janjiModel) {
     _janjiModel = api.ai.model()
       .then((r) => {
@@ -62,7 +85,11 @@ export function ambilModelAI() {
         kabari();
         return _model;
       })
-      .catch(() => ({ bawaan: "", pilihan: "", daftar: [] }))
+      .catch(() => {
+        _model = { bawaan: "", pilihan: "", daftar: [] };
+        kabari();
+        return _model;
+      })
       .finally(() => { _janjiModel = null; });
   }
   return _janjiModel;

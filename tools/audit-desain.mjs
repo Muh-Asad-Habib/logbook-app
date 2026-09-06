@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { PANEL_HTML } from '../backend/src/admin/panel.js';
 import { auditNavigasi } from './audit-navigasi.mjs';
 import { auditMobile } from './audit-mobile.mjs';
+import { auditAIAvailability } from './audit-ai-availability.mjs';
 import { SKEMA_PKM, SUMBER_PKM } from '../backend/src/ai/pkm-knowledge.js';
 
 const base = process.env.AUDIT_URL || 'http://localhost:3100';
@@ -121,6 +122,7 @@ async function measure(page, name) {
 }
 
 try {
+  if (process.env.AUDIT_AI_ONLY !== '1') {
   if (process.env.AUDIT_NAV_ONLY !== '1' && process.env.AUDIT_MOBILE_ONLY !== '1') {
   for (const role of ['tim', 'fasilitator', 'dosen']) {
     for (const theme of (quick ? ['light'] : ['light', 'dark'])) {
@@ -354,6 +356,8 @@ try {
   }
   if (process.env.AUDIT_MOBILE_ONLY !== '1') results.push(...await auditNavigasi(contextFor, base, quick));
   if (process.env.AUDIT_NAV_ONLY !== '1') await auditMobile(contextFor, base, quick, measure, out);
+  }
+  if (process.env.AUDIT_NAV_ONLY !== '1' && process.env.AUDIT_MOBILE_ONLY !== '1') await auditAIAvailability(contextFor, base, measure);
 } finally {
   await browser.close();
   await writeFile(`${out}/hasil.json`, JSON.stringify({ generatedAt: new Date().toISOString(), unknownApi: [...unknown], results }, null, 2));

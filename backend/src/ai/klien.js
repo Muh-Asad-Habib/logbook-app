@@ -213,7 +213,9 @@ export async function statusAI() {
   const daftar = await daftarModel();
   const tersedia = daftar.length > 0;
   const modelAda = daftar.some((m) => m.nama === info.model || m.nama === `${info.model}:latest`);
-  _status = { t: Date.now(), data: { ...info, tersedia, modelAda } };
-  return _status.data;
+  const data = { ...info, tersedia, modelAda };
+  // Gangguan sesaat harus dapat diperiksa ulang, bukan terkunci lima menit.
+  if (tersedia) _status = { t: Date.now(), data };
+  return data;
 }
 
