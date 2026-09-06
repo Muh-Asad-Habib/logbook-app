@@ -17,7 +17,8 @@
     "cek:online": "node tools/cek-online.mjs",
     "check:repo": "node tools/check-repo.mjs --secrets",
     "audit:desain": "node tools/audit-desain.mjs",
-    "test:pradeploy": "node --test tools/test-dependensi.mjs tools/test-pradeploy.mjs tools/test-pkm.mjs tools/test-static-export.mjs tools/test-repo-privacy.mjs tools/test-markdown.mjs tools/test-ai-status.mjs && npm run diag:panel --workspace backend && npm run diag:panel-ui --workspace backend"
+    "audit:panel": "node tools/audit-panel.mjs",
+    "test:pradeploy": "node --test tools/test-dependensi.mjs tools/test-pradeploy.mjs tools/test-pkm.mjs tools/test-static-export.mjs tools/test-repo-privacy.mjs tools/test-markdown.mjs tools/test-ai-status.mjs tools/test-admin-theme.mjs && npm run diag:panel --workspace backend && npm run diag:panel-ui --workspace backend"
   },
   "engines": {
     "node": ">=20"

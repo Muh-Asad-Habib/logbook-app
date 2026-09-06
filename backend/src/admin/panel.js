@@ -3,10 +3,11 @@
  * Disajikan LANGSUNG oleh backend di path rahasia; sama sekali bukan bagian
  * dari build Next.js, jadi tidak ada jejaknya di bundel frontend (F12 aman).
  *
- * Desain v2 — "Mission Control": tema gelap, sidebar bernavigasi penuh,
- * jam live, kartu statistik ber-glow, tabel & dialog kaca. Seluruh ID elemen,
- * atribut data-act/data-tab, dan alur API tetap sama dengan versi sebelumnya.
+ * Tampilan administrasi dengan tema terang/gelap/sistem. ID elemen,
+ * atribut data-act/data-tab, dan alur API dipertahankan.
  */
+import { ADMIN_THEME_BOOT, ADMIN_APPEARANCE_CSS, themePicker } from "./appearance.js";
+
 export const PANEL_HTML = /* html */ `<!doctype html>
 <html lang="id">
 <head>
@@ -14,6 +15,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow,noarchive">
 <title>Pusat Kendali</title>
+<script>${ADMIN_THEME_BOOT}</script>
 <style>
   :root{
     --bg:#070a14;--bg2:#0b0f1e;
@@ -847,6 +849,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .btn,.btn.sm,.fchip,.seg button,.tabs button,.side-nav a,.side-out{min-height:44px}
     .btn.ic{min-width:44px}
   }
+${ADMIN_APPEARANCE_CSS}
 </style>
 </head>
 <body>
@@ -879,12 +882,10 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
 </svg>
 
-<div class="orbs"><i class="orb a"></i><i class="orb b"></i><i class="orb c"></i></div>
-
 <!-- ===== LOGIN ===== -->
 <div id="v-login" class="login-wrap">
   <div class="login">
-    <div class="win-dots"><i></i><i></i><i></i><span>akses-terbatas · teraudit</span></div>
+    <div class="login-top"><span>Administrasi Logbook</span>${themePicker("tema-login")}</div>
     <div class="login-body">
       <div class="logo"><svg class="i"><use href="#i-shield"/></svg></div>
       <h1>Pusat Kendali</h1>
@@ -903,7 +904,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <svg class="i"><use href="#i-unlock"/></svg> Masuk
         </button>
       </form>
-      <div class="hint">kredensial tersimpan satu arah (hash scrypt) — tidak bisa dilihat, hanya diganti</div>
+      <div class="hint">Gunakan akun pengelola. Setiap perubahan tercatat untuk menjaga keamanan data tim.</div>
     </div>
   </div>
 </div>
@@ -949,6 +950,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <h1><span id="judul-hal">Ringkasan</span> <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
         </div>
         <div class="top-act">
+          ${themePicker("tema-panel")}
           <button class="btn sm" id="btn-muat" data-act="muat" aria-label="Segarkan data"><svg class="i"><use href="#i-refresh"/></svg><span class="btn-txt"> Segarkan</span></button>
         </div>
       </div>
@@ -962,9 +964,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <div class="hero-ic"><svg class="i"><use href="#i-gauge"/></svg></div>
           <div class="hero-tx">
             <h2>Ringkasan sistem</h2>
-            <p>Sekilas keadaan seluruh logbook: jumlah akun, entri kegiatan &amp; belanja,
-            berkas yang sudah masuk, dan berapa perangkat yang sedang login saat ini.
-            Angka menyegarkan diri otomatis — tidak perlu memuat ulang halaman.</p>
+            <p>Pantau akun, kegiatan, keuangan, dan berkas seluruh tim. Data diperbarui otomatis.</p>
           </div>
         </div>
 
@@ -989,13 +989,11 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <div class="hero-ic"><svg class="i"><use href="#i-users"/></svg></div>
           <div class="hero-tx">
             <h2>Akun pengguna <span class="tag" id="jml-user"></span></h2>
-            <p>Semua akun terdaftar — tim, fasilitator, dan dosen pendamping. Dari sini kamu bisa
-            membuka seluruh datanya, mengatur pendamping tim, mengganti username, menyetel ulang
-            password, mengeluarkan perangkat, sampai menghapus akun.</p>
+            <p>Kelola akun tim dan pendamping, periksa data logbook, serta atur akses pengguna.</p>
           </div>
           <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
-            <input id="cari" placeholder="Cari username…"><kbd>/</kbd></span>
+            <input id="cari" aria-label="Cari akun pengguna" placeholder="Cari username…"><kbd>/</kbd></span>
             <button class="btn p" data-act="baru" title="Buat akun baru tanpa kode pendaftaran">
               <svg class="i"><use href="#i-user"/></svg> Akun baru
             </button>
@@ -1006,7 +1004,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <div class="tabs">
             <button class="on" data-role-tab="tim"> Tim</button>
             <button data-role-tab="fasilitator"> Fasilitator</button>
-            <button data-role-tab="dosen">‍ Dosen Pendamping</button>
+            <button data-role-tab="dosen">Dosen pendamping</button>
           </div>
           <div class="tbl">
             <table>
@@ -1032,15 +1030,12 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           <div class="hero-ic"><svg class="i"><use href="#i-device"/></svg></div>
           <div class="hero-tx">
             <h2>Perangkat &amp; sesi</h2>
-            <p>Siapa saja yang sedang login, dari perangkat apa, dan sejak kapan — bisa dilihat
-            menyeluruh atau ditelusuri per akun. Alamat IP tampil penuh di sini dan hanya tersimpan
-            selama sesinya hidup (ikut terhapus saat dicabut atau kedaluwarsa 30 hari menganggur).
-            <b>Alamat MAC tidak bisa dilihat</b> aplikasi web mana pun — ia tidak pernah ikut
-            melewati internet.</p>
+            <p>Periksa perangkat yang terhubung dan cabut sesi yang tidak dikenali.
+            Alamat IP hanya terlihat oleh pengelola; alamat MAC tidak tersedia melalui web.</p>
           </div>
           <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
-            <input id="cari-sesi" placeholder="Cari akun / perangkat / IP…"></span>
+            <input id="cari-sesi" aria-label="Cari akun, perangkat, atau IP" placeholder="Cari akun / perangkat / IP…"></span>
           </div>
         </div>
 
@@ -1088,7 +1083,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
             login yang gagal. Tersimpan di database dan tidak bisa diubah dari panel.</p>
           </div>
           <div class="hero-act">
-            <select id="audit-n" style="width:auto;margin:0">
+            <select id="audit-n" aria-label="Jumlah catatan audit" style="width:auto;margin:0">
               <option value="60">60 baris</option>
               <option value="200" selected>200 baris</option>
               <option value="500">500 baris</option>
@@ -1115,6 +1110,10 @@ export const PANEL_HTML = /* html */ `<!doctype html>
           </div>
         </div>
 
+        <div class="card appearance-card">
+          <div><h2>Tampilan panel</h2><p class="mut">Pilih tema yang nyaman. Preferensi tersimpan di browser ini, terpisah dari tema aplikasi tim.</p></div>
+          ${themePicker("tema-pengaturan")}
+        </div>
         <div class="grid2">
           <div>
             <div class="card">
@@ -1185,7 +1184,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </div>
 
 <!-- ===== DIALOG DETAIL ===== -->
-<dialog id="d-detail" class="besar">
+<dialog id="d-detail" class="besar" aria-label="Data pengguna">
   <div class="dlg-h">
     <span class="ava lg" id="dt-ava">?</span>
     <div style="min-width:0">
@@ -1197,12 +1196,12 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   <div class="dlg-b">
     <div class="chips" id="dt-chips"></div>
     <div class="tabs">
-      <button class="on" data-tab="keg">️ Kegiatan</button>
+      <button class="on" data-tab="keg">Kegiatan</button>
       <button data-tab="keu"> Keuangan</button>
       <button data-tab="lap"> Laporan</button>
-      <button data-tab="pre">️ Presentasi</button>
+      <button data-tab="pre">Presentasi</button>
       <button data-tab="pkm">Profil PKM</button>
-      <button data-tab="ses">️ Perangkat</button>
+      <button data-tab="ses">Perangkat</button>
       <button data-tab="akt"> Aktivitas</button>
     </div>
     <div id="dt-isi"></div>
@@ -1210,7 +1209,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- ===== DIALOG ASSIGN TIM FASILITATOR ===== -->
-<dialog id="d-tim" class="mini">
+<dialog id="d-tim" class="mini" aria-label="Tim yang diampu">
   <div class="dlg-h"><h3> Tim yang diampu</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-tim-sub"></p>
@@ -1225,7 +1224,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- ===== DIALOG ASSIGN PENDAMPING KE TIM ===== -->
-<dialog id="d-fas" class="mini">
+<dialog id="d-fas" class="mini" aria-label="Pendamping tim">
   <div class="dlg-h"><h3> Pendamping tim</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-fas-sub"></p>
@@ -1240,8 +1239,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- ===== DIALOG GANTI USERNAME ===== -->
-<dialog id="d-un" class="mini">
-  <div class="dlg-h"><h3>✏️ Ganti username</h3></div>
+<dialog id="d-un" class="mini" aria-label="Ganti username">
+  <div class="dlg-h"><h3>Ganti username</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-un-sub"></p>
     <form method="dialog" id="f-un">
@@ -1258,7 +1257,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- ===== DIALOG RESET PASSWORD ===== -->
-<dialog id="d-pw" class="mini">
+<dialog id="d-pw" class="mini" aria-label="Setel ulang password">
   <div class="dlg-h"><h3> Setel ulang password</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-pw-sub"></p>
@@ -1278,8 +1277,8 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- ===== DIALOG AKUN BARU ===== -->
-<dialog id="d-baru" class="mini">
-  <div class="dlg-h"><h3>➕ Buat akun baru</h3></div>
+<dialog id="d-baru" class="mini" aria-label="Buat akun baru">
+  <div class="dlg-h"><h3>Buat akun baru</h3></div>
   <div class="dlg-b">
     <p class="mut">Akun dibuat langsung tanpa kode pendaftaran. Sampaikan kredensialnya
     secara pribadi, lalu minta pemiliknya mengganti password lewat menu profil.</p>
@@ -1308,7 +1307,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
 </dialog>
 
 <!-- Dialog konfirmasi umum — pengganti confirm()/prompt() browser -->
-<dialog id="d-konfirmasi" class="mini">
+<dialog id="d-konfirmasi" class="mini" aria-labelledby="d-konf-judul">
   <div class="dlg-h"><h3 id="d-konf-judul">Konfirmasi</h3></div>
   <div class="dlg-b">
     <p class="mut" id="d-konf-isi"></p>
@@ -1325,10 +1324,11 @@ export const PANEL_HTML = /* html */ `<!doctype html>
   </div>
 </dialog>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <script>
 "use strict";
+if (window.AdminAppearance) window.AdminAppearance.mount();
 
 /* ---------- alamat dasar panel & halaman aktif ----------
  * Panel dipasang di path rahasia yang bisa diganti (mis. /pusat-kendali),
@@ -1466,7 +1466,7 @@ function hueDari(s){
 }
 function avaStyle(nama){
   var h = hueDari(nama);
-  return "background:linear-gradient(135deg,hsl(" + h + ",72%,56%),hsl(" + ((h + 46) % 360) + ",76%,44%))";
+  return "--avatar-h:" + h;
 }
 
 function call(p, opt){
@@ -1755,13 +1755,7 @@ function stat(ic, lbl, v, cls, sub, extra){
     (sub ? '<span class="sub">' + sub + '</span>' : '') + '</div></div>';
 }
 function hitungNaik(el, akhir){
-  var awal = performance.now(), durasi = 650;
-  function tik(t){
-    var k = Math.min(1, (t - awal) / durasi);
-    el.textContent = Math.round(akhir * (1 - Math.pow(1 - k, 3)));
-    if (k < 1) requestAnimationFrame(tik);
-  }
-  requestAnimationFrame(tik);
+  el.textContent = akhir;
 }
 function auditCls(a){
   a = String(a).toLowerCase();
@@ -1832,7 +1826,7 @@ function barisUser(u){
     '<td data-l="Aktivitas" style="white-space:nowrap">' + tgl(u.aktivitasTerakhir) + "</td>" +
     '<td class="acts-cell"><div class="acts">' +
       '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + ' Data</button>' +
-      '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '"></button>' +
+      '<button class="btn sm ic" title="Pendamping tim ini (fasilitator & dosen)" data-act="fas" data-id="' + u.id + '">' + sv("users") + '</button>' +
       '<button class="btn sm ic" title="Jejak aktivitas akun" data-act="akt-cepat" data-id="' + u.id + '">' + sv("scroll") + '</button>' +
       '<button class="btn sm ic" title="Ganti username" data-act="un" data-id="' + u.id + '">' + sv("edit") + '</button>' +
       '<button class="btn sm ic" title="Setel ulang password" data-act="pw" data-id="' + u.id + '">' + sv("key") + '</button>' +
@@ -1885,11 +1879,7 @@ function sejak(iso){
 }
 /** Ikon kasar sesuai jenis perangkat yang terbaca dari labelnya. */
 function ikonSesi(label){
-  var s = String(label || "").toLowerCase();
-  if (s.indexOf("android") >= 0 || s.indexOf("iphone") >= 0) return "";
-  if (s.indexOf("ipad") >= 0) return "";
-  if (s) return "️";
-  return "❔";
+  return sv("device");
 }
 /** Peramban yang sengaja menyamar sebagai Chrome → beri catatan. */
 function catatanPerangkat(label){
@@ -2121,8 +2111,8 @@ function kartuAkunSesi(u, list){
         statusKepala +
         '<button class="btn sm p" data-act="detail" data-id="' + u.id + '">' + sv("folder") + " Data</button>" +
         (isPendamping(role)
-          ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '"></button>'
-          : '<button class="btn sm ic" title="Pendamping tim ini" data-act="fas" data-id="' + u.id + '"></button>') +
+          ? '<button class="btn sm ic" title="Tim yang diampu" data-act="tim" data-id="' + u.id + '">' + sv("users") + '</button>'
+          : '<button class="btn sm ic" title="Pendamping tim ini" data-act="fas" data-id="' + u.id + '">' + sv("users") + '</button>') +
         (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
           u.id + '">' + sv("power") + "</button>" : "") +
         '<button class="asx-tgl" data-act="lipat" data-id="' + u.id +

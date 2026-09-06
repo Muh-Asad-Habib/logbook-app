@@ -160,6 +160,18 @@ Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepat
 - Konfigurasi proyek Vercel saat diperiksa tidak memasang variabel AI yang menonaktifkan fitur, dan endpoint daftar model provider bawaan merespons 200 dari lingkungan pemeriksaan. Permintaan status produksi tanpa login tetap 401. Ini bukan pengujian jawaban AI dengan data akun pengguna, dan tidak membuktikan penyebab jaringan pada sesi pengguna yang sebelumnya gagal.
 - Mode uji terarah: set `AUDIT_AI_ONLY=1` bersama `AUDIT_URL` lokal, lalu jalankan `npm run audit:desain`.
 
+### Pusat Kendali responsif dan tema — 6 September 2026
+
+- Tampilan lebih tenang: latar polos, aksen indigo, hierarki teks dan jarak konsisten, kartu tanpa glow/gerak dekoratif, serta angka statistik langsung terbaca. Tabel, sesi perangkat, audit, pengaturan, login, dan seluruh dialog memakai palet yang sama.
+- Pilihan **Terang / Gelap / Ikuti perangkat** tersedia pada login, bilah atas, dan Pengaturan. Preferensi disimpan sebagai `logbook_admin_theme`, terpisah dari tema aplikasi tim. Tema diterapkan sebelum CSS tampil, mengikuti perubahan tema perangkat bila dipilih, dan disinkronkan antar tab.
+- Tombol aksi pendamping yang sebelumnya kosong kini berikon. Input textarea dan checkbox, nama akun/judul panjang, label form, nama dialog, fokus keyboard, serta tabel yang berubah menjadi kartu pada layar kecil dirapikan. Jalur API, pembatas akses, dan konfirmasi aksi berbahaya tetap dipertahankan.
+- **234 skenario Chromium lulus**, tanpa overflow halaman, dialog terpotong, error runtime, atau API tanpa fixture. Meliputi lima halaman, tabel akun tim/fasilitator/dosen, login, sidebar mini, tujuh tab detail, enam dialog tambahan, mode sesi per akun, persistensi tema, perubahan tema sistem, dan pemilihan dengan keyboard.
+- Ukuran uji: **320×740, 375×812, 430×932, 640×800, 768×1024, 900×700, 1024×600, 1440×900, 1920×1080, 844×390**, pada tema terang dan gelap. Tabel/tab yang sengaja dapat digulir horizontal dikecualikan; formulir dialog tidak dikecualikan.
+- Tujuh pasangan warna teks/latar semantik pada masing-masing tema lolos rasio **4,5:1**. Ini pemeriksaan palet, bukan audit WCAG menyeluruh terhadap seluruh elemen.
+- **48 tes pradeploy**, **32 diagnostik UI admin**, dan build produksi lulus. Skrip diagnostik struktur HTML diperbaiki agar tetap membaca body setelah penambahan script tema pada head.
+- Jalankan ulang melalui `npm run audit:panel` tanpa server atau akun nyata. Hasil dan 28 screenshot tersimpan di `artifacts/audit-panel/`; log akhir `browser-final.log`, `pradeploy-final.log`, dan `build-final.log` beserta exit code 0.
+- Seluruh API/data ditiru dan aksi destruktif dibatalkan; tes ini tidak mengubah akun/database pengguna. Uji perangkat fisik, keyboard virtual, Safari/Firefox, dan alur penyimpanan data nyata tetap di luar cakupan.
+
 ### Menjalankan ulang
 
 1. Pasang dependensi melalui `npm ci`, lalu browser melalui `npx playwright install chromium`.
@@ -181,7 +193,7 @@ Untuk uji terarah, gunakan `$env:AUDIT_NAV_ONLY='1'` (nav + skeleton) atau `$env
 - Screenshot dihasilkan untuk pemeriksaan ulang, bukan pembandingan visual otomatis terhadap gambar baseline.
 - Pengujian utama Chromium dengan emulasi ukuran/touch; **Safari/iOS, Firefox, keyboard virtual perangkat fisik, screen reader, dan zoom browser 200% belum diuji langsung**. Pengujian viewport sempit tidak sama dengan pengujian zoom 200%.
 - Office/Canva eksternal ditiru untuk menghindari akses layanan nyata. Akurasi seluruh dokumen PPTX/DOCX pengguna, unggah, unduh, dan integrasi backend bukan bagian dari tes tata letak ini.
-- Tujuh dialog admin diuji secara struktural dengan `showModal`; ini tidak memverifikasi seluruh aksi pengelolaan akun di dalamnya.
+- Audit awal membuka dialog admin secara struktural dengan `showModal`. Audit khusus panel terbaru juga membuka dialog melalui kontrol/fungsi aslinya dan membatalkan aksi; ini tetap bukan verifikasi seluruh transaksi pengelolaan akun pada backend nyata.
 - Error/empty states serta skeleton dengan API yang ditahan telah diuji. Ini bukan emulasi penuh jaringan seluler, keyboard virtual perangkat fisik, atau seluruh transisi aplikasi.
 - CSS masih memiliki beberapa lapisan override lama. Refaktor menyeluruh perlu dilakukan bertahap agar tidak merusak halaman yang memakai aturan bersama.
 - Temuan dependency awal **12 kerentanan (5 moderate, 7 high)** sudah ditindaklanjuti. Setelah pembaruan dan instalasi bersih `npm ci`, **npm audit workspace dan frontend terpisah melaporkan 0 kerentanan terdeteksi**. Tidak menggunakan `npm audit fix --force` atau menurunkan ExcelJS. Override `qs@6.16.0` dan `exceljs → uuid@11.1.1` dipakai untuk dependensi transitif; tinjau ulang saat upstream memperbarui dependensinya. Next.js terkunci pada 16.3.4 dan Express pada 4.22.2. Status audit bukan jaminan tidak adanya kerentanan yang belum diketahui.

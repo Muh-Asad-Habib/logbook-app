@@ -100,7 +100,12 @@ if (idHilang.length) {
 
 // Tag pembungkus harus seimbang — satu </div> yang terlewat bisa merusak
 // seluruh tata letak halaman tanpa memunculkan error apa pun di konsol.
-const markup = PANEL_HTML.slice(PANEL_HTML.indexOf("<body>"), PANEL_HTML.indexOf("<script>"));
+const bodyStart = PANEL_HTML.indexOf("<body>");
+const markup = PANEL_HTML.slice(bodyStart, PANEL_HTML.indexOf("<script>", bodyStart));
+if (!markup.includes('id="v-app"') || !markup.includes('id="v-login"')) {
+  gagal += 1;
+  console.log("❌ struktur body panel tidak ditemukan");
+}
 const timpang = [];
 for (const t of ["div", "section", "aside", "header", "nav", "table", "tbody", "form", "dialog"]) {
   const buka = (markup.match(new RegExp(`<${t}\\b`, "g")) || []).length;
