@@ -1411,6 +1411,7 @@ function setHTML(el, html, kunci){
   var wy = window.scrollY || window.pageYOffset || 0;
 
   el.innerHTML = html;
+  rapikanKontrol(el);
 
   for (var i = 0; i < simpan.length; i++) simpan[i][0].scrollTop = simpan[i][1];
   if (wy) window.scrollTo(0, wy);
@@ -1422,7 +1423,18 @@ function esc(s){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });
 }
-function sv(n){ return '<svg class="i"><use href="#i-' + n + '"/></svg>'; }
+function sv(n){ return '<svg class="i" aria-hidden="true" focusable="false"><use href="#i-' + n + '"/></svg>'; }
+/** Ikon di samping teks hanya dekoratif; kontrol ikon tetap memiliki nama aksi. */
+function rapikanKontrol(root){
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('svg.i').forEach(function(icon){
+    icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+  });
+  root.querySelectorAll('button[title]').forEach(function(button){
+    if (!button.hasAttribute('aria-label')) button.setAttribute('aria-label', button.title);
+  });
+}
+rapikanKontrol(document);
 var BLN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 function tgl(iso){
   if(!iso) return "—";
@@ -2097,14 +2109,12 @@ function kartuAkunSesi(u, list){
   }
   meta.push("dibuat " + tgl(u.createdAt));
 
-  var isi = "";
-  if (buka) {
-    isi = '<div class="asx-b">' + (list.length
+  var regionId = "perangkat-" + encodeURIComponent(u.id);
+  var isi = '<div class="asx-b" id="' + esc(regionId) + '"' + (buka ? '' : ' hidden') + '>' + (buka ? (list.length
       ? list.map(barisPerangkat).join("")
       : '<div class="mut" style="padding:13px 2px">Akun ini sedang tidak login di perangkat mana pun.' +
-        (u.loginTerakhir ? " Terakhir login " + esc(tglJam(u.loginTerakhir)) + "." : "") + "</div>") +
+        (u.loginTerakhir ? " Terakhir login " + esc(tglJam(u.loginTerakhir)) + "." : "") + "</div>") : "") +
       "</div>";
-  }
 
   var statusKepala = tingkat === 2
     ? '<span class="st on kecil"><i></i>Online · ' + list.length + " perangkat</span>"
@@ -2113,7 +2123,7 @@ function kartuAkunSesi(u, list){
       : '<span class="st off"><i></i>offline</span>';
 
   return '<div class="asx' + (online ? " aktif" : "") + (tingkat === 2 ? " membuka" : "") + (buka ? " buka" : "") + '">' +
-    '<div class="asx-h" data-act="lipat" data-id="' + u.id + '">' +
+    '<div class="asx-h">' +
       '<span class="ava" style="' + avaStyle(u.username) + '">' + esc(ini) + "</span>" +
       '<div class="asx-nm"><b>' + esc(u.username) +
         ' <span class="badge ' + kelas + '">' + labelPeran(role) + "</span>" +
@@ -2131,8 +2141,9 @@ function kartuAkunSesi(u, list){
         (online ? '<button class="btn sm ic d" title="Keluarkan dari semua perangkat" data-act="sesi" data-id="' +
           u.id + '">' + sv("power") + "</button>" : "") +
         '<button class="asx-tgl" data-act="lipat" data-id="' + u.id +
-          '" title="' + (buka ? "Sembunyikan" : "Lihat") + ' perangkat" aria-expanded="' + buka + '">' +
-          sv("chev") + "</button>" +
+          '" type="button" title="' + (buka ? "Sembunyikan" : "Lihat") + ' perangkat" aria-label="' +
+          esc((buka ? "Sembunyikan" : "Lihat") + " perangkat " + u.username) + '" aria-controls="' + esc(regionId) + '" aria-expanded="' + buka + '">' +
+          sv("chev") + '<span>Perangkat</span></button>' +
       "</div></div>" + isi + "</div>";
 }
 
@@ -2415,7 +2426,7 @@ function tabelKegiatan(list){
     '<th>Capaian</th><th class="num">Waktu</th><th>Foto</th></tr></thead><tbody>';
   list.forEach(function(e, i){
     var fotos = (e.foto_keys || []).map(function(k){
-      return '<img class="th" loading="lazy" src="' + fotoUrl(k) + '" data-act="foto" data-key="' + esc(k) + '" alt="">';
+      return '<button type="button" class="thumb-action" data-act="foto" data-key="' + esc(k) + '" aria-label="Buka foto kegiatan ' + esc(tgl(e.tanggal)) + '"><img class="th" loading="lazy" src="' + fotoUrl(k) + '" alt=""></button>';
     }).join("");
     out += "<tr>" +
       '<td class="mut nomor">' + (i + 1) + "</td>" +
@@ -2451,7 +2462,7 @@ function tabelKeuangan(list){
                  : (e.bukti_key ? [e.bukti_key] : []);
         if (!keys.length) return '<span class="mut">—</span>';
         return keys.map(function(k){
-          return '<img class="th" loading="lazy" src="' + fotoUrl(k) + '" data-act="foto" data-key="' + esc(k) + '" alt="">';
+          return '<button type="button" class="thumb-action" data-act="foto" data-key="' + esc(k) + '" aria-label="Buka bukti belanja ' + esc(tgl(e.tanggal)) + '"><img class="th" loading="lazy" src="' + fotoUrl(k) + '" alt=""></button>';
         }).join(" ");
       })() + "</td>" +
     "</tr>";
@@ -2658,6 +2669,8 @@ function bersihkanDialog(){
 function bukaDialog(dlg){
   if (!dlg) return;
   try { if (dlg.open) dlg.close(); } catch(e){}
+  dlg.returnValue = ""; // Escape/backdrop tidak boleh memakai nilai "ok" dari pembukaan sebelumnya.
+  rapikanKontrol(dlg);
   try { dlg.showModal(); }
   catch(e){ try { dlg.show(); } catch(e2){ dlg.setAttribute("open", ""); } }
   // :modal true = benar-benar di top layer (backdrop digambar browser)
@@ -2677,6 +2690,17 @@ function tutupSemuaDialog(){
   for (var i = 0; i < buka.length; i++) tutupDialog(buka[i]);
   bersihkanDialog();
 }
+
+window.addEventListener("resize", function(){
+  requestAnimationFrame(function(){
+    var el = document.activeElement;
+    var box = el && el.closest ? el.closest("dialog[open] .dlg-b") : null;
+    if (!box) return;
+    var control = el.getBoundingClientRect(), area = box.getBoundingClientRect();
+    if (control.bottom > area.bottom - 16) box.scrollTop += control.bottom - area.bottom + 16;
+    else if (control.top < area.top + 16) box.scrollTop -= area.top + 16 - control.top;
+  });
+});
 
 /**
  * Dialog konfirmasi panel — pengganti confirm()/prompt() bawaan browser agar
@@ -2822,9 +2846,14 @@ document.addEventListener("click", function(ev){
     case "lipat":
       // bentangkan/lipat rincian sebuah kartu (keadaan diingat, jadi
       // pembaruan otomatis tidak menutupnya kembali)
+      var fokusLipat = document.activeElement === el;
+      var akunLipat = el.dataset.id;
       if (BUKA_SESI[el.dataset.id]) delete BUKA_SESI[el.dataset.id];
       else BUKA_SESI[el.dataset.id] = true;
       renderSesi();
+      if (fokusLipat) document.querySelectorAll('.asx-tgl').forEach(function(button){
+        if (button.dataset.id === akunLipat) button.focus({ preventScroll:true });
+      });
       break;
     case "tutup-detail": tutupDialog($("#d-detail")); break;
     case "foto": window.open(fotoUrl(el.dataset.key), "_blank"); break;

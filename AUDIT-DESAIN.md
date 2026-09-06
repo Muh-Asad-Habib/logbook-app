@@ -183,6 +183,16 @@ Catatan historis: revisi visual pada bagian ini dibatalkan atas permintaan pengg
 - **48 tes pradeploy dan 32 diagnostik admin lulus.** Hasil terbaru: `artifacts/audit-panel/restore-browser.*` dan `restore-tests.*`. Pengujian tetap menggunakan data tiruan pada 320–1920 px, bukan perangkat fisik.
 - Pemeriksaan kontras terbaru mencakup teks dasar dan tombol tema baru. Tidak mengklaim bahwa seluruh warna/gradien desain lama memenuhi WCAG AA; hasil palet revisi yang dibatalkan tidak berlaku untuk desain ini.
 
+### Perapian sesuai ui-ux-pro-max — 6 September 2026
+
+- Menggunakan pencarian lokal terarah: `responsive admin data table` (UX/Web, Table Handling), `focus not obscured modal` (UX/Web, Focus Not Obscured), `icon button accessible label` (Icons/Guideline), dan panduan fokus HTML. Rekomendasi native-only, bulk action, dan video yang tidak sesuai kebutuhan tidak diterapkan. Tidak menambah framework, pustaka ikon baru, atau mengubah desain sistem aplikasi utama.
+- Struktur, warna dasar gelap, gradien, kartu, serta tombol tema satu klik tetap dipertahankan. Teks sekunder diperbesar, jarak baca diperjelas, pilihan pendamping dan pemisah aksi form dirapikan. Teks tombol gradien kini memakai warna yang lebih kontras; respons tekan tidak menggeser batas kontrol.
+- Tombol ikon memiliki nama aksi eksplisit; SVG dekoratif disembunyikan dari accessibility tree. Thumbnail menjadi tombol berlabel. Kartu perangkat memiliki tombol **Perangkat** dengan `aria-expanded`/`aria-controls`, mendukung Enter/Space, dan mempertahankan fokus setelah render ulang.
+- Temuan uji: tombol Segarkan mobile semula 37 px diperbesar menjadi minimal 44 px. Kontrol dialog yang sedang fokus kini tetap terlihat setelah resize ke landscape. Nilai `returnValue` dialog direset saat dibuka agar pembatalan tidak memakai hasil `ok` dari pembukaan sebelumnya.
+- **240 skenario Chromium lulus**, tanpa overflow, target tombol kecil pada cakupan ukuran mobile yang diuji, error runtime, fixture yang tidak dikenal, atau permintaan mutasi data. Meliputi 320–1920 px pada dua tema, landscape, pembatalan/fokus dialog, kontrol perangkat dengan keyboard, dan kasus ukuran teks root 200% di halaman sesi. Uji pembesaran teks tersebut bukan browser zoom 200% atau Dynamic Type perangkat native.
+- **48 tes pradeploy, 32 diagnostik admin, dan build produksi lulus.** Log hasil final tersimpan sebagai `artifacts/audit-panel/ux-pro-verified-browser.*`, `ux-pro-verified-tests.*`, dan `ux-pro-verified-build.*`; pengujian dapat diulang dengan `npm run audit:panel`.
+- Pemeriksaan kontras mencakup teks dasar, kontrol tema, dan titik warna gradien tombol utama pada kedua tema. Ini bukan sertifikasi aksesibilitas menyeluruh. Data/API tetap tiruan; perangkat fisik, pembaca layar, dan transaksi akun nyata tidak diuji.
+
 ### Menjalankan ulang
 
 1. Pasang dependensi melalui `npm ci`, lalu browser melalui `npx playwright install chromium`.

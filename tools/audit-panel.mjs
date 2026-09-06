@@ -26,7 +26,7 @@ const detail = {
   pkm: { profil: { skema: 'PKM-KC', tahun: 2026, judul: long.repeat(4), status: 'dikonfirmasi_tim' }, skema: SKEMA_PKM, sumber: Object.values(SUMBER_PKM) },
 };
 const sizes = [[320,740],[375,812],[430,932],[640,800],[768,1024],[900,700],[1024,600],[1440,900],[1920,1080],[844,390]];
-const results = [], errors = [], unknown = new Set();
+const results = [], errors = [], unknown = new Set(), mutations = [];
 const browser = await chromium.launch();
 async function context(theme = 'light', login = false, blocked = false) {
   const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: theme, reducedMotion: 'reduce', serviceWorkers: 'block' });
@@ -41,6 +41,7 @@ async function context(theme = 'light', login = false, blocked = false) {
     const u = new URL(route.request().url());
     if (!u.href.startsWith(base)) { unknown.add(u.pathname); return route.abort(); }
     const p = u.pathname.slice('/panel-audit'.length);
+    if (route.request().method() !== 'GET') mutations.push({ path: p, method: route.request().method() });
     const send = json => route.fulfill({ json });
     if (['', '/akun', '/sesi', '/audit', '/pengaturan'].includes(p)) return route.fulfill({ contentType: 'text/html', body: PANEL_HTML });
     if (p === '/events') return route.abort();
@@ -64,7 +65,7 @@ async function measure(page, name, screenshot = false) {
     const width = document.documentElement.clientWidth, height = document.documentElement.clientHeight;
     const modal = document.querySelector('dialog[open]');
     const root = modal || (document.querySelector('#v-app').classList.contains('hide') ? document.querySelector('#v-login') : document.querySelector('#v-app'));
-    const overflow = [];
+    const overflow = [], smallTargets = [];
     for (const el of [root, ...root.querySelectorAll('*')]) {
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height || el.closest('svg') || getComputedStyle(el).visibility === 'hidden') continue;
@@ -73,12 +74,13 @@ async function measure(page, name, screenshot = false) {
         if (p.matches('.tbl,.tabs,.seg') && ['auto','scroll'].includes(getComputedStyle(p).overflowX) && p.scrollWidth > p.clientWidth + 1) { scroll = true; break; }
       }
       if (!scroll && (r.left < -1 || r.right > width + 1)) overflow.push({ tag: el.tagName, class: String(el.className), left: r.left, right: r.right });
+      if (width <= 640 && el.matches('button:not(:disabled)') && (r.width < 43 || r.height < 43)) smallTargets.push({ label: el.getAttribute('aria-label') || el.textContent, width: r.width, height: r.height });
     }
     const bounds = modal?.getBoundingClientRect();
-    return { width, documentWidth: document.documentElement.scrollWidth, overflow, clippedDialog: !!bounds && (bounds.top < -1 || bounds.bottom > height + 1) };
+    return { width, documentWidth: document.documentElement.scrollWidth, overflow, smallTargets, clippedDialog: !!bounds && (bounds.top < -1 || bounds.bottom > height + 1) };
   });
   results.push({ name, ...geometry });
-  if (geometry.overflow.length || geometry.documentWidth > geometry.width + 1 || geometry.clippedDialog) console.log('FAIL', name, JSON.stringify(geometry));
+  if (geometry.overflow.length || geometry.smallTargets.length || geometry.documentWidth > geometry.width + 1 || geometry.clippedDialog) console.log('FAIL', name, JSON.stringify(geometry));
   if (screenshot) await page.screenshot({ path: fileURLToPath(new URL(name + '.png', out)), fullPage: true });
 }
 async function paletteContrast(page) {
@@ -86,7 +88,7 @@ async function paletteContrast(page) {
     const probe = document.createElement('span'); document.body.appendChild(probe);
     const rgb = name => { probe.style.color = `var(${name})`; return getComputedStyle(probe).color.match(/[\d.]+/g).slice(0,3).map(Number); };
     const lum = values => values.map(v => { v /= 255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; }).reduce((a,v,i) => a + v*[.2126,.7152,.0722][i], 0);
-    // Desain/gradien lama dipertahankan; periksa teks utama dan kontrol tema baru.
+    // Warna gradien tetap sama; periksa kontras teksnya pada setiap titik warna.
     const pairs = [['--ink','--panel'],['--mut','--panel2']];
     const values = pairs.map(([fg,bg]) => { const a=lum(rgb(fg)), b=lum(rgb(bg)); return { fg,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05) }; });
     for (const selector of ['#tema-sidebar']) {
@@ -96,6 +98,13 @@ async function paletteContrast(page) {
       const a = lum(css.color.match(/[\d.]+/g).slice(0,3).map(Number));
       const b = lum(css.backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number));
       values.push({ selector, ratio: (Math.max(a,b)+.05)/(Math.min(a,b)+.05) });
+    }
+    const primary = document.querySelector('#hal-akun .btn.p');
+    const style = getComputedStyle(primary);
+    const fg = lum(style.color.match(/[\d.]+/g).slice(0,3).map(Number));
+    for (const stop of style.backgroundImage.match(/rgba?\([^)]*\)/g) || []) {
+      const bg = lum(stop.match(/[\d.]+/g).slice(0,3).map(Number));
+      values.push({ selector: '.btn.p gradient', stop, ratio: (Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05) });
     }
     probe.remove(); return values;
   });
@@ -139,13 +148,37 @@ try {
     }
     await page.locator('[data-role-tab="tim"]').click();
     await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(page.locator('#t-users button.btn.ic:not([aria-label])')).toHaveCount(0);
+    const rename = page.locator('[data-act="un"][data-id="u0"]').first();
+    await page.evaluate(() => { document.querySelector('#d-un').returnValue = 'ok'; });
+    await rename.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#d-un')).toBeVisible();
+    await expect(page.locator('#d-un')).toHaveJSProperty('returnValue', '');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#d-un')).toBeHidden();
+    await expect(rename).toBeFocused();
+    results.push({ name: `${theme}-dialog-cancel-focus-no-mutation`, overflow: [] });
     await page.locator('[data-act="detail"][data-id="u0"]').first().click();
     const dialog = page.locator('#d-detail'); await expect(dialog).toBeVisible();
     for (const tab of ['keg','keu','lap','pre','pkm','ses','akt']) {
       await dialog.locator(`[data-tab="${tab}"]`).click();
+      if (tab === 'keg' || tab === 'keu') {
+        const photo = dialog.locator('.thumb-action').first();
+        await expect(photo).toHaveAttribute('aria-label', /Buka (foto|bukti)/);
+        await expect(photo.locator('img')).toHaveAttribute('alt', '');
+      }
       if (tab === 'pkm') await dialog.locator('details summary').click();
       for (const [width,height] of [[320,740],[844,390],[1440,900]]) {
         await page.setViewportSize({ width,height });
+        if (tab === 'pkm') {
+          await dialog.locator('#f-pkm-admin button[type="submit"]').focus();
+          await expect.poll(() => page.evaluate(() => {
+            const el = document.activeElement, r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2, y = r.top + r.height / 2;
+            return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && el.contains(document.elementFromPoint(x,y));
+          }), { message: 'Fokus tombol Simpan PKM harus terlihat pada ' + width + 'x' + height }).toBe(true);
+        }
         await measure(page, `${theme}-detail-${tab}-${width}x${height}`, tab === 'pkm');
       }
     }
@@ -166,9 +199,21 @@ try {
     await page.locator('#d-konfirmasi').getByRole('button', { name: 'Batal' }).click();
     await page.locator('.side-nav [data-page="sesi"]').click();
     await page.locator('[data-mode-sesi="akun"]').click();
-    await page.locator('.asx-tgl').first().click();
+    const expand = page.locator('.asx-tgl').first();
+    await expand.focus(); await page.keyboard.press('Enter');
+    await expect(expand).toBeFocused();
+    await expect(expand).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#' + await expand.getAttribute('aria-controls'))).toBeVisible();
+    await page.keyboard.press('Space');
+    await expect(expand).toBeFocused();
+    await expect(expand).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Enter');
+    results.push({ name: `${theme}-session-card-keyboard`, overflow: [] });
     for (const [width,height] of sizes) { await page.setViewportSize({ width,height }); await measure(page, `${theme}-sesi-kartu-${width}x${height}`); }
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+    await measure(page, `${theme}-larger-text-200-percent`);
+    await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
     await page.locator('#tema-sidebar').click();
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-admin-theme', theme === 'light' ? 'dark' : 'light');
@@ -194,9 +239,10 @@ try {
   }
 } finally {
   await browser.close();
-  await writeFile(new URL('hasil.json', out), JSON.stringify({ generatedAt: new Date().toISOString(), results, errors, unknown: [...unknown] }, null, 2));
+  await writeFile(new URL('hasil.json', out), JSON.stringify({ generatedAt: new Date().toISOString(), results, errors, unknown: [...unknown], mutations }, null, 2));
 }
-const failed = results.filter(r => r.overflow.length || r.documentWidth > r.width + 1 || r.clippedDialog);
+const failed = results.filter(r => r.overflow.length || r.smallTargets?.length || r.documentWidth > r.width + 1 || r.clippedDialog);
 console.log(`${results.length} skenario panel; ${failed.length} masalah tata letak; ${errors.length} error runtime; ${unknown.size} fixture tidak dikenal.`);
-if (failed.length || errors.length || unknown.size) process.exitCode = 1;
+if (mutations.length) console.error('Mutasi tidak diharapkan:', JSON.stringify(mutations));
+if (failed.length || errors.length || unknown.size || mutations.length) process.exitCode = 1;
 
