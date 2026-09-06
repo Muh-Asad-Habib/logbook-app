@@ -162,6 +162,8 @@ Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepat
 
 ### Pusat Kendali responsif dan tema — 6 September 2026
 
+Catatan historis: revisi visual pada bagian ini dibatalkan atas permintaan pengguna. Desain yang berlaku dijelaskan pada bagian pemulihan berikut.
+
 - Tampilan lebih tenang: latar polos, aksen indigo, hierarki teks dan jarak konsisten, kartu tanpa glow/gerak dekoratif, serta angka statistik langsung terbaca. Tabel, sesi perangkat, audit, pengaturan, login, dan seluruh dialog memakai palet yang sama.
 - Pilihan **Terang / Gelap / Ikuti perangkat** tersedia pada login, bilah atas, dan Pengaturan. Preferensi disimpan sebagai `logbook_admin_theme`, terpisah dari tema aplikasi tim. Tema diterapkan sebelum CSS tampil, mengikuti perubahan tema perangkat bila dipilih, dan disinkronkan antar tab.
 - Tombol aksi pendamping yang sebelumnya kosong kini berikon. Input textarea dan checkbox, nama akun/judul panjang, label form, nama dialog, fokus keyboard, serta tabel yang berubah menjadi kartu pada layar kecil dirapikan. Jalur API, pembatas akses, dan konfirmasi aksi berbahaya tetap dipertahankan.
@@ -171,6 +173,15 @@ Pengujian pengetahuan PKM menggunakan model/store tiruan: **kualitas dan kecepat
 - **48 tes pradeploy**, **32 diagnostik UI admin**, dan build produksi lulus. Skrip diagnostik struktur HTML diperbaiki agar tetap membaca body setelah penambahan script tema pada head.
 - Jalankan ulang melalui `npm run audit:panel` tanpa server atau akun nyata. Hasil dan 28 screenshot tersimpan di `artifacts/audit-panel/`; log akhir `browser-final.log`, `pradeploy-final.log`, dan `build-final.log` beserta exit code 0.
 - Seluruh API/data ditiru dan aksi destruktif dibatalkan; tes ini tidak mengubah akun/database pengguna. Uji perangkat fisik, keyboard virtual, Safari/Firefox, dan alur penyimpanan data nyata tetap di luar cakupan.
+
+### Pemulihan desain Pusat Kendali lama — 6 September 2026
+
+- Stylesheet dasar dalam `panel.js` kembali memakai desain sebelum revisi `eda951a` (acuan `3841654`), tanpa perubahan setelah normalisasi line ending. Latar/orbs, susunan kartu, gradien, avatar, dan animasi angka lama dipulihkan; reduced motion tetap dihormati.
+- Lapisan perombakan `appearance.js` dihapus. `theme.js` hanya menambahkan warna mode terang, ukuran ikon/kontrol, pembungkusan isi dialog panjang, dan tombol tema. Frontend utama, rute API, fitur PKM, dan otorisasi tidak diubah.
+- **Tidak ada dropdown tema atau kartu pengaturan tema tambahan.** Satu klik tombol matahari/bulan berganti terang ↔ gelap, seperti aplikasi utama: tombol berlabel di sidebar desktop, ikon di topbar mobile, serta tombol di login. Pilihan tersimpan; tab lain ikut menyesuaikan. Tanpa preferensi tersimpan, tampil desain gelap lama.
+- **234 skenario responsif lulus**, termasuk konfirmasi sidebar 236 px, konten maksimum 1160 px, radius kartu 18 px, warna gelap asli, serta klik/Enter/Space, ikon, label, dan persistensi tombol tema. Tidak ada overflow halaman atau error runtime pada fixture.
+- **48 tes pradeploy dan 32 diagnostik admin lulus.** Hasil terbaru: `artifacts/audit-panel/restore-browser.*` dan `restore-tests.*`. Pengujian tetap menggunakan data tiruan pada 320–1920 px, bukan perangkat fisik.
+- Pemeriksaan kontras terbaru mencakup teks dasar dan tombol tema baru. Tidak mengklaim bahwa seluruh warna/gradien desain lama memenuhi WCAG AA; hasil palet revisi yang dibatalkan tidak berlaku untuk desain ini.
 
 ### Menjalankan ulang
 

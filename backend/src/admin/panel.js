@@ -3,10 +3,10 @@
  * Disajikan LANGSUNG oleh backend di path rahasia; sama sekali bukan bagian
  * dari build Next.js, jadi tidak ada jejaknya di bundel frontend (F12 aman).
  *
- * Tampilan administrasi dengan tema terang/gelap/sistem. ID elemen,
- * atribut data-act/data-tab, dan alur API dipertahankan.
+ * Desain v2 asli dipertahankan. Tambahan hanya perbaikan ikon/ukuran
+ * dan tombol tema terang/gelap; alur API tetap sama.
  */
-import { ADMIN_THEME_BOOT, ADMIN_APPEARANCE_CSS, themePicker } from "./appearance.js";
+import { ADMIN_THEME_BOOT, ADMIN_THEME_CSS, themeToggle } from "./theme.js";
 
 export const PANEL_HTML = /* html */ `<!doctype html>
 <html lang="id">
@@ -849,7 +849,7 @@ export const PANEL_HTML = /* html */ `<!doctype html>
     .btn,.btn.sm,.fchip,.seg button,.tabs button,.side-nav a,.side-out{min-height:44px}
     .btn.ic{min-width:44px}
   }
-${ADMIN_APPEARANCE_CSS}
+${ADMIN_THEME_CSS}
 </style>
 </head>
 <body>
@@ -882,10 +882,12 @@ ${ADMIN_APPEARANCE_CSS}
   <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
 </svg>
 
+<div class="orbs"><i class="orb a"></i><i class="orb b"></i><i class="orb c"></i></div>
+
 <!-- ===== LOGIN ===== -->
 <div id="v-login" class="login-wrap">
   <div class="login">
-    <div class="login-top"><span>Administrasi Logbook</span>${themePicker("tema-login")}</div>
+    <div class="win-dots"><i></i><i></i><i></i><span>akses-terbatas · teraudit</span>${themeToggle("tema-login", true)}</div>
     <div class="login-body">
       <div class="logo"><svg class="i"><use href="#i-shield"/></svg></div>
       <h1>Pusat Kendali</h1>
@@ -904,7 +906,7 @@ ${ADMIN_APPEARANCE_CSS}
           <svg class="i"><use href="#i-unlock"/></svg> Masuk
         </button>
       </form>
-      <div class="hint">Gunakan akun pengelola. Setiap perubahan tercatat untuk menjaga keamanan data tim.</div>
+      <div class="hint">kredensial tersimpan satu arah (hash scrypt) — tidak bisa dilihat, hanya diganti</div>
     </div>
   </div>
 </div>
@@ -931,6 +933,7 @@ ${ADMIN_APPEARANCE_CSS}
     </nav>
     <div class="side-foot">
       <div class="side-note">tekan / untuk cari</div>
+      ${themeToggle("tema-sidebar")}
       <button class="side-out" data-act="keluar" data-tip="Keluar" data-m="Keluar" aria-label="Keluar dari panel">
         <svg class="i"><use href="#i-logout"/></svg><span>Keluar</span>
       </button>
@@ -950,7 +953,7 @@ ${ADMIN_APPEARANCE_CSS}
           <h1><span id="judul-hal">Ringkasan</span> <span class="live mati" id="live-badge"><i></i><span id="live-txt">menyambung…</span></span></h1>
         </div>
         <div class="top-act">
-          ${themePicker("tema-panel")}
+          ${themeToggle("tema-panel", true)}
           <button class="btn sm" id="btn-muat" data-act="muat" aria-label="Segarkan data"><svg class="i"><use href="#i-refresh"/></svg><span class="btn-txt"> Segarkan</span></button>
         </div>
       </div>
@@ -964,7 +967,9 @@ ${ADMIN_APPEARANCE_CSS}
           <div class="hero-ic"><svg class="i"><use href="#i-gauge"/></svg></div>
           <div class="hero-tx">
             <h2>Ringkasan sistem</h2>
-            <p>Pantau akun, kegiatan, keuangan, dan berkas seluruh tim. Data diperbarui otomatis.</p>
+            <p>Sekilas keadaan seluruh logbook: jumlah akun, entri kegiatan &amp; belanja,
+            berkas yang sudah masuk, dan berapa perangkat yang sedang login saat ini.
+            Angka menyegarkan diri otomatis — tidak perlu memuat ulang halaman.</p>
           </div>
         </div>
 
@@ -989,7 +994,9 @@ ${ADMIN_APPEARANCE_CSS}
           <div class="hero-ic"><svg class="i"><use href="#i-users"/></svg></div>
           <div class="hero-tx">
             <h2>Akun pengguna <span class="tag" id="jml-user"></span></h2>
-            <p>Kelola akun tim dan pendamping, periksa data logbook, serta atur akses pengguna.</p>
+            <p>Semua akun terdaftar — tim, fasilitator, dan dosen pendamping. Dari sini kamu bisa
+            membuka seluruh datanya, mengatur pendamping tim, mengganti username, menyetel ulang
+            password, mengeluarkan perangkat, sampai menghapus akun.</p>
           </div>
           <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
@@ -1030,8 +1037,11 @@ ${ADMIN_APPEARANCE_CSS}
           <div class="hero-ic"><svg class="i"><use href="#i-device"/></svg></div>
           <div class="hero-tx">
             <h2>Perangkat &amp; sesi</h2>
-            <p>Periksa perangkat yang terhubung dan cabut sesi yang tidak dikenali.
-            Alamat IP hanya terlihat oleh pengelola; alamat MAC tidak tersedia melalui web.</p>
+            <p>Siapa saja yang sedang login, dari perangkat apa, dan sejak kapan — bisa dilihat
+            menyeluruh atau ditelusuri per akun. Alamat IP tampil penuh di sini dan hanya tersimpan
+            selama sesinya hidup (ikut terhapus saat dicabut atau kedaluwarsa 30 hari menganggur).
+            <b>Alamat MAC tidak bisa dilihat</b> aplikasi web mana pun — ia tidak pernah ikut
+            melewati internet.</p>
           </div>
           <div class="hero-act">
             <span class="search"><svg class="i"><use href="#i-search"/></svg>
@@ -1110,10 +1120,6 @@ ${ADMIN_APPEARANCE_CSS}
           </div>
         </div>
 
-        <div class="card appearance-card">
-          <div><h2>Tampilan panel</h2><p class="mut">Pilih tema yang nyaman. Preferensi tersimpan di browser ini, terpisah dari tema aplikasi tim.</p></div>
-          ${themePicker("tema-pengaturan")}
-        </div>
         <div class="grid2">
           <div>
             <div class="card">
@@ -1466,7 +1472,7 @@ function hueDari(s){
 }
 function avaStyle(nama){
   var h = hueDari(nama);
-  return "--avatar-h:" + h;
+  return "background:linear-gradient(135deg,hsl(" + h + ",72%,56%),hsl(" + ((h + 46) % 360) + ",76%,44%))";
 }
 
 function call(p, opt){
@@ -1755,7 +1761,16 @@ function stat(ic, lbl, v, cls, sub, extra){
     (sub ? '<span class="sub">' + sub + '</span>' : '') + '</div></div>';
 }
 function hitungNaik(el, akhir){
-  el.textContent = akhir;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = akhir; return;
+  }
+  var awal = performance.now(), durasi = 650;
+  function tik(t){
+    var k = Math.min(1, (t - awal) / durasi);
+    el.textContent = Math.round(akhir * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(tik);
+  }
+  requestAnimationFrame(tik);
 }
 function auditCls(a){
   a = String(a).toLowerCase();

@@ -86,9 +86,10 @@ async function paletteContrast(page) {
     const probe = document.createElement('span'); document.body.appendChild(probe);
     const rgb = name => { probe.style.color = `var(${name})`; return getComputedStyle(probe).color.match(/[\d.]+/g).slice(0,3).map(Number); };
     const lum = values => values.map(v => { v /= 255; return v <= .04045 ? v/12.92 : ((v+.055)/1.055)**2.4; }).reduce((a,v,i) => a + v*[.2126,.7152,.0722][i], 0);
-    const pairs = [['--ink','--panel'],['--mut','--panel2'],['--p','--accent-soft'],['--ok','--ok-soft'],['--bad','--bad-soft'],['--warn','--warn-soft'],['--cy','--cy-soft'],['--on-primary','--primary-fill']];
+    // Desain/gradien lama dipertahankan; periksa teks utama dan kontrol tema baru.
+    const pairs = [['--ink','--panel'],['--mut','--panel2']];
     const values = pairs.map(([fg,bg]) => { const a=lum(rgb(fg)), b=lum(rgb(bg)); return { fg,bg,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05) }; });
-    for (const selector of ['.side-nav a.on', '.top-act .btn', '#v-app .btn.p']) {
+    for (const selector of ['#tema-sidebar']) {
       const el = document.querySelector(selector);
       if (!el) continue;
       const css = getComputedStyle(el);
@@ -105,6 +106,16 @@ try {
     const c = await context(theme); const page = await c.newPage();
     await page.goto(base); await expect(page.locator('#statistik .stat')).toHaveCount(9);
     await expect(page.locator('html')).toHaveAttribute('data-admin-theme', theme);
+    await expect(page.locator('[data-admin-theme-select],.appearance-card,.login-top')).toHaveCount(0);
+    await expect(page.locator('.side')).toHaveCSS('width', '236px');
+    await expect(page.locator('.wrap')).toHaveCSS('max-width', '1160px');
+    await expect(page.locator('.card').first()).toHaveCSS('border-radius', '18px');
+    await expect(page.locator('.hero-ic').first()).toBeVisible();
+    await expect(page.locator('.orbs')).toBeVisible();
+    if (theme === 'dark') {
+      await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(7, 10, 20)');
+      await expect(page.locator('.card').first()).toHaveCSS('background-color', 'rgb(14, 19, 41)');
+    }
     await paletteContrast(page);
     for (const section of ['ringkas','akun','sesi','audit','pengaturan']) {
       await page.locator(`.side-nav [data-page="${section}"]`).click();
@@ -158,23 +169,27 @@ try {
     await page.locator('.asx-tgl').first().click();
     for (const [width,height] of sizes) { await page.setViewportSize({ width,height }); await measure(page, `${theme}-sesi-kartu-${width}x${height}`); }
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.locator('#tema-panel').selectOption(theme === 'light' ? 'dark' : 'light');
+    await page.locator('#tema-sidebar').click();
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-admin-theme', theme === 'light' ? 'dark' : 'light');
-    await page.locator('#tema-panel').selectOption('system');
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await expect(page.locator('html')).toHaveAttribute('data-admin-theme', 'dark');
-    await page.emulateMedia({ colorScheme: 'light' });
-    await expect(page.locator('html')).toHaveAttribute('data-admin-theme', 'light');
-    await page.locator('#tema-panel').focus();
-    await page.keyboard.press('End');
+    await expect(page.locator('#tema-sidebar')).toHaveAccessibleName(theme === 'light' ? 'Mode terang' : 'Mode gelap');
+    await page.locator('#tema-sidebar').focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('html')).toHaveAttribute('data-admin-theme', 'dark');
-    results.push({ name: `${theme}-preferensi-tema-keyboard-sistem-reload`, overflow: [], clippedDialog: false });
+    await expect(page.locator('html')).toHaveAttribute('data-admin-theme', theme);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect(page.locator('#tema-sidebar')).toBeHidden();
+    await expect(page.locator('#tema-panel')).toBeVisible();
+    await page.locator('#tema-panel').focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('html')).toHaveAttribute('data-admin-theme', theme === 'light' ? 'dark' : 'light');
+    await expect(page.locator('#tema-panel ' + (theme === 'light' ? '.theme-sun' : '.theme-moon'))).toBeVisible();
+    results.push({ name: `${theme}-tombol-tema-desktop-mobile-keyboard-reload`, overflow: [], clippedDialog: false });
     await c.close();
     const loginContext = await context(theme, true); const login = await loginContext.newPage();
     await login.goto(base); await expect(login.locator('#v-login')).toBeVisible();
     for (const [width,height] of sizes) { await login.setViewportSize({ width,height }); await measure(login, `${theme}-login-${width}x${height}`, width === 375); }
+    await login.locator('#tema-login').click();
+    await expect(login.locator('html')).toHaveAttribute('data-admin-theme', theme === 'light' ? 'dark' : 'light');
     await loginContext.close();
   }
 } finally {
