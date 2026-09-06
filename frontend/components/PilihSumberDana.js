@@ -13,7 +13,7 @@
  * (components/BadgeSumber.js) agar tampilannya konsisten.
  */
 import { Check, Wallet, X } from "lucide-react";
-import { KATEGORI_PKM, SUMBER_DANA } from "@/lib/pkm";
+import { KATEGORI_PKM, SUMBER_DANA, kelasKategori } from "@/lib/pkm";
 
 /** Satu chip pilihan — `warna` = belmawa | pt | netral. */
 export function ChipDana({ warna = "netral", aktif, judul, ket, onClick, ikon }) {
@@ -42,7 +42,7 @@ export function ChipsKategori({ kategori, onPilih, tanpaKategori = true }) {
       {KATEGORI_PKM.map((k) => (
         <ChipDana
           key={k.id}
-          warna="belmawa"
+          warna={kelasKategori(k.id)}
           aktif={kategori === k.id}
           judul={k.label}
           ket={`maks ${k.maks}%`}

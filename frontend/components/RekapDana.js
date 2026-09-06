@@ -15,7 +15,7 @@ import {
   ChartPie, TriangleAlert, Info, Landmark, Building2, ChevronDown,
 } from "lucide-react";
 import { fmtRupiah, fmtNominal } from "@/lib/api";
-import { rekapDana, BATAS_DANA_PT } from "@/lib/pkm";
+import { rekapDana, BATAS_DANA_PT, kelasKategori } from "@/lib/pkm";
 
 const KUNCI_BUKA = "logbook_rekap_terbuka";
 
@@ -185,7 +185,7 @@ export default function RekapDana({ items, dana, milikTim = true, memuat = false
             {r.kategori.map((k) => (
               <div key={k.id} className="rekap-row">
                 <span className="rekap-label">
-                  {k.label}
+                  <i className={`dot ${kelasKategori(k.id)}`} aria-hidden="true" /> {k.label}
                   <small>maks {k.maks}%</small>
                 </span>
                 {r.danaBelmawa > 0 ? (

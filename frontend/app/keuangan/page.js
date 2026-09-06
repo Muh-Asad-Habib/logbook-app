@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 import { kompresFormFoto, BATAS_UPLOAD, fmtUkuran, retryFoto } from "@/lib/foto";
 import { unduhFotoEntri } from "@/lib/unduh";
-import { KATEGORI_PKM } from "@/lib/pkm";
+import { KATEGORI_PKM, kelasKategori } from "@/lib/pkm";
 import { simpanDraf, ambilDraf, hapusDraf } from "@/lib/draf";
 import { useMuatBertahap, TombolMuatLagi } from "@/lib/muatBertahap";
 import Lightbox from "@/components/Lightbox";
@@ -223,9 +223,10 @@ function ToolbarFilter({
             </button>
             {KATEGORI_PKM.map((k) => (
               <button key={k.id} type="button"
-                      className={`kat-chip${kat === k.id ? " on" : ""}`}
+                      className={`kat-chip ${kelasKategori(k.id)}${kat === k.id ? " on" : ""}`}
                       onClick={() => setKat(k.id)} aria-pressed={kat === k.id}
                       title={`${k.label} — maksimum ${k.maks}% dana Belmawa`}>
+                <i className="dot" aria-hidden="true" />
                 {k.label}
                 <small>maks {k.maks}%</small>
               </button>

@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { api } from "@/lib/api";
-import { SUMBER_DANA, labelSumber, labelKategori } from "@/lib/pkm";
+import { SUMBER_DANA, labelSumber, labelKategori, kelasKategori } from "@/lib/pkm";
 import { ChipDana, ChipsKategori } from "@/components/PilihSumberDana";
 import { toast } from "@/components/Toast";
 
@@ -26,7 +26,7 @@ function IsiBadge({ e }) {
       </span>
       {e.sumber === "belmawa" && (
         e.kategori
-          ? <span className="badge ok">{labelKategori(e.kategori)}</span>
+          ? <span className={`badge ${kelasKategori(e.kategori)}`}>{labelKategori(e.kategori)}</span>
           : <span className="badge netral">kategori?</span>
       )}
     </>

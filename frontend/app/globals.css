@@ -515,6 +515,29 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 [data-theme="dark"] .badge.teal { background: #134e4a; color: #5eead4; }
 [data-theme="dark"] .badge.danger { background: #7f1d1d; color: #fecaca; }
 
+/* ---------- Warna kategori belanja PKM ----------
+   Tiap kategori punya satu variabel --kat yang dipakai ulang oleh lencana,
+   titik penanda, chip pemilih, dan chip penyaring lewat kelasKategori()
+   di lib/pkm.js — supaya "Bahan habis pakai", "Sewa & jasa", "Transportasi
+   lokal", dan "Lain-lain" tidak lagi tampil seragam hijau. */
+.kat-bahan { --kat: #059669; }
+.kat-sewa { --kat: #d97706; }
+.kat-transport { --kat: #0284c7; }
+.kat-lain { --kat: #db2777; }
+
+.badge.kat-bahan { background: #d1fae5; color: #065f46; }
+.badge.kat-sewa { background: #fef3c7; color: #92400e; }
+.badge.kat-transport { background: #e0f2fe; color: #075985; }
+.badge.kat-lain { background: #fce7f3; color: #9d174d; }
+[data-theme="dark"] .badge.kat-bahan { background: #064e3b; color: #6ee7b7; }
+[data-theme="dark"] .badge.kat-sewa { background: #78350f; color: #fcd34d; }
+[data-theme="dark"] .badge.kat-transport { background: #0c4a6e; color: #7dd3fc; }
+[data-theme="dark"] .badge.kat-lain { background: #831843; color: #f9a8d4; }
+[data-theme="dark"] .kat-bahan { --kat: #34d399; }
+[data-theme="dark"] .kat-sewa { --kat: #fbbf24; }
+[data-theme="dark"] .kat-transport { --kat: #38bdf8; }
+[data-theme="dark"] .kat-lain { --kat: #f472b6; }
+
 /* Rekap dana PKM (halaman Keuangan) */
 .rekap-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rekap-head h3 { margin: 0; }
@@ -572,6 +595,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 }
 .rekap-row:last-child { border-bottom: none; }
 .rekap-label { font-size: 0.81rem; font-weight: 700; min-width: 0; }
+.rekap-label .dot { vertical-align: middle; margin-right: 3px; }
 .rekap-label small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--muted); }
 .rekap-row .rekap-bar { margin-top: 0; }
 .rekap-nilai {
@@ -608,6 +632,7 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .dot.belmawa { background: var(--p1, #4f46e5); }
 .dot.pt { background: #0d9488; }
 .dot.netral { background: var(--muted); }
+.dot.kat-bahan, .dot.kat-sewa, .dot.kat-transport, .dot.kat-lain { background: var(--kat); }
 
 /* Lencana sumber dana + menu ubah cepat (tabel & kartu keuangan) */
 .badge-sumber { position: relative; display: inline-flex; }
@@ -671,6 +696,18 @@ svg.lucide { width: 1em; height: 1em; flex: 0 0 auto; vertical-align: -0.12em; }
 .dana-chip.pt.on { border-color: #0d9488; background: rgba(13, 148, 136, 0.1); }
 .dana-chip.pt.on .dana-chip-cek { color: #0d9488; }
 .dana-chip.netral.on { border-color: var(--line-hover); background: var(--soft); }
+
+/* Chip kategori aktif memakai warna kategorinya sendiri, bukan indigo Belmawa,
+   agar pilihan yang sedang aktif cocok dengan lencana pada daftar belanja. */
+.dana-chip.kat-bahan.on, .dana-chip.kat-sewa.on,
+.dana-chip.kat-transport.on, .dana-chip.kat-lain.on {
+  border-color: var(--kat);
+  background: color-mix(in srgb, var(--kat) 12%, transparent);
+}
+.dana-chip.kat-bahan.on .dana-chip-cek, .dana-chip.kat-sewa.on .dana-chip-cek,
+.dana-chip.kat-transport.on .dana-chip-cek, .dana-chip.kat-lain.on .dana-chip-cek {
+  color: var(--kat);
+}
 .dana-chip:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }
 
 /* Panel pemilih di dialog belanja */
@@ -1609,6 +1646,20 @@ td.num small { font-weight: 600; }
   background: rgba(79, 70, 229, 0.1); color: var(--p1); border-color: var(--p1);
 }
 .kat-chip.netral.on { background: var(--soft); color: var(--ink); border-color: var(--line-hover); }
+/* Penyaring kategori memakai warna kategorinya, sama dengan lencana entri.
+   Kelasnya disebut satu per satu (bukan [class*="kat-"]) karena pola itu
+   ikut cocok dengan nama kelas ".kat-chip" sendiri. */
+.kat-chip.kat-bahan > .dot, .kat-chip.kat-sewa > .dot,
+.kat-chip.kat-transport > .dot, .kat-chip.kat-lain > .dot {
+  background: var(--kat); align-self: center;
+}
+.kat-chip.kat-bahan:hover, .kat-chip.kat-sewa:hover,
+.kat-chip.kat-transport:hover, .kat-chip.kat-lain:hover { color: var(--kat); }
+.kat-chip.kat-bahan.on, .kat-chip.kat-sewa.on,
+.kat-chip.kat-transport.on, .kat-chip.kat-lain.on {
+  color: var(--kat); border-color: var(--kat);
+  background: color-mix(in srgb, var(--kat) 12%, transparent);
+}
 .kat-chip:focus-visible { outline: 3px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }
 
 @media (max-width: 640px) {

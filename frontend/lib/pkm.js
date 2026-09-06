@@ -32,6 +32,17 @@ export const labelKategori = (id) =>
   KATEGORI_PKM.find((k) => k.id === id)?.label || "";
 
 /**
+ * Kelas warna sebuah kategori PKM.
+ *
+ * Satu nama kelas dipakai bersama oleh lencana (.badge), titik penanda (.dot),
+ * dan chip pemilih (.dana-chip) — lihat definisi warnanya di app/globals.css.
+ * Dengan begitu "Bahan habis pakai", "Sewa & jasa", "Transportasi lokal", dan
+ * "Lain-lain" selalu berwarna sama di seluruh aplikasi.
+ */
+export const kelasKategori = (id) =>
+  KATEGORI_PKM.some((k) => k.id === id) ? `kat-${id}` : "netral";
+
+/**
  * Rekap pemakaian dana dari daftar entri belanja.
  *
  * @param {Array} items entri /api/keuangan
