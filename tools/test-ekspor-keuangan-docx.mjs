@@ -1,7 +1,11 @@
 /**
  * Uji ekspor DOCX KHUSUS KEUANGAN memakai data NYATA di database (hanya baca).
  *
- * Memeriksa format lampiran laporan PKM ("Lampiran 1. Penggunaan Dana"):
+ * Halaman 1 = rekap dana tim (section sendiri, tanpa nomor halaman) yang
+ * angkanya harus sama dengan lampiran dan menunjuk halaman awal lampiran
+ * (field PAGEREF → bookmark pada judul "LAMPIRAN").
+ *
+ * Halaman 2 dst. = format lampiran laporan PKM ("Lampiran 1. Penggunaan Dana"):
  * paket .docx valid (zip + part wajib + nomor halaman), tabel ringkas yang
  * cocok dengan dana & profil PKM tim, kalimat keterangan kode nota,
  * Lampiran 1.1 Belmawa (satu tabel per kategori yang berisi), 1.2 Perguruan
@@ -94,12 +98,26 @@ for (const p of daftar.filter((n) => /\.(xml|rels)$/.test(n))) {
   const rusak = rusakDi(await baca(p));
   cek(`XML well-formed: ${p}`, !rusak, rusak ? `tag bermasalah: ${rusak}` : "");
 }
-cek("tabel selalu diikuti paragraf (syarat Word)", !/<\/w:tbl>\s*(<w:tbl>|<w:sectPr)/.test(doc));
+cek("tabel selalu diikuti paragraf (syarat Word)", !/<\/w:tbl>\s*(<w:tbl>|<w:sectPr|<\/w:tc>)/.test(doc));
 cek("halaman A4, margin kiri 4 cm & lainnya 3 cm",
   doc.includes(`<w:pgSz w:w="11906" w:h="16838"/>`)
   && doc.includes(`<w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268"`));
 cek("nomor halaman (field PAGE) di kepala halaman",
   / PAGE /.test(header) && /Target="header1\.xml"/.test(rels) && /PartName="\/word\/header1\.xml"/.test(ctypes));
+
+/* ---------- dua section: rekap (hal. 1) & lampiran (hal. 2 dst.) ---------- */
+const awalBody = doc.indexOf("<w:body>") + 8;
+const batasRekap = doc.indexOf("</w:p>", doc.indexOf("<w:sectPr>")) + 6;
+const rekapXml = doc.slice(awalBody, batasRekap);
+const lampiranXml = doc.slice(batasRekap, doc.lastIndexOf("<w:sectPr>"));
+const sectAkhir = doc.slice(doc.lastIndexOf("<w:sectPr>"));
+cek("dua section: rekap lalu lampiran", (doc.match(/<w:sectPr>/g) || []).length === 2);
+cek("section rekap: margin kiri-kanan 2 cm & atas-bawah 1,5 cm, tanpa kepala halaman, nomor mulai 1",
+  /<w:pgMar w:top="850" w:right="1134" w:bottom="850" w:left="1134"[^>]*\/><w:pgNumType w:start="1"\/>/.test(rekapXml)
+  && !rekapXml.includes("<w:headerReference"));
+cek("section lampiran: halaman baru, nomor halaman melanjutkan (mulai 2)",
+  sectAkhir.includes(`<w:headerReference w:type="default" r:id="rId3"/><w:type w:val="nextPage"/>`)
+  && !sectAkhir.includes("pgNumType"));
 
 /* ---------- teks per paragraf & tabel ---------- */
 const unesc = (s) => s
@@ -107,21 +125,34 @@ const unesc = (s) => s
   .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 const teksDari = (xml) => unesc((xml.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>|<w:tab\/>|<w:br\/>/g) || [])
   .map((x) => (x === "<w:tab/>" ? "\t" : x === "<w:br/>" ? "\n" : x.replace(/<[^>]+>/g, ""))).join(""));
-const paragraf = (doc.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(teksDari);
-const tabel = (doc.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || []).map((t) =>
+const paragraf = (lampiranXml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(teksDari);
+const tabel = (lampiranXml.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || []).map((t) =>
   (t.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || []).map((tr) =>
     (tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).map(teksDari)));
 const adaPar = (s) => paragraf.includes(s);
 const angka = (s) => Number(String(s).replace(/\./g, "").replace(",", ".")) || 0;
 
-cek('dibuka judul "LAMPIRAN" lalu caption "Lampiran 1. Penggunaan Dana" (field SEQ)',
+cek('lampiran dibuka judul "LAMPIRAN" lalu caption "Lampiran 1. Penggunaan Dana" (field SEQ)',
   paragraf[0] === "LAMPIRAN" && paragraf[1] === "Lampiran 1. Penggunaan Dana"
   && doc.includes(" SEQ Lampiran \\* ARABIC "));
+cek("judul LAMPIRAN diberi bookmark tujuan PAGEREF",
+  /<w:bookmarkStart w:id="0" w:name="_RefLampiranDana"\/><w:r>(?:(?!<\/w:p>)[\s\S])*>LAMPIRAN<\/w:t>/.test(lampiranXml));
+const parRekap = (rekapXml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(teksDari).filter(Boolean);
 cek("format lama (L-1, rekap) sudah tidak dipakai",
-  !paragraf.some((p) => /LAPORAN KEUANGAN LOGBOOK|NOTA & BUKTI PEMBAYARAN|REKAP PEMAKAIAN/.test(p)));
+  ![...parRekap, ...paragraf].some((p) => /LAPORAN KEUANGAN LOGBOOK|NOTA & BUKTI PEMBAYARAN|REKAP PEMAKAIAN/.test(p)));
+cek("lampiran memakai format polos (tanpa Calibri/warna latar)", !/Calibri|w:fill=/.test(lampiranXml));
+
+/* ---------- halaman rekap ---------- */
+const nilaiSesudah = (label) => parRekap[parRekap.indexOf(label) + 1];
+cek('rekap: judul "Rekap Dana PKM" & kotak "SIAP DISALIN KE LAPORAN"',
+  parRekap.some((p) => p.startsWith("Rekap Dana PKM\t")) && parRekap.includes("SIAP DISALIN KE LAPORAN"));
+cek("rekap: menunjuk halaman 2 lewat PAGEREF",
+  nilaiSesudah("SIAP DISALIN KE LAPORAN") === "Halaman 2 sampai akhir dokumen  ·  Lampiran 1. Penggunaan Dana"
+  && rekapXml.includes(" PAGEREF _RefLampiranDana \\h "), nilaiSesudah("SIAP DISALIN KE LAPORAN"));
+cek("rekap: tanpa gambar", !rekapXml.includes("<w:drawing>"));
 
 /* ---------- tabel ringkas ---------- */
-const ringkas = tabel[0] || [];
+const ringkas = tabel.find((t) => t[0]?.[0] === "Judul") || [];
 const barisSumber = (label) => ringkas.find((r) => r[1] === label);
 cek("tabel ringkas: Judul dari profil PKM", ringkas[0]?.[0] === "Judul" && ringkas[0]?.[1] === profil.judul,
   ringkas[0]?.[1] || "(kosong)");
@@ -150,6 +181,17 @@ cek("tabel ringkas: SUB TOTAL",
   ringkas.at(-1)?.join(" | "));
 const ket = paragraf.find((p) => p.startsWith("Keterangan: Penggunaan dana dipisahkan berdasarkan sumber pendanaan"));
 cek("kalimat Keterangan tercetak", Boolean(ket), ket);
+cek("rekap: total diterima, terpakai & sisa sama dengan SUB TOTAL lampiran",
+  nilaiSesudah("TOTAL DANA DITERIMA") === fmtRp(totDana) && nilaiSesudah("TOTAL TERPAKAI") === fmtRp(totPakai)
+  && nilaiSesudah("SISA BELUM TERPAKAI") === fmtRp(totDana - totPakai),
+  [nilaiSesudah("TOTAL DANA DITERIMA"), nilaiSesudah("TOTAL TERPAKAI"), nilaiSesudah("SISA BELUM TERPAKAI")].join(" | "));
+const nilaiKartu = (awal) => parRekap[parRekap.findIndex((p) => p.startsWith(awal)) + 1];
+cek("rekap: kartu Belmawa & Perguruan Tinggi sesuai total lampiran",
+  nilaiKartu("DANA BELMAWA") === fmtRp(jumlahkan(bel)) && nilaiKartu("DANA PERGURUAN TINGGI") === fmtRp(jumlahkan(pt)));
+const butirRekap = parRekap.slice(parRekap.indexOf("CEK SEBELUM DISALIN") + 1, parRekap.indexOf("CEK SEBELUM DISALIN") + 13);
+cek("rekap: 6 butir cek berlabel OK/CEK",
+  butirRekap.length === 12 && butirRekap.every((t, i) => (i % 2 ? t.length > 10 : t === "OK" || t === "CEK")),
+  butirRekap.filter((_, i) => i % 2 === 0).join(" "));
 
 /* ---------- bagian per sumber ---------- */
 cek("Lampiran 1.1 (Belmawa) ada", adaPar("Lampiran 1.1 Penggunaan Dana dari Belmawa"));

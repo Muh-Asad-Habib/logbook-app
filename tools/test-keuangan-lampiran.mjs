@@ -1,12 +1,14 @@
-// Uji penyusun DOCX "Khusus Keuangan" berformat Lampiran 1. Penggunaan Dana PKM.
+// Uji penyusun DOCX "Khusus Keuangan": halaman 1 rekap dana tim, lalu
+// Lampiran 1. Penggunaan Dana PKM (siap salin) mulai halaman 2.
 // Memakai data contoh — tanpa database, CDN, maupun jaringan.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
-  bikinMedia, fmtAngka, fmtJumlah, fmtKeterangan, fmtRp, fmtTanggal, kalimatKeterangan,
-  satuanDari, susunDocxKeuangan, ukuranNota,
+  bikinMedia, butirCek, fmtAngka, fmtJumlah, fmtKeterangan, fmtRp, fmtTanggal, kalimatKeterangan,
+  lebarBilah, periodeBelanja, satuanDari, susunDocxKeuangan, ukuranNota,
 } from '../backend/src/export/keuangan-lampiran.js';
+import { rekapDana } from '../backend/src/export/pkm.js';
 
 const requireBackend = createRequire(new URL('../backend/package.json', import.meta.url));
 const JSZip = requireBackend('jszip');
@@ -23,12 +25,28 @@ const teks = (xml) => unesc((xml.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>|<w:tab\/>|<
 const barisTabel = (tbl) => (tbl.match(/<w:tr>[\s\S]*?<\/w:tr>/g) || [])
   .map((tr) => (tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).map(teks));
 
-/** Isi body tingkat atas, berurutan: { p, xml } untuk paragraf, { tabel, xml } untuk tabel. */
+/**
+ * Dua bagian body: `rekap` (section 1, diakhiri paragraf ber-sectPr) dan
+ * `lampiran` (section 2, sebelum sectPr akhir dokumen).
+ */
+function pisahBagian(doc) {
+  const awal = doc.indexOf('<w:body>') + 8;
+  const batas = doc.indexOf('</w:p>', doc.indexOf('<w:sectPr>')) + 6;
+  return { rekap: doc.slice(awal, batas), lampiran: doc.slice(batas, doc.lastIndexOf('<w:sectPr>')) };
+}
+
+/** Teks tiap paragraf berisi (termasuk di dalam tabel bersarang), berurutan. */
+const paragrafDari = (xml) => (xml.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(teks).filter(Boolean);
+
+/** Isi body lampiran tingkat atas, berurutan: { p, xml } untuk paragraf, { tabel, xml } untuk tabel. */
 function blokBody(doc) {
-  const body = doc.slice(doc.indexOf('<w:body>') + 8, doc.lastIndexOf('<w:sectPr>'));
-  return (body.match(/<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g) || []).map((xml) =>
+  const { lampiran } = pisahBagian(doc);
+  return (lampiran.match(/<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g) || []).map((xml) =>
     (xml.startsWith('<w:tbl>') ? { tabel: barisTabel(xml), xml } : { p: teks(xml), xml }));
 }
+
+/** Teks sesudah label (mis. nilai di bawah "TOTAL TERPAKAI"). */
+const sesudah = (daftar, label, n = 1) => daftar.slice(daftar.indexOf(label) + 1, daftar.indexOf(label) + 1 + n);
 
 /** Pemeriksa well-formed sederhana (tanpa parser XML tambahan). */
 function cekXml(xml, nama) {
@@ -164,10 +182,64 @@ test('dokumen lengkap: urutan lampiran, tabel, kode nota, subtotal, dan dokument
   assert.match(styles, /w:styleId="Caption"/);
   assert.match(styles, /w:ascii="Times New Roman"/);
 
-  // Tata halaman A4: atas/kanan/bawah 3 cm, kiri 4 cm, kepala halaman bernomor
-  assert.match(doc, /<w:sectPr><w:headerReference w:type="default" r:id="rId3"\/><w:pgSz w:w="11906" w:h="16838"\/>/);
-  assert.match(doc, /<w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268"/);
-  assert.doesNotMatch(doc, /Calibri|w:fill=/, 'tanpa font/warna latar gaya lama');
+  // Dua section: halaman rekap (A4, margin kiri-kanan 2 cm & atas-bawah 1,5 cm, tanpa kepala halaman,
+  // nomor mulai 1) lalu lampiran di halaman baru (A4: atas/kanan/bawah 3 cm, kiri 4 cm, bernomor lanjut)
+  const { rekap, lampiran } = pisahBagian(doc);
+  assert.equal((doc.match(/<w:sectPr>/g) || []).length, 2);
+  assert.match(rekap, /<w:sectPr><w:pgSz w:w="11906" w:h="16838"\/><w:pgMar w:top="850" w:right="1134" w:bottom="850" w:left="1134" w:header="567" w:footer="567" w:gutter="0"\/><w:pgNumType w:start="1"\/>/);
+  assert.match(rekap, /<\/w:sectPr><\/w:pPr>(?:(?!<w:p>)[\s\S])*<\/w:p>$/, 'pemisah section ada di paragraf terakhir rekap');
+  assert.doesNotMatch(rekap, /<w:headerReference|<w:drawing>/, 'rekap tanpa nomor halaman & gambar');
+  const sectAkhir = doc.slice(doc.lastIndexOf('<w:sectPr>'));
+  assert.match(sectAkhir, /^<w:sectPr><w:headerReference w:type="default" r:id="rId3"\/><w:type w:val="nextPage"\/><w:pgSz w:w="11906" w:h="16838"\/>/);
+  assert.match(sectAkhir, /<w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268"/);
+  assert.doesNotMatch(sectAkhir, /pgNumType/, 'nomor halaman lampiran melanjutkan rekap → mulai 2');
+  assert.doesNotMatch(lampiran, /Calibri|w:fill=/, 'lampiran tanpa font/warna latar gaya lama');
+  assert.doesNotMatch(doc, /<\/w:tbl>\s*(?:<w:tbl>|<\/w:tc>)/, 'tabel tidak berdempetan & sel diakhiri paragraf');
+
+  // Halaman rekap: angka sama dengan lampiran, menunjuk halaman lampiran lewat PAGEREF
+  const pr = paragrafDari(rekap);
+  assert.deepEqual(pr.slice(0, 3), [
+    'LOGBOOK PKM · TIM AMERTA SIGN', 'Rekap Dana PKM\tPKM-KC',
+    'Pemakaian dana per sumber & kategori — pedoman PKM 2026\tTahun 2026',
+  ]);
+  assert.match(rekap, /^<w:tbl><w:tblPr>(?:(?!<\/w:tblPr>)[\s\S])*<\/w:tblPr><w:tblGrid><w:gridCol w:w="9638"\/><\/w:tblGrid>/,
+    'pita judul satu sel (tanpa sambungan antarsel)');
+  assert.deepEqual(sesudah(pr, 'JUDUL PKM'), ['RANCANG BANGUN APLIKASI PENERJEMAH BAHASA ISYARAT']);
+  assert.deepEqual(sesudah(pr, 'PERIODE BELANJA', 2), ['3 Jun – 13 Agu 2026', '10 entri · 12 nota terlampir']);
+  assert.deepEqual(sesudah(pr, 'SIAP DISALIN KE LAPORAN', 2), [
+    'Halaman 2 sampai akhir dokumen  ·  Lampiran 1. Penggunaan Dana',
+    'Mulai judul “LAMPIRAN” sudah berformat lampiran laporan PKM (Times New Roman 12, tabel per sumber & ' +
+      'kategori, nota ber-kode). Salin utuh ke laporan; halaman rekap ini tidak perlu disalin.',
+  ]);
+  assert.match(rekap, /<w:fldChar w:fldCharType="begin"\/><\/w:r><w:r><w:rPr>(?:(?!<\/w:r>)[\s\S])*<\/w:rPr><w:instrText xml:space="preserve"> PAGEREF _RefLampiranDana \\h <\/w:instrText><\/w:r><w:r><w:rPr>(?:(?!<\/w:r>)[\s\S])*<\/w:rPr><w:fldChar w:fldCharType="separate"\/><\/w:r><w:r><w:rPr>(?:(?!<\/w:r>)[\s\S])*<\/w:rPr><w:t>2<\/w:t><\/w:r><w:r><w:rPr>(?:(?!<\/w:r>)[\s\S])*<\/w:rPr><w:fldChar w:fldCharType="end"\/>/);
+  assert.deepEqual(sesudah(pr, 'IKHTISAR DANA', 11), [
+    'TOTAL DANA DITERIMA', 'Rp8.500.000', 'Belmawa Rp6,5 jt · PT Rp2 jt', '−',
+    'TOTAL TERPAKAI', 'Rp2.225.923', '26% dari dana diterima', '=',
+    'SISA BELUM TERPAKAI', 'Rp6.274.077', 'siap dibelanjakan',
+  ]);
+  assert.deepEqual(sesudah(pr, 'PER SUMBER DANA', 8), [
+    'DANA BELMAWA\t25,4% terpakai', 'Rp1.652.080', 'dari Rp6,5 jt · sisa Rp4.847.920', '7 entri · Nota 01-09',
+    'DANA PERGURUAN TINGGI\t26,2% terpakai', 'Rp523.843', 'dari Rp2 jt · sisa Rp1.476.157', '2 entri · Nota 10-11',
+  ]);
+  const labelKategori = 'KATEGORI BELANJA DANA BELMAWA\tpersen dari dana Belmawa Rp6,5 jt';
+  assert.deepEqual(sesudah(pr, labelKategori, 20), [
+    '● Bahan habis pakai', 'maks 60% · batas Rp3.900.000', '24,7% dari batas', 'Rp965.137', '14,8% dana Belmawa',
+    '● Sewa & jasa', 'maks 15% · batas Rp975.000', '30,8% dari batas', 'Rp300.143', '4,6% dana Belmawa',
+    '● Transportasi lokal', 'maks 30% · batas Rp1.950.000', '9,7% dari batas', 'Rp190.000', '2,9% dana Belmawa',
+    '● Lain-lain', 'maks 15% · batas Rp975.000', '18,1% dari batas', 'Rp176.800', '2,7% dana Belmawa',
+  ]);
+  assert.deepEqual(sesudah(pr, 'CEK SEBELUM DISALIN', 12), [
+    'OK', 'Profil PKM lengkap — judul, skema, dan tahun tercetak di tabel ringkas.',
+    'OK', 'Nominal dana terisi — Belmawa Rp6.500.000, Perguruan Tinggi Rp2.000.000.',
+    'CEK', '1 entri (Rp50.000) belum ditandai sumber dananya — tercetak terpisah di Lampiran 1.3.',
+    'CEK', '1 entri Belmawa (Rp20.000) belum berkategori — tercetak di tabel “Belum Berkategori”.',
+    'CEK', '1 entri belum punya nota terlampir (Kode Nota “-”) — unggah fotonya di menu Keuangan bila ada.',
+    'OK', 'Semua kategori Belmawa & dana PT masih dalam batas pedoman PKM 2026.',
+  ]);
+  assert.match(pr.at(-1), /^Angka di halaman ini memakai data yang sama dengan Lampiran 1 — total terpakai = SUB TOTAL/);
+  // Bilah kemajuan = tabel bersarang setinggi 6 pt; tiap sel tabel rekap tidak terbelah
+  assert.equal((rekap.match(/<w:trHeight w:val="120" w:hRule="exact"\/>/g) || []).length, 6, 'bilah: 2 sumber + 4 kategori');
+  assert.ok((rekap.match(/<w:tr>/g) || []).length === (rekap.match(/<w:tr><w:trPr><w:cantSplit\/>/g) || []).length);
 
   // Urutan judul & keterangan
   const blok = blokBody(doc);
@@ -193,6 +265,10 @@ test('dokumen lengkap: urutan lampiran, tabel, kode nota, subtotal, dan dokument
   ]);
   const para = (awal) => blok.find((b) => b.p?.startsWith(awal));
   assert.match(para('LAMPIRAN').xml, /<w:pStyle w:val="Heading1"\/>[\s\S]*<w:jc w:val="center"\/>/);
+  assert.match(para('LAMPIRAN').xml,
+    /<\/w:pPr><w:bookmarkStart w:id="0" w:name="_RefLampiranDana"\/><w:r>[\s\S]*<\/w:r><w:bookmarkEnd w:id="0"\/><\/w:p>$/,
+    'judul LAMPIRAN = tujuan PAGEREF di halaman rekap');
+  assert.equal(blok[0], para('LAMPIRAN'), 'lampiran dibuka judul LAMPIRAN');
   assert.match(para('Lampiran 1. ').xml, /<w:pStyle w:val="Caption"\/>/);
   assert.match(para('Lampiran 1. ').xml, /<w:instrText xml:space="preserve"> SEQ Lampiran \\\* ARABIC <\/w:instrText>/);
   assert.match(para('Keterangan:').xml, /<w:jc w:val="both"\/>/);
@@ -389,10 +465,119 @@ test('data kosong dengan dana awal lama dan teks istimewa tetap menghasilkan dok
   assert.ok(blok.some((b) => b.p === 'TOTAL DANA BELMAWA: Rp0'));
   assert.ok(!blok.some((b) => b.p?.startsWith('Lampiran 1.3')), 'tanpa entri tak bertanda → tanpa Lampiran 1.3');
 
+  // Rekap: dana awal lama tanpa rincian, belum ada belanja, bilah kosong
+  const pr = paragrafDari(pisahBagian(doc).rekap);
+  assert.equal(pr[0], 'LOGBOOK PKM', 'tanpa nama tim');
+  assert.deepEqual(sesudah(pr, 'JUDUL PKM'), ['Uji <Judul> & "Kutip"']);
+  assert.deepEqual(sesudah(pr, 'PERIODE BELANJA', 2), ['belum ada belanja', '0 entri · 0 nota terlampir']);
+  assert.deepEqual(sesudah(pr, 'IKHTISAR DANA', 11), [
+    'TOTAL DANA DITERIMA', 'Rp5.000.000', 'dana awal — belum dirinci per sumber', '−',
+    'TOTAL TERPAKAI', 'Rp0', '0% dari dana diterima', '=',
+    'SISA BELUM TERPAKAI', 'Rp5.000.000', 'siap dibelanjakan',
+  ]);
+  assert.deepEqual(sesudah(pr, 'PER SUMBER DANA', 8), [
+    'DANA BELMAWA', 'Rp0', 'nominal dana belum diisi', 'belum ada belanja',
+    'DANA PERGURUAN TINGGI', 'Rp0', 'batas umum Rp2 jt', 'belum ada belanja',
+  ]);
+  assert.deepEqual(sesudah(pr, 'KATEGORI BELANJA DANA BELMAWA\tbatas pedoman PKM 2026', 5), [
+    '● Bahan habis pakai', 'maks 60% dana Belmawa', 'isi nominal dana Belmawa untuk menghitung', 'Rp0', '–',
+  ]);
+  assert.deepEqual(sesudah(pr, 'CEK SEBELUM DISALIN', 12).filter((_, i) => i % 2 === 0),
+    ['OK', 'CEK', 'OK', 'OK', 'CEK', 'CEK']);
+
   const aneh = await susunDocxKeuangan({
     keuangan: [E({ tanggal: '2026-01-05', item: 'Kabel <USB> & "adaptor"\nbaris 2\u0007', harga_satuan: 15000, kategori: 'bahan' })],
     dana: { belmawa: 100000, pt: 0 },
   });
   const isiAneh = blokBody((await bukaDocx(aneh)).doc).filter((b) => b.tabel)[1];
   assert.equal(isiAneh.tabel[1][2], 'Kabel <USB> & "adaptor"\nbaris 2');
+});
+
+/* ------------------------------------------------------ halaman rekap --- */
+test('rekap: periode belanja, lebar bilah, dan butir cek', () => {
+  assert.equal(periodeBelanja([]), 'belum ada belanja');
+  assert.equal(periodeBelanja([{ tanggal: '2026-08-13' }, { tanggal: 'x' }, { tanggal: '2026-06-03' }]), '3 Jun – 13 Agu 2026');
+  assert.equal(periodeBelanja([{ tanggal: '2026-06-03' }, { tanggal: '2026-06-03' }]), '3 Jun 2026');
+  assert.equal(periodeBelanja([{ tanggal: '2026-01-04' }, { tanggal: '2025-12-30' }]), '30 Des 2025 – 4 Jan 2026');
+
+  assert.deepEqual(lebarBilah(0, 4000), [0, 4000]);
+  assert.deepEqual(lebarBilah(-5, 4000), [0, 4000]);
+  assert.deepEqual(lebarBilah(Number.NaN, 4000), [0, 4000]);
+  assert.deepEqual(lebarBilah(50, 4000), [2000, 2000]);
+  assert.deepEqual(lebarBilah(0.4, 4000), [90, 3910], 'sedikit terpakai tetap terlihat');
+  assert.deepEqual(lebarBilah(99.9, 4000), [3910, 90], 'belum penuh tetap terlihat sisa');
+  assert.deepEqual(lebarBilah(100, 4000), [4000, 0]);
+  assert.deepEqual(lebarBilah(240, 4000), [4000, 0]);
+
+  const profil = { judul: 'Judul', skema: 'PKM-KC', tahun: 2026 };
+  const rapi = [
+    E({ tanggal: '2026-06-01', item: 'Kertas', harga_satuan: 100000, kategori: 'bahan' }),
+    E({ tanggal: '2026-06-02', item: 'GPU', harga_satuan: 50000, sumber: 'pt', kategori: '' }),
+  ];
+  const a = butirCek({
+    r: rekapDana(rapi, { belmawa: 1_000_000, pt: 500_000 }), profil, nBelmawa: 1, nPt: 1, nEntri: 2, nNota: 2,
+  });
+  assert.equal(a.length, 6);
+  assert.ok(a.every((x) => x.ok), 'data rapi → semua OK');
+  assert.equal(a[4].teks, 'Setiap entri punya nota — 2 nota tercetak di tabel Dokumentasi Nota.');
+
+  const b = butirCek({ r: rekapDana([], {}), profil: { skema: 'PKM-RE' }, danaLama: 5_000_000 });
+  assert.deepEqual(b.map((x) => x.ok), [false, false, true, true, false, false]);
+  assert.equal(b[0].teks, 'Profil PKM belum lengkap (judul dan tahun kosong) — lengkapi di menu Profil.');
+  assert.equal(b[1].teks, 'Dana awal Rp5.000.000 belum dirinci per sumber — isi dana Belmawa & PT di Dashboard.');
+  assert.equal(b[3].teks, 'Belum ada belanja dana Belmawa yang perlu dikategorikan.');
+  assert.equal(b[4].teks, 'Belum ada belanja yang dicatat di menu Keuangan.');
+  assert.match(b[5].teks, /belum bisa dicek/);
+  assert.match(butirCek({ r: rekapDana([], {}), profil })[1].teks, /^Nominal dana Belmawa & Perguruan Tinggi belum diisi/);
+  assert.match(butirCek({ r: rekapDana([], { pt: 100 }), profil })[1].teks, /^Nominal dana Belmawa belum diisi/);
+
+  const lewat = [
+    E({ tanggal: '2026-06-01', item: 'Bahan', harga_satuan: 700000, kategori: 'bahan' }),
+    E({ tanggal: '2026-06-01', item: 'Lain', harga_satuan: 200000, kategori: 'lain' }),
+    E({ tanggal: '2026-06-01', item: 'Server', harga_satuan: 2_500_000, sumber: 'pt' }),
+  ];
+  const c = butirCek({
+    r: rekapDana(lewat, { belmawa: 1_000_000, pt: 0 }), profil, nBelmawa: 2, nPt: 1, nEntri: 3, nTanpaNota: 3,
+  });
+  assert.equal(c[1].teks, 'Ada belanja Perguruan Tinggi, tetapi nominal dana PT belum diisi — isi di Dashboard.');
+  assert.equal(c[4].teks, '3 entri belum punya nota terlampir (Kode Nota “-”) — unggah fotonya di menu Keuangan bila ada.');
+  assert.deepEqual(c[5], {
+    ok: false,
+    teks: 'Melewati batas pedoman PKM 2026: Bahan habis pakai (maks 60%), Lain-lain (maks 15%), dan dana PT (maks Rp2.000.000).',
+  });
+});
+
+test('rekap kasus berat: teks panjang dipendekkan, dana minus & lewat batas berwarna merah', async () => {
+  const judul = `SISTEM ${'PEMANTAUAN KUALITAS AIR BERBASIS INTERNET OF THINGS '.repeat(8)}`.trim();
+  const buf = await susunDocxKeuangan({
+    keuangan: [
+      E({ tanggal: '2026-05-02', item: 'Sensor pH', harga_satuan: 900000, kategori: 'bahan' }),
+      E({ tanggal: '2026-05-03', item: 'Sewa lab', harga_satuan: 400000, kategori: 'sewa' }),
+      E({ tanggal: '2026-05-04', item: 'Server', harga_satuan: 2_400_000, sumber: 'pt' }),
+    ],
+    dana: { belmawa: 1_000_000, pt: 2_000_000 },
+    profil: { skema: 'PKM-KARSACIPTAKARYAINOVATIF', tahun: 2026, judul },
+    namaTim: 'Tim Dengan Nama yang Sangat Panjang Sekali Hingga Melebihi Batas',
+  });
+  const { doc } = await bukaDocx(buf);
+  const { rekap } = pisahBagian(doc);
+  const pr = paragrafDari(rekap);
+  assert.equal(pr[0], 'LOGBOOK PKM · TIM TIM DENGAN NAMA YANG SANGAT PANJANG…', 'dipotong di batas kata');
+  assert.equal(pr[1], 'Rekap Dana PKM\tPKM-KARSACIPTAKARYA…', 'skema tanpa spasi dipotong paksa');
+  const [judulRekap] = sesudah(pr, 'JUDUL PKM');
+  assert.equal(judulRekap, `${judul.slice(0, 162)}…`, 'judul ≤ 170 karakter, dipotong di batas kata');
+  assert.equal(judul[162], ' ');
+  const [ringkas] = blokBody(doc).filter((b) => b.tabel);
+  assert.equal(ringkas.tabel[0][1], judul, 'lampiran tetap memuat judul lengkap');
+
+  assert.deepEqual(sesudah(pr, 'SISA BELUM TERPAKAI', 2), ['-Rp700.000', 'melebihi dana yang diterima']);
+  assert.match(rekap, /w:fill="FEF2F2"/, 'kotak sisa minus berlatar merah');
+  assert.deepEqual(sesudah(pr, 'DANA PERGURUAN TINGGI\t120% terpakai', 4), [
+    'Rp2.400.000', 'dari Rp2 jt · sisa -Rp400.000', '1 entri · tanpa nota', 'Melebihi batas dana PT Rp2.000.000',
+  ]);
+  assert.deepEqual(sesudah(pr, '● Bahan habis pakai', 4),
+    ['maks 60% · batas Rp600.000', 'melewati batas — 150% dari batas', 'Rp900.000', '90% dana Belmawa']);
+  assert.deepEqual(sesudah(pr, '● Sewa & jasa', 2), ['maks 15% · batas Rp150.000', 'melewati batas — 266,7% dari batas']);
+  assert.match(sesudah(pr, 'CEK SEBELUM DISALIN', 12).at(-1),
+    /^Melewati batas pedoman PKM 2026: Bahan habis pakai \(maks 60%\), Sewa & jasa \(maks 15%\), dan dana PT/);
 });

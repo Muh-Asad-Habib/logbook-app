@@ -17,7 +17,7 @@ router.use(hanyaTim); // fasilitator tidak punya data untuk diekspor
  * Versi penyusun dokumen — naikkan bila tata letak/isi ekspor berubah supaya
  * cache hasil ekspor (lihat sidikJariData) tidak menyajikan berkas lama.
  */
-const VERSI_EKSPOR = "2026-10-27a";
+const VERSI_EKSPOR = "2026-10-27b";
 
 /**
  * Sidik jari SELURUH data yang mempengaruhi isi berkas ekspor: tiap entri
@@ -285,14 +285,20 @@ router.get("/xlsx", async (req, res, next) => {
  * /api/export/keuangan-docx:
  *   get:
  *     tags: [Export]
- *     summary: Unduh DOCX KHUSUS KEUANGAN berformat lampiran laporan PKM ("Lampiran 1. Penggunaan Dana")
+ *     summary: Unduh DOCX KHUSUS KEUANGAN — halaman 1 rekap dana tim, halaman 2 dst. lampiran laporan PKM ("Lampiran 1. Penggunaan Dana")
  *     description: >
- *       Dokumen Word (Times New Roman 12, A4, teks/tabel/gambar biasa — mudah
- *       disalin ke laporan) berisi tabel ringkas Judul · Skema · Sumber · Tahun ·
- *       Pendanaan · Penggunaan · Sisa (judul/skema/tahun dari Profil PKM tim),
- *       kalimat keterangan rentang kode nota, lalu Lampiran 1.1 Dana Belmawa
- *       (satu tabel per kategori PKM + SUB TOTAL), Lampiran 1.2 Dana Perguruan
- *       Tinggi, dan Lampiran 1.3 bila ada entri yang belum ditandai sumbernya.
+ *       Halaman 1 (section tersendiri) berisi rekap dana untuk tim: ikhtisar
+ *       dana diterima/terpakai/sisa, kartu per sumber dana, kategori Belmawa
+ *       terhadap batas pedoman PKM 2026, daftar cek OK/CEK, serta keterangan
+ *       bahwa mulai halaman 2 (field PAGEREF ke judul LAMPIRAN) isinya siap
+ *       disalin ke laporan. Mulai halaman 2 (halaman baru, nomor halaman
+ *       berlanjut): dokumen Word (Times New Roman 12, A4, teks/tabel/gambar
+ *       biasa — mudah disalin ke laporan) berisi tabel ringkas Judul · Skema ·
+ *       Sumber · Tahun · Pendanaan · Penggunaan · Sisa (judul/skema/tahun dari
+ *       Profil PKM tim), kalimat keterangan rentang kode nota, lalu Lampiran 1.1
+ *       Dana Belmawa (satu tabel per kategori PKM + SUB TOTAL), Lampiran 1.2 Dana
+ *       Perguruan Tinggi, dan Lampiran 1.3 bila ada entri yang belum ditandai
+ *       sumbernya.
  *       Tiap sumber diakhiri TOTAL DANA serta tabel Dokumentasi Nota ber-kode
  *       (01, 02, …; entri dengan beberapa nota memakai rentang "04-07"). Satu
  *       berkas gambar hanya disimpan sekali sehingga dokumen tetap hemat.

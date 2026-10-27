@@ -6,8 +6,15 @@
  * dengan data contoh (tools/test-keuangan-lampiran.mjs). Pengambilan data tim
  * dan unduhan nota ada di keuangan-docx.js.
  *
- * Susunan dokumen meniru lampiran penggunaan dana PKM:
- *   LAMPIRAN
+ * Halaman 1 — REKAP DANA khusus tim (tidak perlu disalin): tampilan seperti
+ *   kartu "Rekap dana PKM" di aplikasi (Calibri, kotak ikhtisar, kartu per
+ *   sumber, bilah per kategori, daftar cek) plus kotak "SIAP DISALIN" yang
+ *   menunjuk halaman awal lampiran lewat field PAGEREF. Section tersendiri
+ *   (margin kiri-kanan 2 cm, atas-bawah 1,5 cm, tanpa nomor halaman); teks
+ *   panjang dipendekkan agar rekap selalu muat satu halaman.
+ *
+ * Halaman 2 dst. — lampiran siap salin, meniru lampiran penggunaan dana PKM:
+ *   LAMPIRAN                         ← bookmark tujuan PAGEREF di halaman rekap
  *   Lampiran 1. Penggunaan Dana      ← caption ber-field SEQ (bisa masuk Daftar Lampiran)
  *   Tabel ringkas: Judul | Skema · Sumber · Tahun · Pendanaan · Penggunaan · Sisa
  *   Keterangan: … Dana Belmawa untuk Nota 01-37 dan Dana Perguruan Tinggi untuk Nota 38-43.
@@ -23,11 +30,11 @@
  * selalu urut. Entri dengan beberapa nota memakai rentang ("04-07"); entri
  * tanpa nota bertanda "-".
  *
- * Setiap run memakai format langsung (Times New Roman 12, hitam) supaya
- * tampilannya tetap sama ketika ditempel ke dokumen laporan tim.
+ * Setiap run lampiran memakai format langsung (Times New Roman 12, hitam)
+ * supaya tampilannya tetap sama ketika ditempel ke dokumen laporan tim.
  */
 import JSZip from "jszip";
-import { KATEGORI_PKM } from "./pkm.js";
+import { BATAS_DANA_PT, KATEGORI_PKM, rekapDana } from "./pkm.js";
 
 /* --------------------------------------------------------------- format --- */
 /** 925000 → "925.000"; pecahan maksimal 2 digit (jumlah boleh desimal). */
@@ -233,7 +240,7 @@ const run = (isi, rp) => `<w:r>${rp}${isi}</w:r>`;
 function P(teks, o = {}) {
   const {
     gaya = "", keepNext = false, halamanBaru = false, before = 0, after = 0,
-    line = 276, ind = null, jc = "", b = false, runs = "",
+    line = 276, ind = null, jc = "", b = false, runs = "", bookmark = "",
   } = o;
   const rp = rPr({ b, tegak: Boolean(gaya) });
   const pPr = "<w:pPr>" +
@@ -245,7 +252,9 @@ function P(teks, o = {}) {
     (jc ? `<w:jc w:val="${jc}"/>` : "") +
     `${rp}</w:pPr>`;
   const isi = runs || (String(teks ?? "") ? run(isiTeks(teks), rp) : "");
-  return `<w:p>${pPr}${isi}</w:p>`;
+  return bookmark
+    ? `<w:p>${pPr}<w:bookmarkStart w:id="0" w:name="${bookmark}"/>${isi}<w:bookmarkEnd w:id="0"/></w:p>`
+    : `<w:p>${pPr}${isi}</w:p>`;
 }
 
 /** Caption "Lampiran {SEQ}. Penggunaan Dana" — field SEQ seperti sisipan Word. */
@@ -404,6 +413,414 @@ function bagianSumber(o) {
   return isi.join("");
 }
 
+/* ------------------------------------------ halaman 1: rekap dana tim ---- */
+const RF = "Calibri";
+/** Palet kartu "Rekap dana PKM" di aplikasi (globals.css & ui-v3.css). */
+const WR = {
+  ink: "12142E", muted: "676E95", line: "E4E7F7", kartu: "F7F8FE",
+  p1: "4F46E5", p1Muda: "C7D2FE", p1Pucat: "EEF2FF", p1Teks: "E0E7FF",
+  teal: "0D9488", biru: "0284C7",
+  ok: "059669", okBg: "ECFDF5", okGaris: "A7F3D0",
+  bad: "DC2626", badBg: "FEF2F2", badGaris: "FECACA",
+  amber: "F59E0B", amberTeks: "B45309", amberBg: "FEF3C7",
+  putih: "FFFFFF",
+};
+const WARNA_KATEGORI = { bahan: "059669", sewa: "D97706", transport: "0284C7", lain: "DB2777" };
+const LEBAR_REKAP = 9638; // lebar teks A4 dengan margin kiri-kanan 2 cm
+const BOOKMARK_LAMPIRAN = "_RefLampiranDana";
+const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+/** Dipendekkan dengan "…" (sebisanya di batas kata) — menjaga rekap tetap muat satu halaman. */
+const potong = (s, n) => {
+  const t = String(s ?? "").replace(/\s+/g, " ").trim();
+  if (t.length <= n) return t;
+  const iris = t.slice(0, n - 1);
+  const spasi = iris.lastIndexOf(" ");
+  return `${(spasi >= n * 0.7 ? iris.slice(0, spasi) : iris).trimEnd()}…`;
+};
+
+/** 24.68 → "24,7%". */
+const persen = (x) => `${fmtAngka(Math.round((Number(x) || 0) * 10) / 10)}%`;
+
+/** Nominal ringkas seperti aplikasi: 6500000 → "Rp6,5 jt"; selain kelipatan 100 rb → lengkap. */
+const fmtNominal = (n) => {
+  const v = Number(n) || 0;
+  if (Math.abs(v) < 1_000_000 || v % 100_000 !== 0) return fmtRp(v);
+  return `Rp${String(v / 1_000_000).replace(".", ",")} jt`;
+};
+
+/** Rentang tanggal belanja: "3 Jun – 13 Agu 2026" (tahun beda → keduanya bertahun). */
+export function periodeBelanja(entri = []) {
+  const tgl = entri
+    .map((e) => /^(\d{4})-(\d{2})-(\d{2})/.exec(String(e?.tanggal ?? "")))
+    .filter((m) => m && BULAN[Number(m[2]) - 1])
+    .map((m) => ({ iso: m[0], d: Number(m[3]), b: BULAN[Number(m[2]) - 1], y: m[1] }))
+    .sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
+  if (!tgl.length) return "belum ada belanja";
+  const a = tgl[0];
+  const z = tgl[tgl.length - 1];
+  const teks = (x, tahun = true) => `${x.d} ${x.b}${tahun ? ` ${x.y}` : ""}`;
+  return a.iso === z.iso ? teks(a) : `${teks(a, a.y !== z.y)} – ${teks(z)}`;
+}
+
+/** rPr Calibri halaman rekap; `sz` dalam pt, `spasi` = renggang huruf (twips). */
+const rpRekap = ({ sz = 10, b = false, i = false, warna = WR.ink, spasi = 0 } = {}) => {
+  const hp = Math.round(sz * 2);
+  return `<w:rPr><w:rFonts w:ascii="${RF}" w:eastAsia="${RF}" w:hAnsi="${RF}" w:cs="${RF}"/>` +
+    (b ? "<w:b/><w:bCs/>" : "") + (i ? "<w:i/><w:iCs/>" : "") +
+    `<w:color w:val="${warna}"/>` + (spasi ? `<w:spacing w:val="${spasi}"/>` : "") +
+    `<w:sz w:val="${hp}"/><w:szCs w:val="${hp}"/></w:rPr>`;
+};
+
+const rt = (teks, o) => run(isiTeks(teks), rpRekap(o));
+
+/**
+ * Paragraf halaman rekap. Tanda paragrafnya ikut Calibri `sz` agar tinggi
+ * baris tidak membesar mengikuti Times New Roman 12 bawaan dokumen.
+ */
+function pr(isi, o = {}) {
+  const {
+    sz = 10, before = 0, after = 0, line = 240, jc = "", keepNext = false,
+    tabKanan = 0, garisAtas = "", sectPr = "",
+  } = o;
+  return `<w:p><w:pPr>` +
+    (keepNext ? "<w:keepNext/>" : "") +
+    (garisAtas ? `<w:pBdr><w:top ${garisAtas}/></w:pBdr>` : "") +
+    (tabKanan ? `<w:tabs><w:tab w:val="right" w:pos="${tabKanan}"/></w:tabs>` : "") +
+    `<w:spacing w:before="${before}" w:after="${after}" w:line="${line}" w:lineRule="auto"/>` +
+    (jc ? `<w:jc w:val="${jc}"/>` : "") +
+    `${rpRekap({ sz })}${sectPr}</w:pPr>${isi}</w:p>`;
+}
+
+/** Paragraf kosong setinggi `pt` — pemisah blok (dua tabel tak boleh berdempetan). */
+const jarak = (pt) =>
+  `<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="${Math.round(pt * 20)}" w:lineRule="exact"/>` +
+  `<w:rPr><w:sz w:val="2"/><w:szCs w:val="2"/></w:rPr></w:pPr></w:p>`;
+
+/** Atribut garis; `sz` dalam 1/8 pt. */
+const gr = (sz, warna, val = "single", space = 0) =>
+  `w:val="${val}" w:sz="${sz}" w:space="${space}" w:color="${warna}"`;
+const TANPA_GARIS = `w:val="nil"`;
+const marXml = ([t, r, b, l]) =>
+  `<w:top w:w="${t}" w:type="dxa"/><w:left w:w="${l}" w:type="dxa"/>` +
+  `<w:bottom w:w="${b}" w:type="dxa"/><w:right w:w="${r}" w:type="dxa"/>`;
+const keliling = (g) => ({ top: g, left: g, bottom: g, right: g });
+
+/** Sel tabel rekap; `garis` = {top,left,bottom,right}, `mar` = [atas, kanan, bawah, kiri]. */
+function tcR(isi, { w, fill = "", garis = null, mar = null, v = "top" } = {}) {
+  const sisi = garis ? ["top", "left", "bottom", "right"].filter((s) => garis[s]) : [];
+  return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>` +
+    (sisi.length ? `<w:tcBorders>${sisi.map((s) => `<w:${s} ${garis[s]}/>`).join("")}</w:tcBorders>` : "") +
+    (fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : "") +
+    (mar ? `<w:tcMar>${marXml(mar)}</w:tcMar>` : "") +
+    `<w:vAlign w:val="${v}"/></w:tcPr>${isi}</w:tc>`;
+}
+
+const trR = (sel, tinggi = 0, aturan = "atLeast") =>
+  `<w:tr><w:trPr><w:cantSplit/>` +
+  (tinggi ? `<w:trHeight w:val="${tinggi}" w:hRule="${aturan}"/>` : "") +
+  `</w:trPr>${sel.join("")}</w:tr>`;
+
+/** Tabel tata letak rekap: kolom tetap, tanpa garis bawaan (garis per sel). */
+function tblR(grid, baris, { mar = [0, 0, 0, 0], garisDalamH = "" } = {}) {
+  const g = ["top", "left", "bottom", "right", "insideH", "insideV"]
+    .map((s) => `<w:${s} ${s === "insideH" && garisDalamH ? garisDalamH : TANPA_GARIS}/>`).join("");
+  return `<w:tbl><w:tblPr><w:tblW w:w="${lebarTotal(grid)}" w:type="dxa"/>` +
+    `<w:tblBorders>${g}</w:tblBorders><w:tblLayout w:type="fixed"/>` +
+    `<w:tblCellMar>${marXml(mar)}</w:tblCellMar></w:tblPr>` +
+    `<w:tblGrid>${grid.map((x) => `<w:gridCol w:w="${x}"/>`).join("")}</w:tblGrid>` +
+    `${baris.join("")}</w:tbl>`;
+}
+
+/** Lebar [berwarna, jalur] bilah (twips); 0 < pct < 100 → keduanya selalu tampak. */
+export function lebarBilah(pct, lebar) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  if (p <= 0) return [0, lebar];
+  if (p >= 100) return [lebar, 0];
+  const isi = Math.min(lebar - 90, Math.max(90, Math.round((lebar * p) / 100)));
+  return [isi, lebar - isi];
+}
+
+/** Bilah kemajuan seperti .rekap-bar aplikasi: tabel bersarang 1 baris setinggi 6 pt. */
+function bilah(pct, warna, lebar) {
+  const bagian = lebarBilah(pct, lebar).map((w, i) => [w, i ? WR.line : warna]).filter(([w]) => w > 0);
+  return tblR(bagian.map(([w]) => w),
+    [trR(bagian.map(([w, fill]) => tcR(jarak(1), { w, fill })), 120, "exact")]);
+}
+
+/** Judul kecil antarbagian ("IKHTISAR DANA"); `kanan` dicetak rata kanan. */
+const labelBagian = (teks, kanan = "") => pr(
+  rt(teks, { sz: 8.5, b: true, warna: WR.p1, spasi: 16 }) +
+  (kanan ? run("<w:tab/>", rpRekap({ sz: 8.5 })) + rt(kanan, { sz: 8.5, warna: WR.muted }) : ""),
+  { sz: 8.5, before: 150, after: 60, keepNext: true, tabKanan: kanan ? LEBAR_REKAP : 0 });
+
+const capKecil = (teks) => rt(teks, { sz: 7.5, b: true, warna: WR.muted, spasi: 16 });
+
+/** Pita judul berwarna (satu sel): nama tim, judul rekap + skema, subjudul + tahun. */
+function bannerRekap({ namaTim, skema, tahun }) {
+  const lebarIsi = LEBAR_REKAP - 600;
+  const tab = (sz) => run("<w:tab/>", rpRekap({ sz }));
+  const atas = `LOGBOOK PKM${namaTim ? ` · TIM ${potong(namaTim, 40).toUpperCase()}` : ""}`;
+  const isi =
+    pr(rt(atas, { sz: 8.5, b: true, warna: WR.p1Muda, spasi: 20 }), { sz: 8.5, after: 30 }) +
+    pr(rt("Rekap Dana PKM", { sz: 24, b: true, warna: WR.putih }) + tab(24) +
+      rt(potong(skema, 20), { sz: 16, b: true, warna: WR.putih }), { sz: 24, after: 10, tabKanan: lebarIsi }) +
+    pr(rt("Pemakaian dana per sumber & kategori — pedoman PKM 2026", { sz: 10, warna: WR.p1Teks }) + tab(10) +
+      rt(`Tahun ${tahun}`, { sz: 10, b: true, warna: WR.p1Muda }), { sz: 10, tabKanan: lebarIsi });
+  return tblR([LEBAR_REKAP], [trR([tcR(isi, { w: LEBAR_REKAP, fill: WR.p1, mar: [200, 300, 210, 300] })])]);
+}
+
+/** Judul PKM + periode belanja. */
+function infoRekap({ judul, periode, nEntri, nNota }) {
+  const K = [6538, 3100];
+  const cap = (t) => pr(capKecil(t), { sz: 7.5, after: 30 });
+  const kiri = cap("JUDUL PKM") + (judul
+    ? pr(rt(potong(judul, 170), { sz: 9.5, b: true }), { sz: 9.5, line: 250 })
+    : pr(rt("Belum diisi — lengkapi Profil PKM di aplikasi.", { sz: 9.5, i: true, warna: WR.muted }), { sz: 9.5 }));
+  const kanan = cap("PERIODE BELANJA") +
+    pr(rt(periode, { sz: 10, b: true }), { sz: 10, after: 20 }) +
+    pr(rt(`${nEntri} entri · ${nNota} nota terlampir`, { sz: 8.5, warna: WR.muted }), { sz: 8.5 });
+  const g = gr(6, WR.line);
+  return tblR(K, [trR([
+    tcR(kiri, { w: K[0], mar: [130, 240, 130, 0], garis: { bottom: g } }),
+    tcR(kanan, { w: K[1], mar: [130, 0, 130, 240], garis: { left: g, bottom: g } }),
+  ])]);
+}
+
+/** Kotak "SIAP DISALIN": halaman awal lampiran = field PAGEREF (hasil tersimpan "2"). */
+function kotakSiapSalin() {
+  const rpNo = rpRekap({ sz: 13, b: true, warna: WR.p1 });
+  const halaman = run(`<w:fldChar w:fldCharType="begin"/>`, rpNo) +
+    run(`<w:instrText xml:space="preserve"> PAGEREF ${BOOKMARK_LAMPIRAN} \\h </w:instrText>`, rpNo) +
+    run(`<w:fldChar w:fldCharType="separate"/>`, rpNo) +
+    run(`<w:t>2</w:t>`, rpNo) +
+    run(`<w:fldChar w:fldCharType="end"/>`, rpNo);
+  const isi =
+    pr(rt("SIAP DISALIN KE LAPORAN", { sz: 8.5, b: true, warna: WR.p1, spasi: 20 }), { sz: 8.5, after: 40 }) +
+    pr(rt("Halaman ", { sz: 13, b: true }) + halaman + rt(" sampai akhir dokumen", { sz: 13, b: true }) +
+      rt("  ·  Lampiran 1. Penggunaan Dana", { sz: 10, b: true, warna: WR.muted }), { sz: 13, after: 50 }) +
+    pr(rt("Mulai judul “LAMPIRAN” sudah berformat lampiran laporan PKM (Times New Roman 12, tabel per " +
+      "sumber & kategori, nota ber-kode). Salin utuh ke laporan; halaman rekap ini tidak perlu disalin.", { sz: 9.5 }),
+    { sz: 9.5, line: 252 });
+  return tblR([LEBAR_REKAP], [trR([tcR(isi, {
+    w: LEBAR_REKAP, fill: WR.p1Pucat, mar: [140, 240, 150, 260], garis: { left: gr(36, WR.p1) },
+  })])]);
+}
+
+/** Ikhtisar: total diterima − total terpakai = sisa (angka sama dengan SUB TOTAL lampiran). */
+function ikhtisarRekap({ dana, pakai, rincianDana }) {
+  const K = [3046, 250, 3046, 250, 3046];
+  const sisa = dana - pakai;
+  const pct = dana > 0 ? Math.round((pakai / dana) * 100) : null;
+  const kotak = (w, cap, nilai, warna, ket, fill = WR.kartu, garis = WR.line) => tcR(
+    pr(capKecil(cap), { sz: 7.5, after: 40 }) +
+    pr(rt(nilai, { sz: 16, b: true, warna }), { sz: 16, after: 20 }) +
+    pr(rt(ket, { sz: 8, warna: WR.muted }), { sz: 8 }),
+    { w, fill, mar: [120, 160, 120, 160], garis: keliling(gr(6, garis)) });
+  const op = (t) => tcR(pr(rt(t, { sz: 15, b: true, warna: WR.muted }), { sz: 15, jc: "center" }),
+    { w: K[1], v: "center" });
+  return tblR(K, [trR([
+    kotak(K[0], "TOTAL DANA DITERIMA", fmtRp(dana), WR.ink, rincianDana),
+    op("−"),
+    kotak(K[2], "TOTAL TERPAKAI", fmtRp(pakai), WR.biru,
+      pct === null ? "nominal dana belum diisi" : `${pct}% dari dana diterima`),
+    op("="),
+    sisa < 0
+      ? kotak(K[4], "SISA BELUM TERPAKAI", fmtRp(sisa), WR.bad, "melebihi dana yang diterima", WR.badBg, WR.badGaris)
+      : kotak(K[4], "SISA BELUM TERPAKAI", fmtRp(sisa), WR.ok, "siap dibelanjakan", WR.okBg, WR.okGaris),
+  ])]);
+}
+
+/** Satu kartu sumber dana (isi sel) seperti .rekap-box aplikasi. */
+function kartuSumber({ w, cap, kanan, nilai, warna, ket, pct, kaki, peringatan = "" }) {
+  const dalam = w - 400;
+  return tcR(
+    pr(capKecil(cap) +
+      (kanan ? run("<w:tab/>", rpRekap({ sz: 7.5 })) + rt(kanan, { sz: 8, b: true, warna }) : ""),
+    { sz: 7.5, after: 40, tabKanan: kanan ? dalam : 0 }) +
+    pr(rt(nilai, { sz: 17, b: true, warna }), { sz: 17, after: 20 }) +
+    pr(ket, { sz: 8.5, after: 90 }) +
+    bilah(pct, warna, dalam) +
+    pr(rt(kaki, { sz: 8, warna: WR.muted }), { sz: 8, before: 80 }) +
+    (peringatan ? pr(rt(peringatan, { sz: 8, b: true, warna: WR.bad }), { sz: 8, before: 30 }) : ""),
+    {
+      w, fill: WR.kartu, mar: [140, 200, 150, 200],
+      garis: { top: gr(24, warna), left: gr(6, WR.line), bottom: gr(6, WR.line), right: gr(6, WR.line) },
+    });
+}
+
+/** Kartu Dana Belmawa & Dana Perguruan Tinggi berdampingan. */
+function sumberRekap(r, { nBelmawa, nPt, notaBelmawa, notaPt }) {
+  const K = [4719, 200, 4719];
+  const ketO = { sz: 8.5, warna: WR.muted };
+  const ket = (danaX, sisa, kosong) => (danaX > 0
+    ? rt(`dari ${fmtNominal(danaX)} · sisa `, ketO) +
+      rt(fmtRp(sisa), { ...ketO, b: true, warna: sisa < 0 ? WR.bad : WR.ink })
+    : rt(kosong, ketO));
+  const kaki = (n, nota) => (n
+    ? `${n} entri · ${nota.length ? `Nota ${rentang(nota.map((x) => x.kode))}` : "tanpa nota"}`
+    : "belum ada belanja");
+  const pctBel = r.danaBelmawa > 0 ? (r.totalBelmawa / r.danaBelmawa) * 100 : 0;
+  const pctPt = (r.totalPt / (r.danaPt > 0 ? r.danaPt : BATAS_DANA_PT)) * 100;
+  const warnaPt = r.ptLewatBatas ? WR.bad : WR.teal;
+  return tblR(K, [trR([
+    kartuSumber({
+      w: K[0], cap: "DANA BELMAWA", kanan: r.danaBelmawa > 0 ? `${persen(pctBel)} terpakai` : "",
+      nilai: fmtRp(r.totalBelmawa), warna: WR.p1, pct: pctBel,
+      ket: ket(r.danaBelmawa, r.sisaBelmawa, "nominal dana belum diisi"),
+      kaki: kaki(nBelmawa, notaBelmawa),
+    }),
+    tcR(jarak(1), { w: K[1] }),
+    kartuSumber({
+      w: K[2], cap: "DANA PERGURUAN TINGGI", kanan: r.danaPt > 0 ? `${persen(pctPt)} terpakai` : "",
+      nilai: fmtRp(r.totalPt), warna: warnaPt, pct: pctPt,
+      ket: ket(r.danaPt, r.sisaPt, `batas umum ${fmtNominal(BATAS_DANA_PT)}`),
+      kaki: kaki(nPt, notaPt),
+      peringatan: r.ptLewatBatas ? `Melebihi batas dana PT ${fmtRp(BATAS_DANA_PT)}` : "",
+    }),
+  ])]);
+}
+
+/** Baris per kategori Belmawa: label + batas, bilah terhadap batas, nominal + % dana. */
+function kategoriRekap(r) {
+  const K = [3338, 3800, 2500];
+  const ada = r.danaBelmawa > 0;
+  return tblR(K, r.kategori.map((k, i) => {
+    const garis = i < r.kategori.length - 1 ? { bottom: gr(6, WR.line, "dashed") } : null;
+    const pctBatas = k.batas > 0 ? (k.terpakai / k.batas) * 100 : 0;
+    const warna = k.lewat ? WR.bad : pctBatas >= 85 ? WR.amber : WR.p1;
+    const label =
+      pr(rt("● ", { sz: 10, warna: WARNA_KATEGORI[k.id] || WR.muted }) + rt(k.label, { sz: 10, b: true }),
+        { sz: 10, after: 10 }) +
+      pr(rt(ada ? `maks ${k.maks}% · batas ${fmtRp(k.batas)}` : `maks ${k.maks}% dana Belmawa`,
+        { sz: 8, warna: WR.muted }), { sz: 8 });
+    const keterangan = !ada ? "isi nominal dana Belmawa untuk menghitung"
+      : k.lewat ? `melewati batas — ${persen(pctBatas)} dari batas` : `${persen(pctBatas)} dari batas`;
+    const tengah = bilah(pctBatas, warna, K[1] - 240) +
+      pr(rt(keterangan, { sz: 7.5, b: k.lewat, warna: k.lewat ? WR.bad : WR.muted }), { sz: 7.5, before: 50 });
+    const nilai =
+      pr(rt(fmtRp(k.terpakai), { sz: 10.5, b: true, warna: k.lewat ? WR.bad : WR.ink }),
+        { sz: 10.5, jc: "right", after: 10 }) +
+      pr(rt(ada ? `${persen(k.pct)} dana Belmawa` : "–", { sz: 8, warna: WR.muted }), { sz: 8, jc: "right" });
+    return trR([
+      tcR(label, { w: K[0], mar: [70, 120, 70, 0], garis, v: "center" }),
+      tcR(tengah, { w: K[1], mar: [70, 120, 70, 120], garis, v: "center" }),
+      tcR(nilai, { w: K[2], mar: [70, 0, 70, 120], garis, v: "center" }),
+    ]);
+  }));
+}
+
+/**
+ * Daftar cek sebelum lampiran disalin — selalu 6 butir (tinggi rekap tetap).
+ * @returns {{ok: boolean, teks: string}[]}
+ */
+export function butirCek({ r, profil = {}, danaLama = 0, nBelmawa = 0, nPt = 0, nEntri = 0, nTanpaNota = 0, nNota = 0 }) {
+  const butir = [];
+  const kurang = [["judul", profil?.judul], ["skema", profil?.skema], ["tahun", profil?.tahun]]
+    .filter(([, v]) => !String(v ?? "").trim()).map(([k]) => k);
+  butir.push(kurang.length
+    ? { ok: false, teks: `Profil PKM belum lengkap (${gabungKalimat(kurang)} kosong) — lengkapi di menu Profil.` }
+    : { ok: true, teks: "Profil PKM lengkap — judul, skema, dan tahun tercetak di tabel ringkas." });
+
+  if (r.danaBelmawa <= 0 && r.danaPt <= 0) {
+    butir.push({
+      ok: false,
+      teks: danaLama > 0
+        ? `Dana awal ${fmtRp(danaLama)} belum dirinci per sumber — isi dana Belmawa & PT di Dashboard.`
+        : "Nominal dana Belmawa & Perguruan Tinggi belum diisi — isi di Dashboard agar kolom Sisa benar.",
+    });
+  } else if (r.danaBelmawa <= 0) {
+    butir.push({ ok: false, teks: "Nominal dana Belmawa belum diisi — isi di Dashboard agar persentase kategori terhitung." });
+  } else if (r.danaPt <= 0 && nPt > 0) {
+    butir.push({ ok: false, teks: "Ada belanja Perguruan Tinggi, tetapi nominal dana PT belum diisi — isi di Dashboard." });
+  } else {
+    butir.push({ ok: true, teks: `Nominal dana terisi — Belmawa ${fmtRp(r.danaBelmawa)}, Perguruan Tinggi ${fmtRp(r.danaPt)}.` });
+  }
+
+  butir.push(r.nTanpaSumber
+    ? { ok: false, teks: `${r.nTanpaSumber} entri (${fmtRp(r.totalTanpaSumber)}) belum ditandai sumber dananya — tercetak terpisah di Lampiran 1.3.` }
+    : { ok: true, teks: "Semua entri sudah ditandai sumber dananya (Belmawa atau Perguruan Tinggi)." });
+
+  butir.push(r.nBelmawaTanpaKategori
+    ? { ok: false, teks: `${r.nBelmawaTanpaKategori} entri Belmawa (${fmtRp(r.totalBelmawaTanpaKategori)}) belum berkategori — tercetak di tabel “Belum Berkategori”.` }
+    : { ok: true, teks: nBelmawa ? "Semua belanja dana Belmawa sudah berkategori." : "Belum ada belanja dana Belmawa yang perlu dikategorikan." });
+
+  if (!nEntri) {
+    butir.push({ ok: false, teks: "Belum ada belanja yang dicatat di menu Keuangan." });
+  } else if (nTanpaNota) {
+    butir.push({ ok: false, teks: `${nTanpaNota} entri belum punya nota terlampir (Kode Nota “-”) — unggah fotonya di menu Keuangan bila ada.` });
+  } else {
+    butir.push({ ok: true, teks: `Setiap entri punya nota — ${nNota} nota tercetak di tabel Dokumentasi Nota.` });
+  }
+
+  const lewat = r.danaBelmawa > 0 ? r.kategori.filter((k) => k.lewat).map((k) => `${k.label} (maks ${k.maks}%)`) : [];
+  if (r.ptLewatBatas) lewat.push(`dana PT (maks ${fmtRp(BATAS_DANA_PT)})`);
+  if (lewat.length) butir.push({ ok: false, teks: `Melewati batas pedoman PKM 2026: ${gabungKalimat(lewat)}.` });
+  else if (r.danaBelmawa > 0) butir.push({ ok: true, teks: "Semua kategori Belmawa & dana PT masih dalam batas pedoman PKM 2026." });
+  else butir.push({ ok: false, teks: "Batas kategori belum bisa dicek — nominal dana Belmawa masih kosong." });
+  return butir;
+}
+
+/** Tabel daftar cek: chip OK/CEK + teks; garis putih memberi celah antarchip. */
+function daftarCek(butir) {
+  const K = [700, 8938];
+  return tblR(K, butir.map((x) => trR([
+    tcR(pr(rt(x.ok ? "OK" : "CEK", { sz: 7.5, b: true, warna: x.ok ? WR.ok : WR.amberTeks, spasi: 10 }),
+      { sz: 7.5, jc: "center" }), { w: K[0], fill: x.ok ? WR.okBg : WR.amberBg, mar: [40, 0, 40, 0], v: "center" }),
+    tcR(pr(rt(x.teks, { sz: 9.5 }), { sz: 9.5 }), { w: K[1], mar: [40, 0, 40, 180], v: "center" }),
+  ])), { garisDalamH: gr(24, WR.putih) });
+}
+
+/** Section halaman rekap: A4, margin kiri-kanan 2 cm & atas-bawah 1,5 cm, tanpa kepala halaman, nomor mulai 1. */
+const SECT_PR_REKAP =
+  `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>` +
+  `<w:pgMar w:top="850" w:right="1134" w:bottom="850" w:left="1134" ` +
+  `w:header="567" w:footer="567" w:gutter="0"/>` +
+  `<w:pgNumType w:start="1"/><w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr>`;
+
+/**
+ * Halaman 1: rekap dana untuk tim, diakhiri pemisah section (lampiran mulai
+ * di halaman baru). Angkanya dihitung dari entri yang sama dengan lampiran.
+ */
+function halamanRekap(o) {
+  const { urut, nota, kodeNota, dana, profil, namaTim, skema, tahun, nBelmawa, nPt } = o;
+  const r = rekapDana(urut, { belmawa: dana.belmawa, pt: dana.pt });
+  const nNota = nota.belmawa.length + nota.pt.length + nota.tanpaSumber.length;
+  const totalDana = dana.belmawa + dana.pt + dana.lama;
+  const butir = butirCek({
+    r, profil, danaLama: dana.lama, nBelmawa, nPt, nEntri: urut.length, nNota,
+    nTanpaNota: urut.filter((e) => kodeNota.get(e) === "-").length,
+  });
+  return [
+    bannerRekap({ namaTim, skema, tahun }),
+    jarak(4),
+    infoRekap({
+      judul: String(profil?.judul ?? "").trim(), periode: periodeBelanja(urut), nEntri: urut.length, nNota,
+    }),
+    jarak(12),
+    kotakSiapSalin(),
+    labelBagian("IKHTISAR DANA"),
+    ikhtisarRekap({
+      dana: totalDana,
+      pakai: totalBelanja(urut),
+      rincianDana: dana.lama > 0
+        ? "dana awal — belum dirinci per sumber"
+        : `Belmawa ${fmtNominal(dana.belmawa)} · PT ${fmtNominal(dana.pt)}`,
+    }),
+    labelBagian("PER SUMBER DANA"),
+    sumberRekap(r, { nBelmawa, nPt, notaBelmawa: nota.belmawa, notaPt: nota.pt }),
+    labelBagian("KATEGORI BELANJA DANA BELMAWA",
+      r.danaBelmawa > 0 ? `persen dari dana Belmawa ${fmtNominal(r.danaBelmawa)}` : "batas pedoman PKM 2026"),
+    kategoriRekap(r),
+    labelBagian("CEK SEBELUM DISALIN"),
+    daftarCek(butir),
+    pr(rt("Angka di halaman ini memakai data yang sama dengan Lampiran 1 — total terpakai = SUB TOTAL " +
+      "tabel ringkas, termasuk entri yang belum ditandai sumbernya. Ubah penandaan sumber/kategori atau " +
+      "unggah nota di menu Keuangan aplikasi, lalu ekspor ulang.", { sz: 8, i: true, warna: WR.muted }),
+    { sz: 8, before: 120, line: 252, garisAtas: gr(6, WR.line, "single", 6), sectPr: SECT_PR_REKAP }),
+  ].join("");
+}
+
 /**
  * Susun berkas .docx lampiran penggunaan dana.
  * @param {object} o
@@ -466,13 +883,20 @@ export async function susunDocxKeuangan({
   const tahunData = Number(String(urut[0]?.tanggal ?? "").slice(0, 4));
   const tahun = Number(profil?.tahun) ||
     (tahunData >= 2000 && tahunData <= 2100 ? tahunData : new Date().getFullYear());
+  const skema = String(profil?.skema ?? "").trim() || "PKM";
 
   const isi = [
-    P("LAMPIRAN", { gaya: "Heading1", keepNext: true, jc: "center", b: true }),
+    halamanRekap({
+      urut, kodeNota, profil, namaTim, skema, tahun,
+      nota: { belmawa: notaBelmawa, pt: notaPt, tanpaSumber: notaTanpa },
+      dana: { belmawa: danaBelmawa, pt: danaPt, lama: danaLama },
+      nBelmawa: belmawa.length, nPt: pt.length,
+    }),
+    P("LAMPIRAN", { gaya: "Heading1", keepNext: true, jc: "center", b: true, bookmark: BOOKMARK_LAMPIRAN }),
     captionLampiran(". Penggunaan Dana"),
     tabelRingkas({
       judul: String(profil?.judul ?? "").trim(),
-      skema: String(profil?.skema ?? "").trim() || "PKM",
+      skema,
       tahun,
       baris,
     }),
@@ -514,12 +938,14 @@ export async function susunDocxKeuangan({
 }
 
 /* ------------------------------------------------ perakitan paket docx ---- */
+// Section lampiran: mulai di halaman baru dan nomor halamannya melanjutkan
+// halaman rekap, jadi judul "LAMPIRAN" selalu berada di halaman 2.
 const SECT_PR =
   `<w:sectPr><w:headerReference w:type="default" r:id="rId3"/>` +
-  `<w:pgSz w:w="11906" w:h="16838"/>` +
+  `<w:type w:val="nextPage"/><w:pgSz w:w="11906" w:h="16838"/>` +
   `<w:pgMar w:top="1701" w:right="1701" w:bottom="1701" w:left="2268" ` +
   `w:header="720" w:footer="720" w:gutter="0"/>` +
-  `<w:pgNumType w:start="1"/><w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr>`;
+  `<w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr>`;
 
 const STYLES_XML =
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +

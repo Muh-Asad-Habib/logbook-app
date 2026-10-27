@@ -27,7 +27,7 @@ const KARTU = [
   },
   {
     Ic: Wallet, judul: "Khusus Keuangan", ext: "DOCX", warna: "v3",
-    ket: "Format Lampiran Penggunaan Dana PKM: ringkasan dana, tabel per kategori & dokumentasi nota.",
+    ket: "Hal. 1 rekap dana tim; hal. 2 dst. Lampiran Penggunaan Dana PKM siap salin ke laporan.",
     jenis: "keuangan-docx",
   },
 ];
@@ -236,9 +236,11 @@ export default function EksporPage() {
           </li>
           <li>Foto disematkan utuh beresolusi tinggi, tanpa batas ukuran unduhan.</li>
           <li>
-            <b>Khusus Keuangan</b> mengikuti format <i>Lampiran 1. Penggunaan Dana</i> proposal PKM.
-            Judul, skema, dan tahun diambil dari <i>Profil &amp; rujukan PKM</i> (menu Profil); tiap
-            belanja diberi kode nota (01, 02, …) yang sama dengan tabel <i>Dokumentasi Nota</i>.
+            <b>Khusus Keuangan</b>: halaman 1 berisi rekap dana untuk tim (ikhtisar, per sumber, kategori
+            &amp; daftar cek) — tidak perlu disalin. Mulai halaman 2 mengikuti format{" "}
+            <i>Lampiran 1. Penggunaan Dana</i> proposal PKM dan siap disalin ke laporan. Judul, skema, dan
+            tahun diambil dari <i>Profil &amp; rujukan PKM</i> (menu Profil); tiap belanja diberi kode nota
+            (01, 02, …) yang sama dengan tabel <i>Dokumentasi Nota</i>.
           </li>
         </ul>
       </div>
