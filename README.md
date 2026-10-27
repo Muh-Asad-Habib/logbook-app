@@ -46,7 +46,7 @@ bisa dicetak menjadi dokumen laporan.
 | 📄 **Laporan kemajuan** | Unggah dokumen Word (`.docx`) dan tampilkan langsung di aplikasi seperti dibuka di Word. |
 | 📊 **Presentasi** | Unggah PowerPoint (`.pptx`) dan/atau tempel tautan Canva — keduanya boleh dipakai bersamaan. Pratinjau `.pptx` memakai penampil PowerPoint Online (maks. 10 MB); berkas lebih besar cukup diunduh. |
 | 🖼️ **Galeri** | Semua foto kegiatan dalam satu halaman, bisa dibuka besar (geser kiri/kanan di ponsel). |
-| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. Tersedia pula **Word khusus keuangan** (dana Belmawa per kategori & dana PT terpisah). |
+| 📤 **Ekspor** | Unduh rekap sebagai **Word**, **PDF**, atau **Excel** — siap dikumpulkan. Tersedia pula **Word khusus keuangan** berformat *Lampiran Penggunaan Dana* proposal PKM (dana Belmawa per kategori, dana PT, dan dokumentasi nota). |
 | 📥 **Impor** | Punya logbook lama berbentuk Word? Unggah, isinya (termasuk foto) dipindahkan otomatis. |
 | 🤖 **Asisten AI** | Tanya langsung soal logbookmu — *"uang paling banyak ke mana?"*, *"berapa persen bahan habis pakai?"*, *"ringkas kegiatan bulan ini"* — dijawab dari data tim yang tersimpan. Juga bisa **merapikan deskripsi kegiatan** dan **mengusulkan sumber dana & kategori PKM** saat mengisi form. Ditenagai model Ollama di server kampus (`ollama.if.unismuh.ac.id`). |
 | 💬 **Komentar 2 arah** | Pembimbing memberi catatan pada entri tertentu, tim membalas, ada penanda "belum dibaca". |
@@ -206,7 +206,7 @@ Buka menu **Ekspor**:
 | **Word (.docx)** | Dokumen logbook terisi otomatis — entri beserta fotonya tersusun dalam tabel kegiatan & keuangan. Bagian **keuangan dimulai di halaman baru** agar dokumen enak dibaca dan dicetak. |
 | **PDF** | Rekap siap cetak: ringkasan dana, seluruh kegiatan berikut foto, tabel keuangan bertotal, dan nomor halaman. |
 | **Excel (.xlsx)** | Tiga lembar: Kegiatan, Keuangan, dan Ringkasan. |
-| **Word Khusus Keuangan (.docx)** | Berkas **terpisah** berisi keuangan saja: tabel **dana Belmawa** dipecah per kategori PKM (tiap kategori diawali baris pemisah *Bahan habis pakai*, *Sewa & jasa*, … dan ditutup subtotal), lalu tabel **dana Perguruan Tinggi** sendiri, rekap pemakaian dana, dan **lampiran nota**. Bukti tiap belanja tampil kecil di kolom *Nota* serta berukuran besar di lampiran dengan nomor sama (**L-1**, **L-2**, …). Isinya teks, tabel, dan gambar biasa sehingga **bebas disalin dan diedit** di Word. |
+| **Word Khusus Keuangan (.docx)** | Berkas **terpisah** berisi keuangan saja, berformat **Lampiran 1. Penggunaan Dana** proposal PKM: tabel ringkas (Judul, Skema, Sumber, Tahun, Pendanaan, Penggunaan, Sisa — judul/skema/tahun dari *Profil & rujukan PKM*) beserta kalimat *Keterangan* rentang nota, lalu **Lampiran 1.1** dana Belmawa per kategori (*Bahan Habis Pakai*, *Sewa dan Jasa*, *Transportasi Lokal*, *Lain-lain*; masing-masing ditutup SUB TOTAL), **Lampiran 1.2** dana Perguruan Tinggi, dan **Lampiran 1.3** bila ada belanja yang belum ditandai sumber dananya. Tiap belanja diberi **kode nota** (01, 02, …; rentang seperti `04-07` bila notanya beberapa) yang sama dengan tabel **Dokumentasi Nota** di akhir tiap bagian. Isinya teks, tabel, dan gambar biasa sehingga **bebas disalin dan diedit** di Word. |
 
 Nama berkas hasil unduhan dibuat khas untuk tiap tim beserta tanggal unduhnya,
 sehingga tidak tertukar saat dikumpulkan bersama tim lain:
@@ -548,7 +548,7 @@ curl -X POST https://ALAMAT-APLIKASI/api/kegiatan \
 | GET | `/api/files/{key}` | Ambil gambar |
 | GET | `/api/export/info` | Jumlah entri baru yang akan masuk ke dokumen |
 | GET | `/api/export/docx` \| `/pdf` \| `/xlsx` | Unduh hasil ekspor |
-| GET | `/api/export/keuangan-docx` | Unduh Word **khusus keuangan** (Belmawa per kategori + tabel PT terpisah) |
+| GET | `/api/export/keuangan-docx` | Unduh Word **khusus keuangan** berformat *Lampiran 1. Penggunaan Dana* PKM (ringkasan, Belmawa per kategori, PT, dokumentasi nota) |
 | POST | `/api/export/tautan/{jenis}` | Siapkan berkas ekspor lalu kembalikan tautan CDN (`docx`, `pdf`, `xlsx`, `keuangan-docx`); data tak berubah → tautan lama (`cache: true`), `?segar=1` memaksa bangun ulang |
 | POST | `/api/import/izin-unggah` | Izin unggah `.docx` impor **langsung ke ImageKit** (byte tidak lewat server, maks. 300 MB) |
 | POST | `/api/import/docx/langsung` | Verifikasi bagian yang diunggah, jalankan impor, hapus berkas sementara |
@@ -687,7 +687,8 @@ Server harus dalam keadaan berjalan (bawaan `:4000`) dan `.env` sudah terisi.
 | `node backend/diag-ekspor-foto.mjs` | Pengambil foto sematan (`export/foto.js`): pemilihan resolusi dari jumlah foto, pembaca dimensi JPEG/PNG, pembatas paralel, dan sidik jari cache ekspor (tanpa database) |
 | `node backend/diag-keuangan-sumber.mjs` | Fitur **sumber dana PKM**: rute `PATCH /:id/sumber`, pembersihan nilai tak dikenal, perhitungan batas kategori (60/15/30/15%), batas dana PT, serta kesamaan hasil rekap backend ↔ frontend (tanpa database) |
 | `node tools/test-ekspor-pdf-xlsx.mjs` | Ekspor **PDF & Excel** memakai data nyata: berkas valid, kolom *Sumber dana* pada sheet Keuangan, dan sheet **Rekap Dana** ikut tercetak |
-| `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan**: paket `.docx` valid & XML well-formed, tabel Belmawa terpisah per kategori (baris pemisah + subtotal), tabel PT sendiri, serta **nota tersemat** (thumbnail + lampiran bernomor, relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |
+| `node tools/test-ekspor-keuangan-docx.mjs` | Ekspor **Word khusus keuangan** memakai data nyata (hanya membaca): paket `.docx` valid & XML well-formed, urutan *Lampiran 1 → 1.1 → 1.2*, tabel ringkas cocok dengan rekap dana, subtotal per kategori, kode nota berurutan sesuai kalimat *Keterangan*, serta **nota tersemat** di tabel Dokumentasi (relationship & content-type lengkap, tiap gambar hanya disimpan sekali) |
+| `node --test tools/test-keuangan-lampiran.mjs` | Penyusun format **Lampiran Penggunaan Dana** tanpa database: format angka/tanggal/jumlah/kode unik, kalimat *Keterangan*, isi tiap tabel, penomoran kode nota (termasuk tanggal sama), ukuran gambar nota, kategori kosong, belanja belum ditandai, dan teks istimewa tetap menghasilkan XML sah |
 | `node tools/test-rute-ekspor.mjs` | Seluruh rute ekspor terdaftar, termasuk `GET /keuangan-docx` dan `POST /tautan/:jenis` |
 | `node --env-file=.env tools/cek-kode-unik.mjs` | Memastikan kolom **kode unik** sudah termigrasi di database dan tiap entri belanja konsisten (`harga × jumlah + kode unik = total`) |
 

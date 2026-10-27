@@ -6,6 +6,7 @@ import { buildPdf } from "../export/pdf.js";
 import { buildXlsx } from "../export/xlsx.js";
 import { authRequired, hanyaTim } from "../auth.js";
 import { pakaiCloud, putFileEkspor, signedUrl, removeFiles, adaFile } from "../files.js";
+import { KUNCI_PROFIL_PKM } from "../ai/pengetahuan-pkm.js";
 import * as store from "../storage.js";
 
 const router = Router();
@@ -16,23 +17,26 @@ router.use(hanyaTim); // fasilitator tidak punya data untuk diekspor
  * Versi penyusun dokumen — naikkan bila tata letak/isi ekspor berubah supaya
  * cache hasil ekspor (lihat sidikJariData) tidak menyajikan berkas lama.
  */
-const VERSI_EKSPOR = "2026-09-04a";
+const VERSI_EKSPOR = "2026-10-27a";
 
 /**
  * Sidik jari SELURUH data yang mempengaruhi isi berkas ekspor: tiap entri
  * kegiatan & keuangan (semua kolom yang tercetak + kunci foto), dana, nama tim,
- * dan versi penyusun. Bila sidik jari sama dengan ekspor sebelumnya, berkas di
- * CDN masih mutakhir → tidak perlu mengunduh ratusan foto & membangun ulang.
+ * profil PKM (khusus keuangan), dan versi penyusun. Bila sidik jari sama dengan
+ * ekspor sebelumnya, berkas di CDN masih mutakhir → tidak perlu mengunduh
+ * ratusan foto & membangun ulang.
  */
-async function sidikJariData(req) {
-  const [keg, keu, dana] = await Promise.all([
+async function sidikJariData(req, jenis) {
+  const [keg, keu, dana, profilPkm] = await Promise.all([
     store.listKegiatan(req.userId),
     store.listKeuangan(req.userId),
     store.hitungDana(req.userId),
+    // Judul/skema/tahun PKM hanya tercetak di tabel ringkas ekspor khusus keuangan
+    jenis === "keuangan-docx" ? store.getSetting(req.userId, KUNCI_PROFIL_PKM, "") : "",
   ]);
   const h = crypto.createHash("sha256");
   h.update(VERSI_EKSPOR).update("|").update(String(req.user?.username || ""));
-  h.update(JSON.stringify(dana));
+  h.update(JSON.stringify(dana)).update("|").update(String(profilPkm || ""));
   for (const e of keg) {
     h.update(JSON.stringify([e.id, e.tanggal, e.kegiatan, e.capaian_delta, e.waktu_menit, e.foto_keys]));
   }
@@ -159,7 +163,7 @@ router.post("/tautan/:jenis", async (req, res, next) => {
     }
 
     // ---- Cache: data tidak berubah → pakai berkas yang sudah ada di CDN ----
-    const sidik = await sidikJariData(req);
+    const sidik = await sidikJariData(req, jenis);
     const [kunciLama, sidikLama, ukuranLama] = await Promise.all([
       store.getSetting(req.userId, `ekspor_key_${jenis}`, ""),
       store.getSetting(req.userId, `ekspor_hash_${jenis}`, ""),
@@ -281,14 +285,17 @@ router.get("/xlsx", async (req, res, next) => {
  * /api/export/keuangan-docx:
  *   get:
  *     tags: [Export]
- *     summary: Unduh DOCX KHUSUS KEUANGAN — tabel Belmawa (dipisah per kategori) & tabel Perguruan Tinggi
+ *     summary: Unduh DOCX KHUSUS KEUANGAN berformat lampiran laporan PKM ("Lampiran 1. Penggunaan Dana")
  *     description: >
- *       Dokumen Word berisi teks, tabel, dan gambar biasa (mudah disalin/diedit).
- *       Belanja dana Belmawa dikelompokkan per kategori PKM dengan baris
- *       pemisah + subtotal, lalu tabel dana Perguruan Tinggi terpisah. Nota
- *       tiap belanja disematkan sebagai cuplikan di kolom Nota sekaligus
- *       lampiran besar bernomor (L-1, L-2, …); satu berkas gambar hanya
- *       disimpan sekali sehingga dokumen tetap hemat.
+ *       Dokumen Word (Times New Roman 12, A4, teks/tabel/gambar biasa — mudah
+ *       disalin ke laporan) berisi tabel ringkas Judul · Skema · Sumber · Tahun ·
+ *       Pendanaan · Penggunaan · Sisa (judul/skema/tahun dari Profil PKM tim),
+ *       kalimat keterangan rentang kode nota, lalu Lampiran 1.1 Dana Belmawa
+ *       (satu tabel per kategori PKM + SUB TOTAL), Lampiran 1.2 Dana Perguruan
+ *       Tinggi, dan Lampiran 1.3 bila ada entri yang belum ditandai sumbernya.
+ *       Tiap sumber diakhiri TOTAL DANA serta tabel Dokumentasi Nota ber-kode
+ *       (01, 02, …; entri dengan beberapa nota memakai rentang "04-07"). Satu
+ *       berkas gambar hanya disimpan sekali sehingga dokumen tetap hemat.
  *       Ekspor gabungan (/api/export/docx) tidak terpengaruh.
  *     responses:
  *       200:

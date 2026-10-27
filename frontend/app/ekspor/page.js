@@ -27,7 +27,7 @@ const KARTU = [
   },
   {
     Ic: Wallet, judul: "Khusus Keuangan", ext: "DOCX", warna: "v3",
-    ket: "Tabel Belmawa per kategori + tabel PT, lengkap dengan nota & lampiran.",
+    ket: "Format Lampiran Penggunaan Dana PKM: ringkasan dana, tabel per kategori & dokumentasi nota.",
     jenis: "keuangan-docx",
   },
 ];
@@ -236,8 +236,9 @@ export default function EksporPage() {
           </li>
           <li>Foto disematkan utuh beresolusi tinggi, tanpa batas ukuran unduhan.</li>
           <li>
-            <b>Khusus Keuangan</b> berdiri sendiri: nota tampil di kolom <i>Nota</i> dan
-            berukuran besar di Lampiran dengan nomor sama (L-1, L-2, …).
+            <b>Khusus Keuangan</b> mengikuti format <i>Lampiran 1. Penggunaan Dana</i> proposal PKM.
+            Judul, skema, dan tahun diambil dari <i>Profil &amp; rujukan PKM</i> (menu Profil); tiap
+            belanja diberi kode nota (01, 02, …) yang sama dengan tabel <i>Dokumentasi Nota</i>.
           </li>
         </ul>
       </div>
